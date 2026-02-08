@@ -1,0 +1,71 @@
+from django.db import models
+from django.contrib.auth.models import User
+
+
+class UserProfile(models.Model):
+    """Профиль пользователя с данными подписки и OpenClaw"""
+
+    MODEL_CHOICES = [
+        ('claude-opus-4.5', 'Claude Opus 4.6'),
+        ('gpt-5.2', 'GPT-5.2'),
+        ('gemini-3-flash', 'Gemini 3 Flash'),
+    ]
+
+    SUBSCRIPTION_STATUS_CHOICES = [
+        ('none', 'Нет подписки'),
+        ('pending', 'Ожидание оплаты'),
+        ('active', 'Активна'),
+        ('cancelled', 'Отменена'),
+        ('expired', 'Истекла'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+
+    # Google OAuth
+    google_id = models.CharField(max_length=255, blank=True, db_index=True)
+    avatar_url = models.URLField(blank=True)
+
+    # Telegram
+    telegram_bot_token = models.CharField(max_length=255, blank=True)
+    telegram_bot_username = models.CharField(max_length=255, blank=True)
+    telegram_bot_validated = models.BooleanField(default=False)
+
+    # Выбор модели
+    selected_model = models.CharField(max_length=50, choices=MODEL_CHOICES, default='claude-opus-4.5')
+
+    # Подписка
+    subscription_status = models.CharField(max_length=20, choices=SUBSCRIPTION_STATUS_CHOICES, default='none')
+    subscription_started_at = models.DateTimeField(null=True, blank=True)
+    subscription_expires_at = models.DateTimeField(null=True, blank=True)
+
+    # OpenRouter
+    openrouter_api_key = models.CharField(max_length=255, blank=True)
+    openrouter_key_id = models.CharField(max_length=255, blank=True)
+    tokens_used_usd = models.DecimalField(max_digits=8, decimal_places=4, default=0)
+    token_limit_usd = models.DecimalField(max_digits=8, decimal_places=2, default=15.00)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Профиль пользователя'
+        verbose_name_plural = 'Профили пользователей'
+
+    def __str__(self):
+        return f'{self.user.email} ({self.subscription_status})'
+
+
+class AuditLog(models.Model):
+    """Лог действий для отладки"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    action = models.CharField(max_length=100)
+    details = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Лог'
+        verbose_name_plural = 'Логи'
+
+    def __str__(self):
+        return f'{self.action} — {self.user} — {self.created_at}'

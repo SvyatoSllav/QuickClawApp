@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+@theme {
+    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --color-zinc-200: #e4e4e7;
+    --color-zinc-300: #d4d4d8;
+    --color-zinc-400: #9f9fa9;
+    --color-zinc-500: #71717b;
+    --color-zinc-600: #52525c;
+    --color-zinc-700: #3f3f46;
+    --color-zinc-800: #27272a;
+    --color-zinc-900: #18181b;
+    --color-zinc-950: #09090b;
+    --color-emerald-400: #00d294;
+    --color-emerald-500: #00bb7f;
+    --color-indigo-400: #7d87ff;
+    --color-red-400: #ff6568;
+    --color-amber-200: #fee685;
+    --color-amber-500: #f99c00;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: #07080a;
+    color: #ffffff;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    min-height: 100dvh;
+}
+
+.main-text {
+    font-feature-settings: "ss08" on, "ss02" on, "liga" off;
+    text-align: center;
+    text-shadow: 0 4px 4px rgba(0, 0, 0, 0.15);
+    -webkit-text-fill-color: transparent;
+    background: linear-gradient(90deg, rgba(255,255,255,0.98) -1.59%, #fff 49.71%, rgba(255,255,255,0.81));
+    -webkit-background-clip: text;
+    background-clip: text;
+    font-size: clamp(1.5rem, 5vw + 1rem, 3rem);
+    font-style: normal;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+@media (min-width: 768px) {
+    .main-text {
+        font-size: clamp(2rem, 4vw, 48px);
+    }
+}
+
+.options-card {
+    background: radial-gradient(75% 75% at 50% 91.9%, var(--key-bg-start-color, #1a1a1f) 0, var(--key-bg-end-color, #111114) 100%);
+    box-shadow:
+        0 1.5px .5px 2.5px rgba(0,0,0,0.4),
+        0 0 .5px 1px #000,
+        inset 0 2px 1px 1px rgba(0,0,0,0.25),
+        inset 0 1px 1px 1px rgba(255,255,255,0.2),
+        inset 0 0 transparent;
+}
+
+.options-card:hover {
+    box-shadow:
+        0 1.5px .5px 2.5px rgba(0,0,0,0.4),
+        0 0 .5px 1px #000,
+        inset 0 2px 1px 1px rgba(0,0,0,0.25),
+        inset 0 1px 1px 1px rgba(255,255,255,0.4),
+        inset 0 0 transparent;
+}
+
+.options-card.selected {
+    background: #18181b;
+    box-shadow:
+        0 1.5px .5px 2.5px rgba(0,0,0,0.4),
+        0 0 .5px 1px #000,
+        inset 0 2px 1px 1px rgba(0,0,0,0.25),
+        inset 0 1px 1px 1px rgba(255,255,255,1),
+        inset 0 0 transparent;
+}
+
+.options-card:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.options-card:disabled:hover {
+    box-shadow:
+        0 1.5px .5px 2.5px rgba(0,0,0,0.4),
+        0 0 .5px 1px #000,
+        inset 0 2px 1px 1px rgba(0,0,0,0.25),
+        inset 0 1px 1px 1px rgba(255,255,255,0.2),
+        inset 0 0 transparent;
+}
+
+.card-frame {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.42);
+}
+
+.main-btn-shadow {
+    box-shadow:
+        0 0 0 2px rgba(0,0,0,0.5),
+        0 0 14px rgba(255,255,255,0.19),
+        inset 0 -1px .4px rgba(0,0,0,0.2),
+        inset 0 1px .4px #fff;
+}
+
+.table-left-gradient {
+    background: radial-gradient(100% 50% at 0%, rgba(255,255,255,0.05) 0, transparent 100%);
+}
+
+@media (max-width: 768px) {
+    .table-left-gradient {
+        background: radial-gradient(49.41% 64.58% at 49.4% 0, rgba(255,255,255,0.03) 0, transparent 100%) !important;
+    }
+}
+
+@keyframes marquee {
+    0% { transform: translate(0); }
+    100% { transform: translateX(calc(-100% - var(--gap))); }
+}
+
+.animate-marquee {
+    animation: marquee var(--duration) infinite linear;
+}
+
+.marquee-wrapper:hover .animate-marquee {
+    animation-play-state: paused;
+}
