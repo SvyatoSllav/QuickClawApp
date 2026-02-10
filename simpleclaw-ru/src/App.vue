@@ -376,14 +376,15 @@
                                     <span>{{ step.label }}</span><span class="tabular-nums">{{ step.time }} мин</span>
                                 </li>
                             </ul>
-                            <p class="mt-3 pt-3 border-t-2 border-white/20 flex justify-between text-base sm:text-lg font-medium text-white"><span class="italic">Итого</span><span class="tabular-nums">30 мин</span></p>
+                            <p class="mt-3 pt-3 border-t-2 border-white/20 flex justify-between text-base sm:text-lg font-medium text-white"><span class="italic">Итого</span><span class="tabular-nums">3 часа</span></p>
                         </div>
                         <div class="w-full md:w-[2px] h-[2px] md:h-auto shrink-0 bg-white/10"></div>
                         <div class="flex-1 md:pl-10 min-w-0 flex flex-col justify-center pt-6 md:pt-0 gap-3">
                             <p class="text-base sm:text-lg font-medium text-zinc-400 italic">SimpleClaw</p>
                             <p class="text-2xl sm:text-3xl font-semibold text-white tabular-nums">&lt;1 мин</p>
-                            <span class="flex items-center gap-2"><span class="text-lg sm:text-xl font-semibold text-emerald-400">3999 ₽/мес</span><span class="text-base sm:text-lg text-zinc-500 line-through">7999 ₽</span></span>
+                            <span class="flex items-center gap-2"><span class="text-lg sm:text-xl font-semibold text-emerald-400">2999 ₽/мес</span><span class="text-base sm:text-lg text-zinc-500 line-through">7999 ₽</span></span>
                             <p class="text-sm sm:text-base text-zinc-400">Выберите модель, подключите Telegram, разверните — готово.</p>
+                            <p class="text-sm text-emerald-400/80">$15 API-кредитов включено ежемесячно</p>
                         </div>
                     </div>
                 </section>
@@ -411,6 +412,13 @@
 
             <!-- Footer -->
             <div class="w-full px-4 sm:px-6 pt-12 pb-8 flex flex-col gap-6 max-w-5xl mx-auto items-center text-center">
+                <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm">
+                    <a href="/articles/how-to-install-openclaw.html" class="text-zinc-400 hover:text-white transition-colors">Как установить OpenClaw</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/what-is-openclaw.html" class="text-zinc-400 hover:text-white transition-colors">Что такое OpenClaw</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/top-5-ways-to-use-openclaw.html" class="text-zinc-400 hover:text-white transition-colors">Топ 5 способов</a>
+                </div>
                 <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm sm:text-base">
                     <span class="text-white font-medium">Тарасов Святослав</span>
                     <div class="size-1 rounded-full bg-current opacity-60"></div>
@@ -524,13 +532,13 @@ export default {
                 { id: 'whatsapp', name: 'WhatsApp', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/WhatsApp.svg/960px-WhatsApp.svg.png', disabled: true },
             ],
             traditionalSteps: [
-                { label: 'Покупка сервера', time: 10 },
-                { label: 'Создание SSH-ключей', time: 3 },
-                { label: 'Подключение по SSH', time: 3 },
-                { label: 'Установка Node.js', time: 5 },
-                { label: 'Установка OpenClaw', time: 2 },
-                { label: 'Настройка', time: 5 },
-                { label: 'Подключение Telegram', time: 2 },
+                { label: 'Выбор и покупка сервера', time: 30 },
+                { label: 'Создание SSH-ключей', time: 10 },
+                { label: 'Подключение и настройка ОС', time: 20 },
+                { label: 'Установка Docker и зависимостей', time: 30 },
+                { label: 'Установка и сборка OpenClaw', time: 30 },
+                { label: 'Настройка конфигурации', time: 30 },
+                { label: 'Подключение Telegram и тесты', time: 30 },
             ],
             marqueeRows: [
                 ['Чтение писем', 'Составление ответов', 'Перевод сообщений', 'Организация почты', 'Поддержка клиентов', 'Краткое изложение', 'Напоминания'],

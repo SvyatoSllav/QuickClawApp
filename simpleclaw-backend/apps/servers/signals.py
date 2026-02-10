@@ -1,17 +1,22 @@
 """Django signals for server management - replaces Celery tasks"""
 import logging
 import threading
+import time
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
 
+# SSH connection retry settings
+SSH_MAX_RETRIES = 5
+SSH_RETRY_DELAY = 15  # seconds between retries
+
 
 def install_openclaw_async(server_id):
     """Install OpenClaw on server in background thread"""
-    import time
     from .models import Server
     from .services import ServerManager
+    from .tasks import send_telegram_message, ADMIN_TELEGRAM_ID
 
     try:
         server = Server.objects.get(id=server_id)
@@ -24,6 +29,10 @@ def install_openclaw_async(server_id):
         server.last_error = 'Missing IP address or SSH password'
         server.save()
         logger.error(f'Server {server_id}: Missing IP or password')
+        send_telegram_message(
+            ADMIN_TELEGRAM_ID,
+            f'🚨 Server {server_id}: Missing IP or SSH password'
+        )
         return
 
     logger.info(f'Starting OpenClaw installation on {server.ip_address}...')
@@ -35,9 +44,30 @@ def install_openclaw_async(server_id):
     manager = ServerManager(server)
 
     try:
-        # Wait for SSH to be ready
-        time.sleep(10)
-        manager.connect()
+        # Retry SSH connection — server may still be booting
+        connected = False
+        for attempt in range(1, SSH_MAX_RETRIES + 1):
+            try:
+                logger.info(
+                    f'SSH connect attempt {attempt}/{SSH_MAX_RETRIES} '
+                    f'to {server.ip_address}...'
+                )
+                time.sleep(SSH_RETRY_DELAY)
+                manager.connect()
+                connected = True
+                break
+            except Exception as e:
+                logger.warning(
+                    f'SSH attempt {attempt}/{SSH_MAX_RETRIES} failed '
+                    f'for {server.ip_address}: {e}'
+                )
+                if attempt < SSH_MAX_RETRIES:
+                    manager.disconnect()
+
+        if not connected:
+            raise Exception(
+                f'SSH connection failed after {SSH_MAX_RETRIES} attempts'
+            )
 
         # Check if Docker is installed
         out, err, code = manager.exec_command('docker --version')
@@ -48,8 +78,6 @@ def install_openclaw_async(server_id):
                 'apt-get install -y apt-transport-https ca-certificates curl software-properties-common',
                 'curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh',
                 'systemctl enable docker && systemctl start docker',
-                'curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose',
-                'chmod +x /usr/local/bin/docker-compose',
             ]
 
             for cmd in commands:
@@ -102,6 +130,10 @@ volumes:
         server.save()
 
         logger.info(f'OpenClaw installed successfully on {server.ip_address}')
+        send_telegram_message(
+            ADMIN_TELEGRAM_ID,
+            f'✅ Server ready: {server.ip_address}\nDocker + OpenClaw image installed, standby.'
+        )
 
     except Exception as e:
         error_msg = str(e)[:500]
@@ -109,6 +141,10 @@ volumes:
         server.status = 'error'
         server.last_error = error_msg
         server.save()
+        send_telegram_message(
+            ADMIN_TELEGRAM_ID,
+            f'🚨 Server install FAILED: {server.ip_address}\nError: {error_msg}'
+        )
     finally:
         manager.disconnect()
 
