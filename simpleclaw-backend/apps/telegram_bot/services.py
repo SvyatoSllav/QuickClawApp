@@ -89,37 +89,19 @@ def validate_and_save_token(tg_bot_user, token):
 def create_payment_for_user(tg_bot_user):
     """
     Create a YooKassa payment for a Telegram bot user.
-    Uses test YooKassa credentials if configured (for testing).
+    Uses production YooKassa credentials (same as backend).
     Returns {'confirmation_url': ...} or None on error.
     """
     if not tg_bot_user.user:
         return None
 
     try:
-        # Use test YooKassa credentials if available
-        from yookassa import Configuration
-        original_shop_id = Configuration.account_id
-        original_secret_key = Configuration.secret_key
-
-        test_shop_id = getattr(settings, 'YOOKASSA_TEST_SHOP_ID', '')
-        test_secret_key = getattr(settings, 'YOOKASSA_TEST_SECRET_KEY', '')
-
-        if test_shop_id and test_secret_key:
-            Configuration.account_id = test_shop_id
-            Configuration.secret_key = test_secret_key
-            logger.info(f'Using test YooKassa credentials for TG:{tg_bot_user.telegram_id}')
-
-        try:
-            result = create_first_payment(
-                user=tg_bot_user.user,
-                telegram_token=tg_bot_user.pending_bot_token,
-                selected_model=tg_bot_user.selected_model,
-                amount=2999,
-            )
-        finally:
-            # Restore original credentials
-            Configuration.account_id = original_shop_id
-            Configuration.secret_key = original_secret_key
+        result = create_first_payment(
+            user=tg_bot_user.user,
+            telegram_token=tg_bot_user.pending_bot_token,
+            selected_model=tg_bot_user.selected_model,
+            amount=2999,
+        )
 
         logger.info(
             f'Payment created for TG:{tg_bot_user.telegram_id}, '
