@@ -107,7 +107,8 @@ class ServerManager:
         """Configure OpenClaw for optimal token usage to reduce costs.
 
         Optimizations applied:
-        - contextTokens: default (200K, managed by OpenClaw per model)
+        - contextTokens: 100K (triggers compaction earlier than default 200K)
+        - bootstrapMaxChars: 20K (limits system prompt bloat from AGENTS.md etc.)
         - Heartbeat disabled (biggest silent cost driver)
         - Sub-agent routing to gemini-3-flash-preview (cheap + fast)
         - Image model routing to gemini-2.5-flash
@@ -115,6 +116,8 @@ class ServerManager:
         - Context pruning with cache-ttl 1h
         - Concurrency limits
         - Cheap fallback models (gemini-2.5-flash → haiku)
+        - Cron isolation (background tasks don't pollute main context)
+        - Local RAG memory search (semantic memory across sessions)
         """
         logger.info(f'Configuring token optimization on {self.server.ip_address}...')
 
@@ -162,6 +165,18 @@ class ServerManager:
 
             # --- Enable web search (uses headless browser) ---
             f'{cli} config set web.enabled true',
+
+            # --- Bootstrap file size limit (reduces system prompt bloat) ---
+            f'{cli} config set agents.defaults.bootstrapMaxChars 20000',
+
+            # --- Context token limit (100K — triggers compaction earlier) ---
+            f'{cli} config set agents.defaults.contextTokens 100000',
+
+            # --- Cron isolation — background tasks don't pollute main chat context ---
+            f"""{cli} config set agents.defaults.cron '{{"sessionTarget": "isolated"}}'""",
+
+            # --- Local RAG — semantic memory search across sessions ---
+            f"""{cli} config set agents.defaults.memorySearch '{{"enabled": true, "provider": "local", "embeddingModel": "hf:second-state/All-MiniLM-L6-v2-Embedding-GGUF", "store": "sqlite", "indexing": {{"autoIndex": true}}, "search": {{"strategy": "hybrid", "topK": 5}}}}'""",
         ]
 
         for cmd in optimization_commands:

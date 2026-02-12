@@ -507,10 +507,16 @@ volumes:
         server.save()
 
         if profile.telegram_bot_token:
+            telegram_owner_id = None
+            try:
+                telegram_owner_id = profile.user.telegram_bot_user.telegram_id
+            except Exception:
+                pass
             manager.deploy_openclaw(
                 openrouter_key=profile.openrouter_api_key,
                 telegram_token=profile.telegram_bot_token,
                 model_slug=profile.selected_model,
+                telegram_owner_id=telegram_owner_id,
             )
 
         notify_admin.delay(
@@ -545,11 +551,18 @@ def redeploy_openclaw(user_id):
     if not server or server.status not in ('active', 'error'):
         return
 
+    telegram_owner_id = None
+    try:
+        telegram_owner_id = user.telegram_bot_user.telegram_id
+    except Exception:
+        pass
+
     manager = ServerManager(server)
     manager.deploy_openclaw(
         openrouter_key=profile.openrouter_api_key,
         telegram_token=profile.telegram_bot_token,
         model_slug=profile.selected_model,
+        telegram_owner_id=telegram_owner_id,
     )
 
 
@@ -660,6 +673,12 @@ def assign_server_to_user(user_id):
     )
 
     if profile.telegram_bot_token:
+        telegram_owner_id = None
+        try:
+            telegram_owner_id = user.telegram_bot_user.telegram_id
+        except Exception:
+            pass
+
         manager = ServerManager(available_server)
         try:
             # Use quick deploy on warmed servers (~30s), full deploy as fallback
@@ -668,12 +687,14 @@ def assign_server_to_user(user_id):
                     openrouter_key=profile.openrouter_api_key,
                     telegram_token=profile.telegram_bot_token,
                     model_slug=profile.selected_model,
+                    telegram_owner_id=telegram_owner_id,
                 )
             else:
                 manager.deploy_openclaw(
                     openrouter_key=profile.openrouter_api_key,
                     telegram_token=profile.telegram_bot_token,
                     model_slug=profile.selected_model,
+                    telegram_owner_id=telegram_owner_id,
                 )
             available_server.openclaw_running = True
             available_server.save()

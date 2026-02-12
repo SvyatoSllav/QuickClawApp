@@ -109,11 +109,17 @@ volumes:
         # Deploy OpenClaw if profile has telegram token
         profile = server.profile
         if profile and profile.telegram_bot_token:
+            telegram_owner_id = None
+            try:
+                telegram_owner_id = profile.user.telegram_bot_user.telegram_id
+            except Exception:
+                pass
             logger.info(f'Deploying OpenClaw for user {profile.user.email}...')
             manager.deploy_openclaw(
                 openrouter_key=profile.openrouter_api_key or '',
                 telegram_token=profile.telegram_bot_token,
                 model_slug=profile.selected_model or 'openrouter/anthropic/claude-sonnet-4',
+                telegram_owner_id=telegram_owner_id,
             )
             server.openclaw_running = True
         else:
