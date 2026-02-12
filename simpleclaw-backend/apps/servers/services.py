@@ -203,6 +203,49 @@ class ServerManager:
 
         logger.info(f'Token optimization configured on {self.server.ip_address}')
 
+    def install_session_watchdog(self):
+        """Install a cron-based watchdog that auto-compacts OpenClaw sessions
+        when Gemini's 'Thought signature is not valid' error is detected.
+
+        The script runs every 2 minutes, checks recent docker logs for the error,
+        and if found — triggers /compact via the agent CLI to flush corrupted
+        thought tokens while preserving conversation memory.
+        """
+        logger.info(f'Installing session watchdog on {self.server.ip_address}...')
+
+        script = r'''#!/bin/bash
+# OpenClaw session watchdog — auto-compact on Gemini "Thought signature" errors
+LOGFILE="/var/log/openclaw-watchdog.log"
+CONTAINER="openclaw"
+CLI="node /app/openclaw.mjs"
+
+# Check last 2 min of logs for the error
+if docker logs "$CONTAINER" --since 2m 2>&1 | grep -qi "Thought signature is not valid"; then
+    echo "$(date -Iseconds) [watchdog] Detected 'Thought signature' error — triggering compaction" >> "$LOGFILE"
+
+    # Get active session IDs
+    SESSIONS=$(docker exec "$CONTAINER" $CLI sessions --json 2>/dev/null | grep -o '"sessionId":"[^"]*"' | cut -d'"' -f4)
+
+    for SID in $SESSIONS; do
+        docker exec "$CONTAINER" $CLI agent --session-id "$SID" --message "/compact" --channel telegram --timeout 120 2>&1 >> "$LOGFILE"
+        echo "$(date -Iseconds) [watchdog] Compacted session $SID" >> "$LOGFILE"
+    done
+else
+    : # no error — do nothing
+fi
+'''
+
+        self.upload_file(script, '/usr/local/bin/openclaw-watchdog.sh')
+        self.exec_command('chmod +x /usr/local/bin/openclaw-watchdog.sh')
+
+        # Install cron job (every 2 min), idempotent — remove old entry first
+        self.exec_command(
+            '(crontab -l 2>/dev/null | grep -v openclaw-watchdog; '
+            'echo "*/2 * * * * /usr/local/bin/openclaw-watchdog.sh") | crontab -'
+        )
+
+        logger.info(f'Session watchdog installed on {self.server.ip_address}')
+
     def warm_deploy_standby(self):
         """Pre-deploy OpenClaw on a pool server without user-specific config.
 
@@ -288,6 +331,9 @@ volumes:
 
             # Apply token optimization
             self.configure_token_optimization()
+
+            # Install session watchdog (auto-recovers from Gemini thought signature errors)
+            self.install_session_watchdog()
 
             # Start browser profile
             self.exec_command(
