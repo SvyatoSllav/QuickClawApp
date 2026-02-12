@@ -148,6 +148,8 @@ MODEL_MAPPING = {
 
 # SimpleClaw Sales Bot
 SIMPLECLAW_BOT_TOKEN = env('SIMPLECLAW_BOT_TOKEN', default='')
+YOOKASSA_TEST_SHOP_ID = env('YOOKASSA_TEST_SHOP_ID', default='')
+YOOKASSA_TEST_SECRET_KEY = env('YOOKASSA_TEST_SECRET_KEY', default='')
 
 # TimeWeb Cloud
 TIMEWEB_API_TOKEN = env('TIMEWEB_API_TOKEN', default='')
