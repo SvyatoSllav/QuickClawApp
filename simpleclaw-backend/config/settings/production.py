@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'apps.payments',
     'apps.servers',
     'apps.telegram_app',
+    'apps.telegram_bot',
     'apps.seo',
 ]
 
@@ -144,6 +145,9 @@ MODEL_MAPPING = {
     'gemini-3-flash': 'google/gemini-3-flash-preview',
     'gemini-2.5-flash': 'google/gemini-2.5-flash',
 }
+
+# SimpleClaw Sales Bot
+SIMPLECLAW_BOT_TOKEN = env('SIMPLECLAW_BOT_TOKEN', default='')
 
 # TimeWeb Cloud
 TIMEWEB_API_TOKEN = env('TIMEWEB_API_TOKEN', default='')

@@ -11,3 +11,4 @@ yookassa==3.10.0
 paramiko==3.5.0
 requests==2.32.3
 google-auth==2.37.0
+python-telegram-bot==21.10

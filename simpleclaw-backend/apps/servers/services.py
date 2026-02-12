@@ -812,6 +812,21 @@ def assign_server_to_user_sync(user_id):
                     ADMIN_TELEGRAM_ID,
                     f'✅ OpenClaw deployed ({deploy_type})!\nIP: {available_server.ip_address}\nUser: {user.email}'
                 )
+                # Notify Telegram bot user that their bot is ready
+                try:
+                    tg_bot_user = user.telegram_bot_user
+                    bot_username = profile.telegram_bot_username or ''
+                    from apps.telegram_bot.services import notify_user
+                    notify_user(
+                        tg_bot_user.chat_id,
+                        f'🎉 Ваш бот готов!\n\n'
+                        f'Напишите <b>@{bot_username}</b> — он уже работает '
+                        f'и ждёт ваших сообщений.\n\n'
+                        f'<i>При первом сообщении бот отправит код сопряжения. '
+                        f'Просто нажмите кнопку подтверждения.</i>',
+                    )
+                except Exception:
+                    pass  # User may not be a Telegram bot user
         except Exception as e:
             send_telegram_message(
                 ADMIN_TELEGRAM_ID,

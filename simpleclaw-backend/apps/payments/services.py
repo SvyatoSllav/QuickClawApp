@@ -20,7 +20,7 @@ def _notify_admin(message):
     send_telegram_message(ADMIN_TELEGRAM_ID, f'🤖 SimpleClaw\n\n{message}')
 
 
-def create_first_payment(user, telegram_token='', selected_model='claude-opus-4.5'):
+def create_first_payment(user, telegram_token='', selected_model='claude-sonnet-4'):
     """Create first payment with optional recurring setup"""
     amount = str(settings.SUBSCRIPTION_PRICE_RUB)
     idempotence_key = str(uuid.uuid4())
@@ -155,7 +155,7 @@ def handle_payment_succeeded(yookassa_payment_id, payment_data):
     # Save telegram token and model from payment metadata
     metadata = payment_data.get('metadata', {})
     telegram_token = metadata.get('telegram_token', '')
-    selected_model = metadata.get('selected_model', 'claude-opus-4.5')
+    selected_model = metadata.get('selected_model', 'claude-sonnet-4')
 
     if telegram_token:
         profile.telegram_bot_token = telegram_token
@@ -188,6 +188,18 @@ def handle_payment_succeeded(yookassa_payment_id, payment_data):
             start_new_session=True,  # detach from parent process
         )
         logger.info(f'Spawned deploy_server process for user {user.id}')
+
+    # Notify Telegram bot user about payment received
+    try:
+        tg_bot_user = user.telegram_bot_user
+        from apps.telegram_bot.services import notify_user
+        notify_user(
+            tg_bot_user.chat_id,
+            '✅ Оплата получена! Настраиваем ваш сервер...\n\n'
+            'Это может занять от 30 секунд до нескольких минут.',
+        )
+    except Exception:
+        pass  # User may not be a Telegram bot user
 
 
 def handle_payment_canceled(yookassa_payment_id):
