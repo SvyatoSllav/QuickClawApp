@@ -117,12 +117,10 @@ volumes:
             )
             server.openclaw_running = True
         else:
-            # Just pull the image for standby (large image, needs long timeout)
-            logger.info(f'Pulling OpenClaw image on {server.ip_address}...')
-            manager.exec_command(
-                f'cd {server.openclaw_path} && docker compose pull',
-                timeout=600,
-            )
+            # Warm deploy: start container, install Chromium, apply token optimization.
+            # When a user is assigned, quick_deploy_user() only takes ~30-60s.
+            logger.info(f'Warm deploying OpenClaw on {server.ip_address}...')
+            manager.warm_deploy_standby()
 
         # Mark as active
         server.status = 'active'

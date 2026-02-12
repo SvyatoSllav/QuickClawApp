@@ -180,6 +180,210 @@ class ServerManager:
 
         logger.info(f'Token optimization configured on {self.server.ip_address}')
 
+    def warm_deploy_standby(self):
+        """Pre-deploy OpenClaw on a pool server without user-specific config.
+
+        Starts the container, installs Chromium, applies token optimization,
+        and creates the browser profile. When a user is assigned, only their
+        OpenRouter key, Telegram token, and model need to be injected via
+        quick_deploy_user() — cutting deployment from ~5-10min to ~30-60s.
+        """
+        import secrets
+        import time
+        path = self.server.openclaw_path
+
+        gateway_token = secrets.token_urlsafe(32)
+
+        # Generic .env — no user keys, just enough to start the container
+        env_content = f"""OPENROUTER_API_KEY=placeholder
+TELEGRAM_BOT_TOKEN=placeholder
+OPENCLAW_GATEWAY_TOKEN={gateway_token}
+LOG_LEVEL=info
+"""
+
+        # Generic config — no telegram channel, default model
+        config_content = f"""provider: openrouter
+model: openrouter/anthropic/claude-sonnet-4
+
+gateway:
+  mode: local
+  auth:
+    type: token
+    token: {gateway_token}
+
+limits:
+  max_tokens_per_message: 4096
+  max_context_messages: 30
+"""
+
+        docker_compose_content = """services:
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: openclaw
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./openclaw-config.yaml:/app/config.yaml
+      - ./data:/app/data
+      - config:/home/node/.openclaw
+volumes:
+  config:
+    name: openclaw_config
+"""
+
+        try:
+            self.connect()
+
+            self.upload_file(env_content, f'{path}/.env')
+            self.upload_file(config_content, f'{path}/openclaw-config.yaml')
+            self.upload_file(docker_compose_content, f'{path}/docker-compose.yml')
+
+            # Stop existing container and clear stale config
+            self.exec_command(f'cd {path} && docker compose down 2>/dev/null || true')
+            self.exec_command('docker volume rm openclaw_config 2>/dev/null || true')
+
+            out, err, code = self.exec_command(f'cd {path} && docker compose up -d')
+            if code != 0:
+                logger.error(f'warm_deploy_standby: docker compose up failed on {self.server.ip_address}: {err}')
+                return False
+
+            time.sleep(8)
+            self._fix_permissions()
+
+            # Clear stale internal config
+            self.exec_command(
+                "docker exec openclaw rm -rf /home/node/.openclaw/openclaw.json 2>/dev/null || true"
+            )
+
+            # Install browser (the slow part — ~3-5 min)
+            self.install_browser_in_container()
+
+            # Run doctor + set gateway mode
+            self.exec_command('docker exec openclaw node /app/openclaw.mjs doctor --fix')
+            self.exec_command('docker exec openclaw node /app/openclaw.mjs config set gateway.mode local')
+
+            # Apply token optimization
+            self.configure_token_optimization()
+
+            # Start browser profile
+            self.exec_command(
+                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
+            )
+
+            self.server.openclaw_running = True
+            self.server.last_error = ''
+            self.server.save()
+            logger.info(f'Warm deploy complete on {self.server.ip_address}')
+            return True
+
+        except Exception as e:
+            logger.error(f'warm_deploy_standby failed on {self.server.ip_address}: {e}')
+            self.server.last_error = str(e)[:500]
+            self.server.save()
+            return False
+
+    def quick_deploy_user(self, openrouter_key, telegram_token, model_slug):
+        """Fast user deployment on an already-warmed server (~30-60s).
+
+        Skips Chromium install, doctor, token optimization (already done by
+        warm_deploy_standby). Only injects user-specific config and restarts.
+        """
+        import secrets
+        import time
+        path = self.server.openclaw_path
+
+        model_mapping = getattr(settings, 'MODEL_MAPPING', {})
+        base_model = model_mapping.get(model_slug, 'anthropic/claude-opus-4.5')
+        openrouter_model = f'openrouter/{base_model}'
+        gateway_token = secrets.token_urlsafe(32)
+
+        # User-specific .env
+        env_content = f"""OPENROUTER_API_KEY={openrouter_key}
+TELEGRAM_BOT_TOKEN={telegram_token}
+OPENCLAW_GATEWAY_TOKEN={gateway_token}
+LOG_LEVEL=info
+"""
+
+        # User-specific config with telegram channel
+        config_content = f"""provider: openrouter
+model: {openrouter_model}
+api_key: {openrouter_key}
+
+gateway:
+  mode: local
+  auth:
+    type: token
+    token: {gateway_token}
+
+channels:
+  telegram:
+    enabled: true
+    botToken: {telegram_token}
+    dmPolicy: open
+    allowFrom: ["*"]
+    groupPolicy: allowlist
+    streamMode: partial
+
+limits:
+  max_tokens_per_message: 4096
+  max_context_messages: 30
+"""
+
+        try:
+            self.connect()
+
+            # Upload user-specific config files
+            self.upload_file(env_content, f'{path}/.env')
+            self.upload_file(config_content, f'{path}/openclaw-config.yaml')
+
+            # Restart (not down/up — preserves volume with browser + token optimization)
+            self.exec_command(f'cd {path} && docker compose restart')
+            time.sleep(8)
+
+            self._fix_permissions()
+
+            # Set model + fallbacks
+            self.exec_command(
+                f'docker exec openclaw node /app/openclaw.mjs models set {openrouter_model}'
+            )
+            self.configure_token_optimization(model_slug)
+
+            # Apply user-specific config (auth-profiles, telegram) with retry
+            config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model)
+
+            if not config_ok:
+                from .tasks import send_telegram_message, ADMIN_TELEGRAM_ID
+                send_telegram_message(
+                    ADMIN_TELEGRAM_ID,
+                    f'🚨 quick_deploy_user config verification FAILED\n'
+                    f'Server: {self.server.ip_address}\n'
+                    f'Manual intervention may be needed.'
+                )
+                self.server.status = 'error'
+                self.server.last_error = 'Quick deploy config verification failed'
+                self.server.save()
+                return False
+
+            # Start browser
+            self.exec_command(
+                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
+            )
+
+            self.server.openclaw_running = True
+            self.server.status = 'active'
+            self.server.last_error = ''
+            self.server.save()
+            logger.info(f'Quick deploy complete on {self.server.ip_address}')
+            return True
+
+        except Exception as e:
+            self.server.status = 'error'
+            self.server.last_error = str(e)[:500]
+            self.server.save()
+            logger.error(f'quick_deploy_user failed on {self.server.ip_address}: {e}')
+            return False
+
     def _fix_permissions(self):
         """Fix /home/node/.openclaw ownership — Docker volume is created as root
         but OpenClaw runs as node."""
@@ -571,17 +775,26 @@ def assign_server_to_user_sync(user_id):
     if profile.telegram_bot_token:
         manager = ServerManager(available_server)
         try:
-            result = manager.deploy_openclaw(
-                openrouter_key=profile.openrouter_api_key,
-                telegram_token=profile.telegram_bot_token,
-                model_slug=profile.selected_model,
-            )
+            # Use quick deploy on warmed servers (~30s), full deploy as fallback (~5-10min)
+            if available_server.openclaw_running:
+                result = manager.quick_deploy_user(
+                    openrouter_key=profile.openrouter_api_key,
+                    telegram_token=profile.telegram_bot_token,
+                    model_slug=profile.selected_model,
+                )
+            else:
+                result = manager.deploy_openclaw(
+                    openrouter_key=profile.openrouter_api_key,
+                    telegram_token=profile.telegram_bot_token,
+                    model_slug=profile.selected_model,
+                )
             if result:
                 available_server.openclaw_running = True
                 available_server.save()
+                deploy_type = 'quick' if available_server.openclaw_running else 'full'
                 send_telegram_message(
                     ADMIN_TELEGRAM_ID,
-                    f'✅ OpenClaw deployed & verified!\nIP: {available_server.ip_address}\nUser: {user.email}'
+                    f'✅ OpenClaw deployed ({deploy_type})!\nIP: {available_server.ip_address}\nUser: {user.email}'
                 )
         except Exception as e:
             send_telegram_message(

@@ -302,8 +302,7 @@ def setup_standby_server(self, server_id):
         # Create OpenClaw directory
         manager.exec_command(f'mkdir -p {server.openclaw_path}')
 
-        docker_compose = '''version: '3.8'
-services:
+        docker_compose = '''services:
   openclaw:
     image: ghcr.io/openclaw/openclaw:latest
     container_name: openclaw
@@ -313,10 +312,14 @@ services:
     volumes:
       - ./openclaw-config.yaml:/app/config.yaml
       - ./data:/app/data
+      - config:/home/node/.openclaw
+volumes:
+  config:
+    name: openclaw_config
 '''
         manager.upload_file(docker_compose, f'{server.openclaw_path}/docker-compose.yml')
 
-        # Mark as active
+        # Mark as active — warm deploy will be triggered by signal handler
         server.status = 'active'
         server.last_error = ''
         server.save()
@@ -482,8 +485,7 @@ def setup_openclaw_server(server_id):
 
         manager.exec_command(f'mkdir -p {server.openclaw_path}')
 
-        docker_compose = '''version: '3.8'
-services:
+        docker_compose = '''services:
   openclaw:
     image: ghcr.io/openclaw/openclaw:latest
     container_name: openclaw
@@ -493,6 +495,10 @@ services:
     volumes:
       - ./openclaw-config.yaml:/app/config.yaml
       - ./data:/app/data
+      - config:/home/node/.openclaw
+volumes:
+  config:
+    name: openclaw_config
 '''
         manager.upload_file(docker_compose, f'{server.openclaw_path}/docker-compose.yml')
 
@@ -656,11 +662,19 @@ def assign_server_to_user(user_id):
     if profile.telegram_bot_token:
         manager = ServerManager(available_server)
         try:
-            manager.deploy_openclaw(
-                openrouter_key=profile.openrouter_api_key,
-                telegram_token=profile.telegram_bot_token,
-                model_slug=profile.selected_model,
-            )
+            # Use quick deploy on warmed servers (~30s), full deploy as fallback
+            if available_server.openclaw_running:
+                manager.quick_deploy_user(
+                    openrouter_key=profile.openrouter_api_key,
+                    telegram_token=profile.telegram_bot_token,
+                    model_slug=profile.selected_model,
+                )
+            else:
+                manager.deploy_openclaw(
+                    openrouter_key=profile.openrouter_api_key,
+                    telegram_token=profile.telegram_bot_token,
+                    model_slug=profile.selected_model,
+                )
             available_server.openclaw_running = True
             available_server.save()
         except Exception as e:
