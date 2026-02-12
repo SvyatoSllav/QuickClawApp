@@ -12,7 +12,6 @@ def start_keyboard():
 def start_keyboard_with_profile():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('👤 Профиль', callback_data='profile')],
-        [InlineKeyboardButton('🔄 Задеплоить заново', callback_data='deploy')],
     ])
 
 
