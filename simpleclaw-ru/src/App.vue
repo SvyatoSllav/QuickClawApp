@@ -139,7 +139,7 @@
                             </div>
                             <div>
                                 <p class="text-lg font-medium text-white">{{ user.email }}</p>
-                                <p class="text-sm text-zinc-500">{{ profile.selected_model || 'claude-opus-4.5' }}</p>
+                                <p class="text-sm text-zinc-500">{{ profile.selected_model || 'claude-sonnet-4' }}</p>
                             </div>
                         </div>
                     </div>
@@ -532,7 +532,7 @@ export default {
             telegramError: '',
             telegramToken: '',
             pendingTelegramToken: '',
-            selectedModel: 'claude-opus-4.5',
+            selectedModel: 'claude-sonnet-4',
             selectedChannel: null,
             availableServers: 5,
             showTelegramModal: false,
@@ -542,9 +542,9 @@ export default {
             deployStatus: { assigned: false, openclaw_running: false, status: '' },
             deployPollTimer: null,
             models: [
-                { id: "claude-opus-4.5", name: "Claude Opus 4.5", icon: "https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg", tooltip: "Самая эффективная, но дорогая" },
-                { id: "gemini-3-flash", name: "Gemini 3 Flash", icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Google_Gemini_icon_2025.svg/960px-Google_Gemini_icon_2025.svg.png", tooltip: "Самая бюджетная и оптимизированная" },
-                { id: "gpt-5.2", name: "GPT-5.2", icon: "https://img.icons8.com/androidL/512/FFFFFF/chatgpt.png", tooltip: "Середина между gemini и claude" },
+                { id: "claude-sonnet-4", name: "Claude Sonnet 4", icon: "https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg", tooltip: "Лучший баланс цены и качества" },
+                { id: "claude-opus-4.5", name: "Claude Opus 4.5", icon: "https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg", tooltip: "Самая эффективная для сложных задач" },
+                { id: "gemini-3-flash", name: "Gemini 3 Flash", icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Google_Gemini_icon_2025.svg/960px-Google_Gemini_icon_2025.svg.png", tooltip: "Самая бюджетная и быстрая" },
             ],
             channels: [
                 { id: 'telegram', name: 'Telegram', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Telegram_logo.svg/960px-Telegram_logo.svg.png', disabled: false },
@@ -769,7 +769,7 @@ export default {
                 this.user = { email: data.email, avatar_url: data.profile?.avatar_url };
                 this.profile = data.profile || {};
                 this.server = data.server;
-                this.selectedModel = this.profile.selected_model || 'claude-opus-4.5';
+                this.selectedModel = this.profile.selected_model || 'claude-sonnet-4';
                 this.isAuthenticated = true;
 
                 if (data.subscription) {

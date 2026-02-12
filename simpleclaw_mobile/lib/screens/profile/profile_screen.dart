@@ -67,7 +67,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     const SizedBox(height: 24),
                     _buildUserCard(
                       email: authState.user?.email ?? '',
-                      model: profile?.selectedModel ?? 'claude-opus-4.5',
+                      model: profile?.selectedModel ?? 'claude-sonnet-4',
                     ),
                     const SizedBox(height: 16),
                     if (hasActiveSub && !deploy.isReady) ...[

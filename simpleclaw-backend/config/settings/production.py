@@ -131,12 +131,18 @@ ADMIN_TELEGRAM_CHAT_ID = env('ADMIN_TELEGRAM_CHAT_ID', default='')
 # Frontend
 FRONTEND_URL = env('FRONTEND_URL', default='https://install-openclow.ru')
 
+# Default model for new deployments
+DEFAULT_MODEL = 'claude-sonnet-4'
+
 # Маппинг моделей → OpenRouter slugs
 MODEL_MAPPING = {
-    'claude-opus-4.5': 'anthropic/claude-opus-4.5',
     'claude-sonnet-4': 'anthropic/claude-sonnet-4',
+    'claude-opus-4.5': 'anthropic/claude-opus-4.5',
+    'claude-sonnet-4.5': 'anthropic/claude-sonnet-4-5-20250929',
+    'claude-haiku-4.5': 'anthropic/claude-haiku-4.5',
     'gpt-4o': 'openai/gpt-4o',
-    'gemini-2.0-flash': 'google/gemini-2.5-flash',
+    'gemini-3-flash': 'google/gemini-3-flash-preview',
+    'gemini-2.5-flash': 'google/gemini-2.5-flash',
 }
 
 # TimeWeb Cloud

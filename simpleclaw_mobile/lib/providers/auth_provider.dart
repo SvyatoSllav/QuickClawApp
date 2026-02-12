@@ -182,7 +182,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (!mounted) return;
 
     final profile = userData.profile;
-    final selectedModel = profile?.selectedModel ?? 'claude-opus-4.5';
+    final selectedModel = profile?.selectedModel ?? 'claude-sonnet-4';
 
     _ref.read(modelSelectionProvider.notifier).setModel(selectedModel);
 
@@ -226,7 +226,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final storage = _ref.read(secureStorageProvider);
       final pendingTelegramToken = await storage.getPendingTelegramToken();
 
-      final selectedModel = state.profile?.selectedModel ?? 'claude-opus-4.5';
+      final selectedModel = state.profile?.selectedModel ?? 'claude-sonnet-4';
 
       final paymentService = _ref.read(paymentServiceProvider);
       final paymentResponse = await paymentService.createPayment(

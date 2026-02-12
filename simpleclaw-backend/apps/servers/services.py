@@ -103,7 +103,7 @@ class ServerManager:
         logger.info(f'Browser configured on {self.server.ip_address}')
         return True
 
-    def configure_token_optimization(self, model_slug='claude-opus-4.5'):
+    def configure_token_optimization(self, model_slug='claude-sonnet-4'):
         """Configure OpenClaw for optimal token usage to reduce costs.
 
         Implements optimizations from TOKEN_OPTIMISATION_PLAN.md (Option A):
@@ -122,7 +122,7 @@ class ServerManager:
 
         if 'claude' in model_slug.lower():
             fallback_models = [
-                'openrouter/anthropic/claude-sonnet-4',
+                'openrouter/anthropic/claude-opus-4.5',
                 'openrouter/anthropic/claude-haiku-4.5',
             ]
         elif 'gpt' in model_slug.lower():
@@ -177,6 +177,22 @@ class ServerManager:
         self.exec_command(f'{cli} models fallbacks clear 2>/dev/null || true')
         for fallback in fallback_models:
             self.exec_command(f'{cli} models fallbacks add {fallback}')
+
+        # Set model aliases for easy /model switching
+        aliases = {
+            "openrouter/anthropic/claude-opus-4.5": {"alias": "opus"},
+            "openrouter/anthropic/claude-sonnet-4": {"alias": "sonnet"},
+            "openrouter/anthropic/claude-haiku-4.5": {"alias": "haiku"},
+            "openrouter/google/gemini-2.5-flash": {"alias": "flash"},
+            "openrouter/deepseek/deepseek-reasoner": {"alias": "deepseek"},
+            "openrouter/google/gemini-3-flash-preview": {"alias": "gemini3"},
+        }
+        aliases_json = json.dumps(aliases)
+        out, err, code = self.exec_command(
+            f"{cli} config set agents.defaults.models '{aliases_json}'"
+        )
+        if code != 0:
+            logger.warning(f'Model aliases failed: {err[:200]}')
 
         logger.info(f'Token optimization configured on {self.server.ip_address}')
 
@@ -294,7 +310,7 @@ volumes:
         path = self.server.openclaw_path
 
         model_mapping = getattr(settings, 'MODEL_MAPPING', {})
-        base_model = model_mapping.get(model_slug, 'anthropic/claude-opus-4.5')
+        base_model = model_mapping.get(model_slug, 'anthropic/claude-sonnet-4')
         openrouter_model = f'openrouter/{base_model}'
         gateway_token = secrets.token_urlsafe(32)
 
@@ -577,7 +593,7 @@ limits:
         path = self.server.openclaw_path
 
         model_mapping = getattr(settings, 'MODEL_MAPPING', {})
-        base_model = model_mapping.get(model_slug, 'anthropic/claude-opus-4.5')
+        base_model = model_mapping.get(model_slug, 'anthropic/claude-sonnet-4')
         openrouter_model = f'openrouter/{base_model}'
         gateway_token = secrets.token_urlsafe(32)
 

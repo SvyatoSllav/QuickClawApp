@@ -24,22 +24,22 @@ class _ModelInfo {
 
 const _models = [
   _ModelInfo(
+    id: 'claude-sonnet-4',
+    name: 'Claude Sonnet 4',
+    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg',
+    tooltip: 'Лучший баланс цены и качества',
+  ),
+  _ModelInfo(
     id: 'claude-opus-4.5',
     name: 'Claude Opus 4.5',
     iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg',
-    tooltip: 'Самая эффективная, но дорогая',
+    tooltip: 'Самая эффективная для сложных задач',
   ),
   _ModelInfo(
     id: 'gemini-3-flash',
     name: 'Gemini 3 Flash',
     iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Google_Gemini_icon_2025.svg/960px-Google_Gemini_icon_2025.svg.png',
-    tooltip: 'Самая бюджетная и оптимизированная',
-  ),
-  _ModelInfo(
-    id: 'gpt-5.2',
-    name: 'GPT-5.2',
-    iconUrl: 'https://img.icons8.com/androidL/512/FFFFFF/chatgpt.png',
-    tooltip: 'Середина между gemini и claude',
+    tooltip: 'Самая бюджетная и быстрая',
   ),
 ];
 

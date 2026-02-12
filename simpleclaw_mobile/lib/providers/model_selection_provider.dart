@@ -5,7 +5,7 @@ class SelectionState {
   final String? selectedChannel;
 
   const SelectionState({
-    this.selectedModel = 'claude-opus-4.5',
+    this.selectedModel = 'claude-sonnet-4',
     this.selectedChannel,
   });
 

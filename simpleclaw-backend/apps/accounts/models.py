@@ -6,9 +6,11 @@ class UserProfile(models.Model):
     """Профиль пользователя с данными подписки и OpenClaw"""
 
     MODEL_CHOICES = [
-        ('claude-opus-4.5', 'Claude Opus 4.6'),
-        ('gpt-5.2', 'GPT-5.2'),
+        ('claude-sonnet-4', 'Claude Sonnet 4'),
+        ('claude-opus-4.5', 'Claude Opus 4.5'),
+        ('claude-haiku-4.5', 'Claude Haiku 4.5'),
         ('gemini-3-flash', 'Gemini 3 Flash'),
+        ('gemini-2.5-flash', 'Gemini 2.5 Flash'),
     ]
 
     SUBSCRIPTION_STATUS_CHOICES = [
@@ -31,7 +33,7 @@ class UserProfile(models.Model):
     telegram_bot_validated = models.BooleanField(default=False)
 
     # Выбор модели
-    selected_model = models.CharField(max_length=50, choices=MODEL_CHOICES, default='claude-opus-4.5')
+    selected_model = models.CharField(max_length=50, choices=MODEL_CHOICES, default='claude-sonnet-4')
 
     # Подписка
     subscription_status = models.CharField(max_length=20, choices=SUBSCRIPTION_STATUS_CHOICES, default='none')
