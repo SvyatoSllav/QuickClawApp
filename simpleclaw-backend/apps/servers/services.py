@@ -423,6 +423,7 @@ limits:
                 f'docker exec openclaw node /app/openclaw.mjs models set {openrouter_model}'
             )
             self.configure_token_optimization(model_slug)
+            self.install_session_watchdog()
 
             # Apply user-specific config (auth-profiles, telegram) with retry
             config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model, telegram_owner_id)
@@ -755,6 +756,7 @@ volumes:
 
             # Configure token optimization
             self.configure_token_optimization(model_slug)
+            self.install_session_watchdog()
 
             # Apply config with restart + verify (includes restart cycle)
             config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model, telegram_owner_id)
