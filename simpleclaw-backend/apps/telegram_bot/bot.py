@@ -404,6 +404,7 @@ def create_application():
             CallbackQueryHandler(cancel_flow_handler, pattern=r'^cancel_flow$'),
         ],
         allow_reentry=True,
+        per_message=False,
     )
 
     application.add_handler(conv_handler)
