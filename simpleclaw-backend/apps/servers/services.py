@@ -116,7 +116,6 @@ class ServerManager:
         - Context pruning with cache-ttl 1h
         - Concurrency limits
         - Cheap fallback models (gemini-2.5-flash → haiku)
-        - Cron isolation (background tasks don't pollute main context)
         - Local RAG memory search (semantic memory across sessions)
         """
         logger.info(f'Configuring token optimization on {self.server.ip_address}...')
@@ -172,11 +171,8 @@ class ServerManager:
             # --- Context token limit (100K — triggers compaction earlier) ---
             f'{cli} config set agents.defaults.contextTokens 100000',
 
-            # --- Cron isolation — background tasks don't pollute main chat context ---
-            f"""{cli} config set agents.defaults.cron '{{"sessionTarget": "isolated"}}'""",
-
             # --- Local RAG — semantic memory search across sessions ---
-            f"""{cli} config set agents.defaults.memorySearch '{{"enabled": true, "provider": "local", "embeddingModel": "hf:second-state/All-MiniLM-L6-v2-Embedding-GGUF", "store": "sqlite", "indexing": {{"autoIndex": true}}, "search": {{"strategy": "hybrid", "topK": 5}}}}'""",
+            f"""{cli} config set agents.defaults.memorySearch '{{"enabled": true, "provider": "local", "store": {{"path": "/home/node/.openclaw/memory.db"}}}}'""",
         ]
 
         for cmd in optimization_commands:
