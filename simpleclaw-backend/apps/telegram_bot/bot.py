@@ -59,6 +59,10 @@ async def start_handler(update: Update, context):
     await update.message.reply_text(
         msg.WELCOME,
         parse_mode='HTML',
+    )
+    await update.message.reply_text(
+        msg.WELCOME_DETAILS,
+        parse_mode='HTML',
         reply_markup=kb.start_keyboard(),
     )
     return ConversationHandler.END
