@@ -106,16 +106,17 @@ class ServerManager:
     def configure_token_optimization(self, model_slug='claude-opus-4.5'):
         """Configure OpenClaw for optimal token usage to reduce costs.
 
-        Implements all optimizations from TOKEN_OPTIMISATION_PLAN.md (Option A):
-        - Context limits (contextTokens + maxHistoryMessages)
+        Implements optimizations from TOKEN_OPTIMISATION_PLAN.md (Option A):
+        - Context limit (contextTokens 50k)
         - Heartbeat disable (biggest silent cost driver)
-        - Sub-agent routing to cheap model
-        - Image model routing to cheap model
+        - Sub-agent routing to cheap model (deepseek-reasoner)
+        - Image model routing to cheap model (gemini-2.5-flash)
         - Compaction in safeguard mode
         - Context pruning with keepLastAssistants
-        - Prompt caching (cacheControlTtl for Anthropic)
         - Concurrency limits
-        - Max output tokens
+
+        Note: maxHistoryMessages, params.cacheControlTtl, temperature, showUsage
+        are not supported by current OpenClaw version.
         """
         logger.info(f'Configuring token optimization on {self.server.ip_address}...')
 
@@ -143,9 +144,8 @@ class ServerManager:
         cli = 'docker exec openclaw node /app/openclaw.mjs'
 
         optimization_commands = [
-            # --- Context limits (60-75% savings) ---
+            # --- Context limit (60-75% savings) ---
             f'{cli} config set agents.defaults.contextTokens 50000',
-            f'{cli} config set agents.defaults.maxHistoryMessages 30',
 
             # --- Heartbeat: disable entirely (up to 30%+ savings) ---
             # Each heartbeat is a full API call with entire session context.
@@ -159,23 +159,13 @@ class ServerManager:
             f"""{cli} config set agents.defaults.imageModel '{{"primary": "openrouter/google/gemini-2.5-flash", "fallbacks": ["openrouter/openai/gpt-4o-mini"]}}'""",
 
             # --- Compaction: safeguard mode (prevents context overflow) ---
-            f"""{cli} config set agents.defaults.compaction '{{"mode": "safeguard", "maxHistoryShare": 0.5, "reserveTokens": 10000}}'""",
+            f"""{cli} config set agents.defaults.compaction '{{"mode": "safeguard"}}'""",
 
             # --- Context pruning with keepLastAssistants (20-40% savings) ---
             f"""{cli} config set agents.defaults.contextPruning '{{"mode": "cache-ttl", "ttl": "1h", "keepLastAssistants": 3}}'""",
 
-            # --- Prompt caching for Anthropic models (up to 90% discount) ---
-            # Extends cache from 5min default to 1 hour
-            f"""{cli} config set agents.defaults.params '{{"cacheControlTtl": "1h", "maxTokens": 4096}}'""",
-
             # --- Concurrency limit ---
             f'{cli} config set agents.defaults.maxConcurrent 2',
-
-            # --- Temperature: low for consistent output ---
-            f'{cli} config set agents.defaults.temperature 0.2',
-
-            # --- Show usage for monitoring ---
-            f'{cli} config set agents.defaults.showUsage true',
         ]
 
         for cmd in optimization_commands:
