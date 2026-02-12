@@ -104,7 +104,19 @@ class ServerManager:
         return True
 
     def configure_token_optimization(self, model_slug='claude-opus-4.5'):
-        """Configure OpenClaw for optimal token usage to reduce costs."""
+        """Configure OpenClaw for optimal token usage to reduce costs.
+
+        Implements all optimizations from TOKEN_OPTIMISATION_PLAN.md (Option A):
+        - Context limits (contextTokens + maxHistoryMessages)
+        - Heartbeat disable (biggest silent cost driver)
+        - Sub-agent routing to cheap model
+        - Image model routing to cheap model
+        - Compaction in safeguard mode
+        - Context pruning with keepLastAssistants
+        - Prompt caching (cacheControlTtl for Anthropic)
+        - Concurrency limits
+        - Max output tokens
+        """
         logger.info(f'Configuring token optimization on {self.server.ip_address}...')
 
         if 'claude' in model_slug.lower():
@@ -128,22 +140,53 @@ class ServerManager:
                 'openrouter/anthropic/claude-haiku-4.5',
             ]
 
+        cli = 'docker exec openclaw node /app/openclaw.mjs'
+
         optimization_commands = [
-            'docker exec openclaw node /app/openclaw.mjs config set agents.defaults.contextTokens 50000',
-            'docker exec openclaw node /app/openclaw.mjs config set agents.defaults.compaction.mode aggressive',
-            "docker exec openclaw node /app/openclaw.mjs config set agents.defaults.compaction.memoryFlush '{\"enabled\": true, \"softThresholdTokens\": 30000}'",
-            'docker exec openclaw node /app/openclaw.mjs config set agents.defaults.temperature 0.2',
-            'docker exec openclaw node /app/openclaw.mjs config set agents.defaults.cache-ttl 3600',
-            "docker exec openclaw node /app/openclaw.mjs config set agents.defaults.contextPruning '{\"mode\": \"cache-ttl\", \"ttl\": \"1h\"}'",
-            'docker exec openclaw node /app/openclaw.mjs config set agents.defaults.showUsage true',
+            # --- Context limits (60-75% savings) ---
+            f'{cli} config set agents.defaults.contextTokens 50000',
+            f'{cli} config set agents.defaults.maxHistoryMessages 30',
+
+            # --- Heartbeat: disable entirely (up to 30%+ savings) ---
+            # Each heartbeat is a full API call with entire session context.
+            # At default intervals: ~48 API calls/day/agent doing nothing.
+            f"""{cli} config set agents.defaults.heartbeat '{{"every": "0m"}}'""",
+
+            # --- Sub-agent model: cheap model (90% savings on sub-agent calls) ---
+            f"""{cli} config set agents.defaults.subagents '{{"model": "openrouter/deepseek/deepseek-reasoner", "maxConcurrent": 2, "archiveAfterMinutes": 60}}'""",
+
+            # --- Image model: cheap model (98% savings on image processing) ---
+            f"""{cli} config set agents.defaults.imageModel '{{"primary": "openrouter/google/gemini-2.5-flash", "fallbacks": ["openrouter/openai/gpt-4o-mini"]}}'""",
+
+            # --- Compaction: safeguard mode (prevents context overflow) ---
+            f"""{cli} config set agents.defaults.compaction '{{"mode": "safeguard", "maxHistoryShare": 0.5, "reserveTokens": 10000}}'""",
+
+            # --- Context pruning with keepLastAssistants (20-40% savings) ---
+            f"""{cli} config set agents.defaults.contextPruning '{{"mode": "cache-ttl", "ttl": "1h", "keepLastAssistants": 3}}'""",
+
+            # --- Prompt caching for Anthropic models (up to 90% discount) ---
+            # Extends cache from 5min default to 1 hour
+            f"""{cli} config set agents.defaults.params '{{"cacheControlTtl": "1h", "maxTokens": 4096}}'""",
+
+            # --- Concurrency limit ---
+            f'{cli} config set agents.defaults.maxConcurrent 2',
+
+            # --- Temperature: low for consistent output ---
+            f'{cli} config set agents.defaults.temperature 0.2',
+
+            # --- Show usage for monitoring ---
+            f'{cli} config set agents.defaults.showUsage true',
         ]
 
         for cmd in optimization_commands:
-            self.exec_command(cmd)
+            out, err, code = self.exec_command(cmd)
+            if code != 0:
+                logger.warning(f'Token opt command failed (code {code}): {cmd[:80]}... err={err[:200]}')
 
-        self.exec_command('docker exec openclaw node /app/openclaw.mjs models fallbacks clear 2>/dev/null || true')
+        # Set fallback models
+        self.exec_command(f'{cli} models fallbacks clear 2>/dev/null || true')
         for fallback in fallback_models:
-            self.exec_command(f'docker exec openclaw node /app/openclaw.mjs models fallbacks add {fallback}')
+            self.exec_command(f'{cli} models fallbacks add {fallback}')
 
         logger.info(f'Token optimization configured on {self.server.ip_address}')
 
@@ -371,7 +414,7 @@ channels:
 
 limits:
   max_tokens_per_message: 4096
-  max_context_messages: 20
+  max_context_messages: 30
 """
 
         docker_compose_content = """services:
