@@ -30,9 +30,9 @@ WELCOME_BACK_DEPLOYING = (
 MODEL_QUESTION = "Какую модель ИИ использовать?"
 
 MODEL_DESCRIPTIONS = {
-    'claude-sonnet-4': 'Claude Sonnet 4 — лучший баланс цены и качества',
-    'claude-opus-4.5': 'Claude Opus 4.5 — самая мощная для сложных задач',
-    'gemini-3-flash': 'Gemini 3 Flash — самая бюджетная и быстрая',
+    'claude-sonnet-4': 'Claude — лучший баланс цены и качества',
+    'gpt-4o': 'GPT — мощная универсальная модель',
+    'gemini-3-flash': 'Gemini — самая бюджетная и быстрая',
 }
 
 MODEL_SELECTED = "Выбрана модель: <b>{model}</b>"

@@ -25,15 +25,15 @@ def deploying_keyboard():
 def model_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(
-            '⚡ Claude Sonnet 4',
+            '⚡ Claude',
             callback_data='model:claude-sonnet-4',
         )],
         [InlineKeyboardButton(
-            '🧠 Claude Opus 4.5',
-            callback_data='model:claude-opus-4.5',
+            '🧠 GPT',
+            callback_data='model:gpt-4o',
         )],
         [InlineKeyboardButton(
-            '💨 Gemini 3 Flash',
+            '💨 Gemini',
             callback_data='model:gemini-3-flash',
         )],
     ])
