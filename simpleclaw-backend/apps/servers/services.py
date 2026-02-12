@@ -353,8 +353,8 @@ limits:
             self.upload_file(env_content, f'{path}/.env')
             self.upload_file(config_content, f'{path}/openclaw-config.yaml')
 
-            # Restart (not down/up — preserves volume with browser + token optimization)
-            self.exec_command(f'cd {path} && docker compose restart')
+            # Recreate to pick up new .env (restart doesn't reload env vars)
+            self.exec_command(f'cd {path} && docker compose up -d --force-recreate')
             time.sleep(8)
 
             self._fix_permissions()
