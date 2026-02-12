@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление почтой и календарём через OpenClaw | SimpleClaw</title>
+    <meta name="description" content="Как управлять электронной почтой и календарём с помощью OpenClaw. Автоматическая сортировка писем, создание событий и умные напоминания.">
+    <link rel="canonical" href="https://install-openclow.ru/articles/openclaw-email-calendar.html">
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta property="og:title" content="Управление почтой и календарём через OpenClaw">
+    <meta property="og:description" content="Как управлять электронной почтой и календарём с помощью OpenClaw. Автоматическая сортировка писем, создание событий и умные напоминания.">
+    <meta property="og:type" content="article">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:url" content="https://install-openclow.ru/articles/openclaw-email-calendar.html">
+    <meta property="og:site_name" content="SimpleClaw">
+    <meta property="og:image" content="https://install-openclow.ru/articles/images/email-laptop.jpg">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Управление почтой и календарём через OpenClaw">
+    <meta name="twitter:description" content="Как управлять электронной почтой и календарём с помощью OpenClaw. Автоматическая сортировка писем, создание событий и умные напоминания.">
+    <meta name="twitter:image" content="https://install-openclow.ru/articles/images/email-laptop.jpg">
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Управление почтой и календарём через OpenClaw",
+        "description": "Как управлять электронной почтой и календарём с помощью OpenClaw. Автоматическая сортировка писем, создание событий и умные напоминания.",
+        "url": "https://install-openclow.ru/articles/openclaw-email-calendar.html",
+        "publisher": {
+            "@type": "Organization",
+            "name": "SimpleClaw",
+            "url": "https://install-openclow.ru/"
+        },
+        "datePublished": "2026-02-11",
+        "dateModified": "2026-02-11",
+        "inLanguage": "ru"
+    }
+    </script>
+
+    <meta name="theme-color" content="#07080a">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-G8GBMRVTD7"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-G8GBMRVTD7');
+    </script>
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+            background: #07080a; color: #d4d4d8;
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.7; min-height: 100vh;
+        }
+        .container { max-width: 768px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+        a { color: #10b981; text-decoration: none; transition: color .2s; }
+        a:hover { color: #34d399; }
+        .back { display: inline-flex; align-items: center; gap: .5rem; color: #a1a1aa; font-size: .875rem; margin-bottom: 2rem; }
+        .back:hover { color: #fff; }
+        h1 { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1.3; margin-bottom: .75rem; }
+        h2 { font-size: 1.375rem; font-weight: 700; color: #fff; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.125rem; font-weight: 600; color: #e4e4e7; margin-top: 2rem; margin-bottom: .75rem; }
+        p { margin-bottom: 1rem; }
+        ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+        li { margin-bottom: .5rem; }
+        .byline { display: flex; align-items: center; gap: .75rem; margin-bottom: 2rem; color: #71717a; font-size: .875rem; }
+        .byline img { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; }
+        .byline .author { color: #a1a1aa; font-weight: 500; }
+        .byline .sep { margin: 0 .25rem; }
+        .lead { font-size: 1.125rem; color: #a1a1aa; margin-bottom: 2rem; }
+        .cta-box {
+            position: relative; background: #0d1117;
+            border: 1px solid rgba(255,255,255,.08);
+            border-left: 3px solid #10b981; border-radius: 12px;
+            padding: 2rem 2.25rem; margin: 3rem 0;
+            transition: border-color .3s ease, box-shadow .3s ease;
+            overflow: hidden;
+        }
+        .cta-box::before {
+            content: ''; position: absolute; top: 0; right: 0;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle at top right, rgba(16,185,129,.07) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .cta-box:hover {
+            border-color: rgba(16,185,129,.25);
+            box-shadow: 0 0 40px rgba(16,185,129,.05);
+        }
+        .cta-box .cta-heading {
+            font-size: 1.25rem; font-weight: 700; color: #f0f0f0;
+            margin-bottom: .5rem; line-height: 1.4;
+        }
+        .cta-box .cta-desc {
+            font-size: .9375rem; color: #8b8b9e;
+            margin-bottom: 1.5rem; line-height: 1.6;
+        }
+        .cta-btn {
+            display: inline-flex; align-items: center; gap: .5rem;
+            background: #10b981; color: #fff; font-weight: 600;
+            font-size: .875rem; padding: .625rem 1.5rem;
+            border-radius: 8px; text-decoration: none;
+            transition: background .2s, transform .15s, box-shadow .2s;
+        }
+        .cta-btn:hover {
+            background: #059669; color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(16,185,129,.25);
+        }
+        .cta-btn svg { transition: transform .2s; }
+        .cta-btn:hover svg { transform: translateX(3px); }.info-box {
+            background: #172554; border: 1px solid #1e3a5f; border-radius: .75rem;
+            padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+        }
+        .info-box p { color: #93c5fd; margin: 0; }
+        .article-img {
+            width: 100%; border-radius: .75rem; margin: 1.5rem 0;
+            display: block;
+        }
+        .footer {
+            margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #27272a;
+            text-align: center; color: #71717a; font-size: .875rem;
+        }
+        @media (max-width: 640px) {
+            h1 { font-size: 1.5rem; }
+            h2 { font-size: 1.125rem; }
+            .container { padding: 1.5rem 1rem 3rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+            На главную
+        </a>
+
+        <h1>OpenClaw почта и календарь: полное руководство по управлению</h1>
+
+        <div class="byline">
+            <img src="/articles/images/openclaw-logo.png" alt="SimpleClaw">
+            <div>
+                <span class="author">Команда SimpleClaw</span>
+                <span class="sep">&middot;</span> 11 февраля 2026
+                <span class="sep">&middot;</span> 9 мин чтения
+            </div>
+        </div>
+
+        <p class="lead">Среднестатистический офисный работник проводит в почтовом клиенте почти три часа каждый день. Сотни входящих писем, десятки событий в календаре, бесконечные переключения между вкладками — всё это создаёт ощущение постоянной загрузки без реального продвижения. Между тем большая часть этих действий предсказуема и поддаётся автоматизации. OpenClaw почта и календарь — это интеграция, которая превращает ИИ-агента в умного персонального секретаря. Он читает и сортирует письма, составляет ответы, создаёт события, управляет расписанием и отправляет вам только то, что действительно требует внимания. Всё это через простой чат, без переключений между приложениями. В этом руководстве мы покажем, как подключить почту и календарь к OpenClaw и настроить автоматизацию под ваши задачи.</p>
+
+        <img src="/articles/images/email-laptop.jpg" alt="Управление почтой и календарём через OpenClaw" class="article-img">
+
+        <h2>Как подключить электронную почту к OpenClaw?</h2>
+
+        <p>OpenClaw подключается к почтовому ящику по стандартным протоколам IMAP и SMTP. IMAP используется для чтения входящих писем, SMTP — для отправки. Эти протоколы поддерживаются практически всеми почтовыми сервисами: Gmail, Yandex, Mail.ru, Outlook, а также корпоративными серверами.</p>
+
+        <p>Для настройки вам потребуются: адрес IMAP-сервера (например, imap.gmail.com), порт (обычно 993 для SSL), адрес SMTP-сервера (smtp.gmail.com), порт SMTP (587 для TLS) и учётные данные. Для Gmail и ряда других сервисов вместо обычного пароля необходимо использовать пароль приложения, генерируемый в настройках безопасности аккаунта.</p>
+
+        <p>Если вы устанавливали OpenClaw через SimpleClaw, подключение выполняется через панель управления в разделе «Интеграции». Укажите параметры подключения и нажмите «Проверить соединение». Подробности процесса установки описаны в <a href="/articles/openclaw-telegram-setup.html">руководстве по настройке Telegram-бота</a>, где используется аналогичный принцип подключения внешних сервисов.</p>
+
+        <div class="info-box">
+            <p>Важно: для Gmail необходимо включить доступ по IMAP в настройках почты (Настройки > Все настройки > Пересылка и POP/IMAP) и создать пароль приложения в разделе безопасности Google-аккаунта. Обычный пароль не подойдёт, если включена двухфакторная аутентификация.</p>
+        </div>
+
+        <p>После подключения OpenClaw получает доступ ко всем папкам почтового ящика: входящие, отправленные, черновики, спам и пользовательские папки. Вы можете ограничить доступ определёнными папками через параметр разрешённых директорий в конфигурации. Вопросы безопасности хранения учётных данных подробно разобраны в <a href="/articles/openclaw-privacy-selfhosted.html">статье о приватности и self-hosting</a>.</p>
+
+        <h2>Как настроить автоматическую сортировку писем?</h2>
+
+        <p>Самый простой сценарий — попросить OpenClaw проверить почту командой в чат. Агент выдаёт список новых входящих с кратким описанием каждого. Вместо самостоятельного просмотра десятков сообщений вы получаете структурированную сводку за секунды.</p>
+
+        <p>Но OpenClaw почта и календарь позволяют намного больше. Агент анализирует содержимое писем и классифицирует их по категориям: рабочие, личные, рассылки, уведомления от сервисов, письма, требующие ответа. Вы можете спросить «Есть ли что-то срочное?» — и получить только действительно важные сообщения.</p>
+
+        <p>Интеллектуальная сортировка работает на основе анализа содержимого, отправителя и контекста предыдущей переписки. OpenClaw учитывает, какие отправители для вас приоритетны, какие темы требуют немедленного внимания, а какие могут подождать. Со временем точность классификации растёт.</p>
+
+        <p>В отличие от обычных почтовых фильтров, работающих с ключевыми словами, ИИ-сортировка понимает смысл сообщения. Письмо с темой «Обед завтра?» от коллеги попадёт в «Личные/Встречи», а не в «Работа», потому что агент распознаёт неформальный характер. Это одна из <a href="/articles/top-5-ways-to-use-openclaw.html">пяти самых популярных задач</a>, которые пользователи решают с помощью OpenClaw.</p>
+
+        <img src="/articles/images/robot.jpg" alt="ИИ-агент OpenClaw для управления почтой и календарём" class="article-img">
+
+        <h2>Автоматические ответы и составление писем</h2>
+
+        <p>OpenClaw составляет черновики ответов на входящие письма. Вы получаете сводку новых сообщений и выбираете те, на которые хотите ответить. Например: «Ответь Ивану, что согласен на встречу в четверг в 15:00, но предпочёл бы онлайн-формат». Агент создаст грамотный ответ, учитывая контекст переписки.</p>
+
+        <p>Для типовых ситуаций настраиваются полностью автоматические ответы. Если вы часто получаете вопросы «Какой график работы?» или «Как заказать услугу?», OpenClaw самостоятельно отвечает, используя шаблоны или генерируя ответ на основе базы знаний.</p>
+
+        <p>При составлении писем агент учитывает стиль коммуникации. Деловые письма пишутся формально, личные — более свободно. Предпочтительный стиль задаётся в системных настройках: формальный, полуформальный или дружеский.</p>
+
+        <p>Важно: автоматические ответы по умолчанию сохраняются как черновики. Агент не отправляет их самостоятельно, пока вы не подтвердите. Полностью автоматическую отправку можно включить для определённых сценариев, но рекомендуется осторожность и предварительное тестирование правил.</p>
+
+        <img src="/articles/images/calendar.jpg" alt="Управление Google Calendar через OpenClaw" class="article-img">
+
+        <h2>Можно ли управлять Google Calendar через OpenClaw?</h2>
+
+        <p>Да, OpenClaw поддерживает полноценное подключение к Google Calendar через OAuth2, а также к CalDAV-совместимым серверам (Nextcloud, Radicale, Baikal) и другим календарным сервисам. Вы авторизуете доступ через стандартную страницу Google, и OpenClaw получает возможность читать и создавать события.</p>
+
+        <p>После подключения управление календарём происходит через чат. Команды вроде «Что запланировано на завтра?» или «Покажи расписание на следующую неделю» выводят список событий с учётом часовых поясов в вашем локальном формате.</p>
+
+        <p>Создание событий происходит естественным языком. Напишите: «Запланируй встречу с командой на пятницу в 14:00 на полтора часа. Тема — обсуждение нового проекта». OpenClaw создаст событие с правильной датой, временем, продолжительностью и описанием. При необходимости пригласить участников укажите их email — агент отправит приглашения автоматически.</p>
+
+        <p>Для CalDAV-серверов достаточно URL сервера и учётных данных. Многие self-hosted решения используют именно CalDAV, что делает OpenClaw совместимым с широким спектром инструментов планирования. Если вы также автоматизируете работу в браузере, рекомендуем ознакомиться с <a href="/articles/openclaw-browser-automation.html">гайдом по автоматизации браузера</a>.</p>
+
+        <h2>Умные напоминания и оптимизация расписания через OpenClaw</h2>
+
+        <p>OpenClaw выходит далеко за рамки обычного календаря благодаря интеллектуальным напоминаниям. Вы устанавливаете напоминание не просто по времени, а по условию: «Напомни позвонить Андрею, когда он ответит на письмо» или «Уведоми за час до первой встречи каждый рабочий день».</p>
+
+        <p>Агент анализирует расписание и предлагает оптимизации. Если между двумя встречами всего 15 минут, а на дорогу нужно 30, OpenClaw предупредит о конфликте. В свободные окна агент может предложить запланировать задачи из очереди.</p>
+
+        <p>Регулярные события создаются через описание паттерна: «Каждый понедельник в 10:00 — планёрка, каждую среду в 16:00 — встреча по проекту». OpenClaw создаст повторяющиеся события и корректно управляет исключениями — отмена одного вхождения не затрагивает остальные.</p>
+
+        <p>Утренняя сводка — особенно востребованная функция. Настройте OpenClaw так, чтобы каждое утро он отправлял краткое сообщение с расписанием на день, списком важных писем и напоминаниями. Это экономит десятки минут ежедневно.</p>
+
+        <h2>Автоматизация рабочих процессов: OpenClaw почта и календарь вместе</h2>
+
+        <p>Настоящая сила раскрывается, когда OpenClaw почта и календарь работают в связке. Агент создаёт цепочки автоматических действий, объединяя оба инструмента в единый рабочий процесс. Для бизнеса это критически важно — подробнее об этом в статье <a href="/articles/openclaw-for-business.html">OpenClaw для бизнеса</a>.</p>
+
+        <p><strong>Письмо в событие.</strong> Когда OpenClaw обнаруживает в письме предложение о встрече, он автоматически создаёт событие в календаре и предлагает подтвердить. Формулировки «Давайте созвонимся в четверг в 14:00» или «Встреча назначена на 15 марта» распознаются и конвертируются в записи с правильной датой и описанием.</p>
+
+        <p><strong>Подготовка к встречам.</strong> За определённое время до встречи OpenClaw подготовит сводку: соберёт последнюю переписку с участниками, найдёт связанные документы, напомнит о предыдущих договорённостях. Вы приходите на встречу полностью подготовленным.</p>
+
+        <p><strong>Контроль задач после встречи.</strong> Если были приняты решения и распределены задачи, OpenClaw отслеживает их выполнение. Агент напомнит исполнителям о сроках, проверит ответные письма и сообщит о статусе каждой задачи.</p>
+
+        <p><strong>Автоматическое перепланирование.</strong> При отмене встречи OpenClaw предлагает использовать освободившееся время для задачи из очереди. При получении срочного письма агент может предложить перенести менее важную встречу.</p>
+
+        <h2>Фильтрация спама и защита от фишинга</h2>
+
+        <p>Стандартные спам-фильтры работают хорошо, но OpenClaw добавляет дополнительный уровень защиты. ИИ-агент анализирует не только технические параметры письма, но и его содержание, распознавая фишинговые сообщения и нежелательные рассылки, прошедшие через обычные фильтры.</p>
+
+        <p>Вы настраиваете персональные правила: «Все письма с предложениями вебинаров — в папку «Позже», все от домена company.com — в приоритете, все автоматические уведомления — читать и сообщать только о важных». OpenClaw применяет правила интеллектуально, с учётом контекста каждого сообщения.</p>
+
+        <p>Агент также помогает с отпиской от нежелательных рассылок. По команде он проанализирует входящие за последний месяц, выявит все рассылки и предложит список для отписки. После подтверждения OpenClaw найдёт ссылки для отписки и выполнит процедуру.</p>
+
+        <p>При обнаружении подозрительных писем — фишинга, попыток социальной инженерии или вредоносных вложений — OpenClaw предупредит отдельным уведомлением с объяснением и рекомендациями.</p>
+
+        <div class="cta-box">
+            <div class="cta-heading">Готовы освободить 3 часа в день?</div>
+            <p class="cta-desc">SimpleClaw настроит OpenClaw с подключением к почте и календарю за вас.</p>
+            <a href="/" class="cta-btn">
+                Начать автоматизацию
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2025 SimpleClaw. Все права защищены.</p>
+            <p style="margin-top: .5rem;">
+                <a href="/">Главная</a> &middot;
+                <a href="/articles/what-is-openclaw.html">Что такое OpenClaw</a> &middot;
+                <a href="/articles/openclaw-telegram-setup.html">Telegram-бот</a> &middot;
+                <a href="/articles/openclaw-browser-automation.html">Автоматизация браузера</a> &middot;
+                <a href="/articles/openclaw-for-business.html">Для бизнеса</a> &middot;
+                <a href="/articles/openclaw-privacy-selfhosted.html">Приватность</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

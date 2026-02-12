@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Автоматизация браузера с OpenClaw: полный гайд | SimpleClaw</title>
+    <meta name="description" content="Как использовать OpenClaw для автоматизации браузера. Настройка Chromium, веб-скрейпинг, заполнение форм и автоматические действия в интернете.">
+    <link rel="canonical" href="https://install-openclow.ru/articles/openclaw-browser-automation.html">
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta property="og:title" content="Автоматизация браузера с OpenClaw: полный гайд">
+    <meta property="og:description" content="Как использовать OpenClaw для автоматизации браузера. Настройка Chromium, веб-скрейпинг, заполнение форм и автоматические действия в интернете.">
+    <meta property="og:type" content="article">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:url" content="https://install-openclow.ru/articles/openclaw-browser-automation.html">
+    <meta property="og:site_name" content="SimpleClaw">
+    <meta property="og:image" content="https://install-openclow.ru/articles/images/code-screen.jpg">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Автоматизация браузера с OpenClaw: полный гайд">
+    <meta name="twitter:description" content="Как использовать OpenClaw для автоматизации браузера. Настройка Chromium, веб-скрейпинг, заполнение форм и автоматические действия в интернете.">
+    <meta name="twitter:image" content="https://install-openclow.ru/articles/images/code-screen.jpg">
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Автоматизация браузера с OpenClaw: полный гайд",
+        "description": "Как использовать OpenClaw для автоматизации браузера. Настройка Chromium, веб-скрейпинг, заполнение форм и автоматические действия в интернете.",
+        "url": "https://install-openclow.ru/articles/openclaw-browser-automation.html",
+        "publisher": {
+            "@type": "Organization",
+            "name": "SimpleClaw",
+            "url": "https://install-openclow.ru/"
+        },
+        "datePublished": "2026-02-11",
+        "dateModified": "2026-02-11",
+        "inLanguage": "ru"
+    }
+    </script>
+
+    <meta name="theme-color" content="#07080a">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-G8GBMRVTD7"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-G8GBMRVTD7');
+    </script>
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+            background: #07080a; color: #d4d4d8;
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.7; min-height: 100vh;
+        }
+        .container { max-width: 768px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+        a { color: #10b981; text-decoration: none; transition: color .2s; }
+        a:hover { color: #34d399; }
+        .back { display: inline-flex; align-items: center; gap: .5rem; color: #a1a1aa; font-size: .875rem; margin-bottom: 2rem; }
+        .back:hover { color: #fff; }
+        h1 { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1.3; margin-bottom: .75rem; }
+        h2 { font-size: 1.375rem; font-weight: 700; color: #fff; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.125rem; font-weight: 600; color: #e4e4e7; margin-top: 2rem; margin-bottom: .75rem; }
+        p { margin-bottom: 1rem; }
+        ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+        li { margin-bottom: .5rem; }
+        .byline { display: flex; align-items: center; gap: .75rem; margin-bottom: 2rem; color: #71717a; font-size: .875rem; }
+        .byline img { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; }
+        .byline .author { color: #a1a1aa; font-weight: 500; }
+        .byline .sep { margin: 0 .25rem; }
+        .lead { font-size: 1.125rem; color: #a1a1aa; margin-bottom: 2rem; }
+        .cta-box {
+            position: relative; background: #0d1117;
+            border: 1px solid rgba(255,255,255,.08);
+            border-left: 3px solid #10b981; border-radius: 12px;
+            padding: 2rem 2.25rem; margin: 3rem 0;
+            transition: border-color .3s ease, box-shadow .3s ease;
+            overflow: hidden;
+        }
+        .cta-box::before {
+            content: ''; position: absolute; top: 0; right: 0;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle at top right, rgba(16,185,129,.07) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .cta-box:hover {
+            border-color: rgba(16,185,129,.25);
+            box-shadow: 0 0 40px rgba(16,185,129,.05);
+        }
+        .cta-box .cta-heading {
+            font-size: 1.25rem; font-weight: 700; color: #f0f0f0;
+            margin-bottom: .5rem; line-height: 1.4;
+        }
+        .cta-box .cta-desc {
+            font-size: .9375rem; color: #8b8b9e;
+            margin-bottom: 1.5rem; line-height: 1.6;
+        }
+        .cta-btn {
+            display: inline-flex; align-items: center; gap: .5rem;
+            background: #10b981; color: #fff; font-weight: 600;
+            font-size: .875rem; padding: .625rem 1.5rem;
+            border-radius: 8px; text-decoration: none;
+            transition: background .2s, transform .15s, box-shadow .2s;
+        }
+        .cta-btn:hover {
+            background: #059669; color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(16,185,129,.25);
+        }
+        .cta-btn svg { transition: transform .2s; }
+        .cta-btn:hover svg { transform: translateX(3px); }.info-box {
+            background: #172554; border: 1px solid #1e3a5f; border-radius: .75rem;
+            padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+        }
+        .info-box p { color: #93c5fd; margin: 0; }
+        .article-img {
+            width: 100%; border-radius: .75rem; margin: 1.5rem 0;
+            display: block;
+        }
+        .footer {
+            margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #27272a;
+            text-align: center; color: #71717a; font-size: .875rem;
+        }
+        @media (max-width: 640px) {
+            h1 { font-size: 1.5rem; }
+            h2 { font-size: 1.125rem; }
+            .container { padding: 1.5rem 1rem 3rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+            На главную
+        </a>
+
+        <h1>Автоматизация браузера с OpenClaw: полный гайд</h1>
+
+        <div class="byline">
+            <img src="/articles/images/openclaw-logo.png" alt="SimpleClaw">
+            <div>
+                <span class="author">Команда SimpleClaw</span>
+                <span class="sep">&middot;</span> 11 февраля 2026
+                <span class="sep">&middot;</span> 10 мин чтения
+            </div>
+        </div>
+
+        <p class="lead">Каждый день специалисты тратят часы на рутинные действия в браузере: копирование данных между вкладками, заполнение одинаковых форм, ручной мониторинг десятков страниц. Эта монотонная работа крадёт время, которое можно посвятить стратегическим задачам. Автоматизация браузера OpenClaw решает эту проблему, позволяя ИИ-агенту самостоятельно управлять полноценным браузером Chromium, открывать сайты, извлекать информацию, заполнять поля и выполнять сложные цепочки действий. Вам достаточно описать задачу на естественном языке, а агент разберётся, какие именно шаги предпринять. В этом подробном гайде мы покажем, как настроить, запустить и эффективно использовать автоматизацию браузера OpenClaw для реальных сценариев, от веб-скрейпинга до автоматической публикации контента.</p>
+
+        <img src="/articles/images/code-screen.jpg" alt="Код автоматизации браузера OpenClaw на экране монитора" class="article-img">
+
+        <h2>Как работает автоматизация браузера OpenClaw</h2>
+
+        <p>OpenClaw управляет встроенным безголовым браузером Chromium через протокол CDP (Chrome DevTools Protocol). Термин «безголовый» означает, что браузер функционирует без графического интерфейса: все действия выполняются в фоновом режиме на сервере, быстро и без потребности в реальном экране.</p>
+
+        <p>Протокол CDP предоставляет программный доступ к тем же функциям, которые используют инструменты разработчика в Chrome. Через него агент перемещается по страницам, кликает по элементам, вводит текст, создаёт скриншоты и извлекает содержимое DOM-дерева. Если вы ещё не знакомы с самой платформой, рекомендуем начать со статьи <a href="/articles/what-is-openclaw.html">Что такое OpenClaw</a>.</p>
+
+        <p>Главное отличие подхода OpenClaw от классических инструментов вроде Selenium или Puppeteer в том, что вам не нужно писать ни строчки кода. Вы описываете задачу естественным языком, например: «Зайди на сайт магазина, найди товар X и сообщи его текущую цену». Агент самостоятельно откроет сайт, найдёт нужный элемент и вернёт результат.</p>
+
+        <p>MCP-инструменты (Model Context Protocol) расширяют возможности браузерной автоматизации, предоставляя ИИ-агенту структурированный набор функций: навигация по URL, клик по элементам, ввод текста, скроллинг, создание скриншотов и извлечение текстового содержимого. Полный обзор MCP-инструментов и других расширений доступен в разделе <a href="/articles/openclaw-skills-plugins.html">Скиллы и плагины OpenClaw</a>.</p>
+
+        <h2>Как установить Chromium в контейнер OpenClaw?</h2>
+
+        <p>Если вы развернули OpenClaw через SimpleClaw, Chromium уже включён в состав контейнера и готов к работе. Никаких дополнительных действий не требуется: достаточно активировать модуль браузерной автоматизации в настройках. Подробности процесса установки самого OpenClaw описаны в <a href="/articles/how-to-install-openclaw.html">пошаговом руководстве</a>.</p>
+
+        <p>При ручной установке убедитесь, что Chromium доступен внутри Docker-контейнера. В большинстве образов OpenClaw он предустановлен. Проверить можно командой <strong>docker exec openclaw chromium --version</strong>. Если браузер не найден, добавьте его в Dockerfile или установите вручную внутри контейнера.</p>
+
+        <p>Важный аспект — настройка профилей браузера. Профиль хранит cookies, кэш и данные авторизации. По умолчанию OpenClaw создаёт временный профиль для каждой сессии, который удаляется после завершения. Если вам нужно сохранять авторизацию между сессиями, настройте постоянный профиль в конфигурации.</p>
+
+        <div class="info-box">
+            <p>Внимание: при работе с сайтами, требующими авторизации, храните учётные данные безопасно. Используйте переменные окружения или секретное хранилище, а не записывайте пароли в конфигурационные файлы открытым текстом. Подробнее о защите данных читайте в <a href="/articles/openclaw-security-guide.html">руководстве по безопасности OpenClaw</a>.</p>
+        </div>
+
+        <p>Для серверного окружения рекомендуется настроить параметры запуска Chromium с флагами: <strong>--no-sandbox</strong>, <strong>--disable-gpu</strong>, <strong>--disable-dev-shm-usage</strong>. Последний флаг особенно критичен в Docker-контейнерах, где размер разделяемой памяти по умолчанию ограничен 64 МБ, чего недостаточно для Chromium.</p>
+
+        <img src="/articles/images/terminal.jpg" alt="Терминал с настройками Chromium для автоматизации браузера" class="article-img">
+
+        <h2>Как настроить веб-скрейпинг через OpenClaw?</h2>
+
+        <p>Веб-скрейпинг — одно из самых востребованных применений автоматизации браузера OpenClaw. Процесс интуитивно прост: вы формулируете запрос на естественном языке, а агент самостоятельно находит и извлекает нужные данные со страниц.</p>
+
+        <p>Рассмотрим практический пример: мониторинг цен. Вы просите OpenClaw ежедневно проверять стоимость определённого товара в интернет-магазине и уведомлять об изменениях. Агент откроет страницу товара, найдёт элемент с ценой, запомнит значение и сравнит с предыдущим. При изменении цены вы получите уведомление в <a href="/articles/openclaw-telegram-setup.html">Telegram</a> или по электронной почте.</p>
+
+        <p>Для сложных задач агент обрабатывает множество страниц одновременно. Например, вы можете попросить собрать данные о вакансиях с нескольких сайтов, агрегировать их и составить сводную таблицу с фильтрацией по зарплате, локации или требуемому опыту.</p>
+
+        <p>OpenClaw корректно работает со страницами, использующими JavaScript-рендеринг. В отличие от простых HTTP-запросов, безголовый браузер полностью выполняет JavaScript и ждёт загрузки динамического контента. Это критично для современных одностраничных приложений (SPA), где данные подгружаются асинхронно.</p>
+
+        <img src="/articles/images/robot.jpg" alt="ИИ-робот для автоматизации браузера и веб-скрейпинга" class="article-img">
+
+        <h2>Какие задачи можно автоматизировать в браузере?</h2>
+
+        <p>Автоматизация браузера OpenClaw не ограничивается чтением данных. Агент способен выполнять активные действия: заполнять формы, нажимать кнопки, загружать файлы и проходить многошаговые процессы без единой строчки кода.</p>
+
+        <p>Типичный сценарий — автоматическое заполнение типовых форм. Если вам регулярно нужно заполнять однотипные заявки, отчёты или регистрационные документы, делегируйте это OpenClaw. Опишите, какие данные куда вводить, и агент выполнит задачу за секунды вместо минут ручной работы.</p>
+
+        <p>Более продвинутый вариант — создание автоматических рабочих цепочек. Представьте сценарий: зайти в корпоративную систему, скачать отчёт за вчерашний день, извлечь ключевые метрики, сформировать сводку и отправить её в групповой чат. OpenClaw выполняет подобные многошаговые задачи автономно, по расписанию или по команде. Для бизнеса это означает значительную экономию ресурсов, о чём мы подробно рассказываем в статье <a href="/articles/openclaw-for-business.html">OpenClaw для бизнеса</a>.</p>
+
+        <p>При заполнении форм агент обрабатывает различные типы полей: текстовые, выпадающие списки, чекбоксы, радиокнопки и файловые поля для загрузки документов. Он корректно работает с формами, разбитыми на несколько шагов, переходя между ними и заполняя все необходимые поля.</p>
+
+        <h2>Скриншоты и визуальный мониторинг с автоматизацией браузера</h2>
+
+        <p>Функция скриншотов — мощный инструмент автоматизации браузера OpenClaw. Агент делает снимки веб-страниц целиком или отдельных элементов. Это полезно для визуального мониторинга: регулярное получение скриншотов дашбордов, графиков или статусных страниц без необходимости самостоятельно заходить на сайт.</p>
+
+        <p>Скриншоты также помогают в отладке. Если агент сообщает, что не может найти нужный элемент, попросите его сделать снимок экрана. Вы увидите, что именно «видит» браузер, и скорректируете инструкции.</p>
+
+        <p>Можно настроить автоматический визуальный мониторинг: OpenClaw периодически делает скриншоты определённых страниц и сравнивает их с предыдущими версиями. При обнаружении значительных визуальных изменений вы получаете уведомление. Это полезно для мониторинга собственных сайтов, отслеживания конкурентов или проверки доступности сервисов.</p>
+
+        <h2>Практические примеры автоматизации браузера OpenClaw</h2>
+
+        <p>Рассмотрим конкретные сценарии, которые можно реализовать прямо сейчас.</p>
+
+        <h3>Мониторинг наличия товаров</h3>
+        <p>Настройте агента на ежечасную проверку наличия товара в интернет-магазине. Когда товар появится, вы мгновенно получите уведомление. Это особенно полезно для отслеживания дефицитных позиций: электроники, лимитированных коллекций или товаров со скидками.</p>
+
+        <h3>Сбор данных для аналитики</h3>
+        <p>Попросите OpenClaw ежедневно собирать курсы валют, цены на товары или рыночные показатели с нескольких источников. Агент скомпилирует информацию в удобный формат и отправит сводку. За неделю у вас накопится структурированный датасет для анализа трендов.</p>
+
+        <h3>Автоматическая публикация контента</h3>
+        <p>Если у вас есть регулярный контент для размещения на нескольких площадках, OpenClaw автоматизирует весь процесс. Подготовьте текст один раз — агент самостоятельно опубликует его на всех нужных платформах, адаптируя формат под каждую из них.</p>
+
+        <h3>Проверка работоспособности сайтов</h3>
+        <p>Настройте регулярную проверку ваших веб-сервисов. OpenClaw не просто пингует URL, а проходит полный пользовательский сценарий: открывает главную страницу, авторизуется, переходит в определённый раздел и проверяет корректность данных. При обнаружении проблем вы получите детальный отчёт со скриншотом.</p>
+
+        <h2>Безопасность и ограничения автоматизации браузера</h2>
+
+        <p>Автоматизация браузера OpenClaw — мощный инструмент, и его следует использовать ответственно. Всегда проверяйте, что агент работает только с указанными сайтами. В конфигурации задаётся белый список доменов, ограничивающий область действий и предотвращающий случайные переходы на вредоносные ресурсы.</p>
+
+        <p>Не храните пароли и токены в открытом виде. Используйте переменные окружения, секретные хранилища или встроенный менеджер учётных данных OpenClaw. При командной работе убедитесь, что доступ к конфигурации ограничен.</p>
+
+        <p>Учитывайте ограничения целевых сайтов. Многие ресурсы имеют защиту от ботов (CAPTCHA, rate limiting), и агрессивная автоматизация может привести к блокировке IP-адреса. Настройте разумные задержки между запросами и соблюдайте правила robots.txt.</p>
+
+        <p>Помните о правовых аспектах. Веб-скрейпинг разрешён не на всех сайтах. Изучите условия использования целевых ресурсов перед началом автоматизации. Для личного использования и мониторинга собственных ресурсов ограничений, как правило, нет.</p>
+
+        <div class="cta-box">
+            <div class="cta-heading">Хотите браузерную автоматизацию без боли?</div>
+            <p class="cta-desc">SimpleClaw устанавливает Chromium и настраивает профили при создании сервера.</p>
+            <a href="/" class="cta-btn">
+                Развернуть с браузером
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2025 SimpleClaw. Все права защищены.</p>
+            <p style="margin-top: .5rem;">
+                <a href="/">Главная</a> &middot;
+                <a href="/articles/what-is-openclaw.html">Что такое OpenClaw</a> &middot;
+                <a href="/articles/openclaw-telegram-setup.html">Telegram-бот</a> &middot;
+                <a href="/articles/openclaw-security-guide.html">Безопасность</a> &middot;
+                <a href="/articles/openclaw-for-business.html">Для бизнеса</a> &middot;
+                <a href="/articles/openclaw-email-calendar.html">Почта и календарь</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

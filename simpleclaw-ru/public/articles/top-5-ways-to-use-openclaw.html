@@ -75,18 +75,45 @@
         .byline .sep { margin: 0 .25rem; }
         .lead { font-size: 1.125rem; color: #a1a1aa; margin-bottom: 2rem; }
         .cta-box {
-            background: linear-gradient(135deg, #065f46 0%, #064e3b 100%);
-            border: 1px solid #10b98133; border-radius: 1rem;
-            padding: 1.5rem 2rem; text-align: center; margin: 2.5rem 0;
+            position: relative; background: #0d1117;
+            border: 1px solid rgba(255,255,255,.08);
+            border-left: 3px solid #10b981; border-radius: 12px;
+            padding: 2rem 2.25rem; margin: 3rem 0;
+            transition: border-color .3s ease, box-shadow .3s ease;
+            overflow: hidden;
         }
-        .cta-box p { color: #d1fae5; margin-bottom: 1rem; font-size: 1.0625rem; }
+        .cta-box::before {
+            content: ''; position: absolute; top: 0; right: 0;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle at top right, rgba(16,185,129,.07) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .cta-box:hover {
+            border-color: rgba(16,185,129,.25);
+            box-shadow: 0 0 40px rgba(16,185,129,.05);
+        }
+        .cta-box .cta-heading {
+            font-size: 1.25rem; font-weight: 700; color: #f0f0f0;
+            margin-bottom: .5rem; line-height: 1.4;
+        }
+        .cta-box .cta-desc {
+            font-size: .9375rem; color: #8b8b9e;
+            margin-bottom: 1.5rem; line-height: 1.6;
+        }
         .cta-btn {
-            display: inline-block; background: #10b981; color: #fff;
-            font-weight: 600; padding: .75rem 2rem; border-radius: .75rem;
-            font-size: 1rem; transition: background .2s;
+            display: inline-flex; align-items: center; gap: .5rem;
+            background: #10b981; color: #fff; font-weight: 600;
+            font-size: .875rem; padding: .625rem 1.5rem;
+            border-radius: 8px; text-decoration: none;
+            transition: background .2s, transform .15s, box-shadow .2s;
         }
-        .cta-btn:hover { background: #059669; color: #fff; }
-        .example-box {
+        .cta-btn:hover {
+            background: #059669; color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(16,185,129,.25);
+        }
+        .cta-btn svg { transition: transform .2s; }
+        .cta-btn:hover svg { transform: translateX(3px); }.example-box {
             background: #0f0f12; border: 1px solid #27272a; border-radius: .5rem;
             padding: 1rem; margin-top: .75rem; margin-bottom: 1.5rem;
         }
@@ -221,8 +248,12 @@
         <p>Когда привыкнете и поймёте, как работает OpenClaw, подключить остальные сценарии будет легко. Подробнее о возможностях читайте в статье <a href="/articles/what-is-openclaw.html">«Что такое OpenClaw»</a>, а инструкцию по установке — в <a href="/articles/how-to-install-openclaw.html">пошаговом руководстве</a>.</p>
 
         <div class="cta-box">
-            <p>Готовы автоматизировать рутину? SimpleClaw развернёт OpenClaw за минуту — без технических знаний.</p>
-            <a href="/" class="cta-btn">Начать сейчас</a>
+            <div class="cta-heading">Готовы автоматизировать рутину?</div>
+            <p class="cta-desc">SimpleClaw настроит OpenClaw со всеми интеграциями — Telegram, почта, браузер.</p>
+            <a href="/" class="cta-btn">
+                Начать автоматизацию
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
         </div>
 
         <div class="footer">

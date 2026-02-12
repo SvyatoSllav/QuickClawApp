@@ -382,7 +382,7 @@
                         <div class="flex-1 md:pl-10 min-w-0 flex flex-col justify-center pt-6 md:pt-0 gap-3">
                             <p class="text-base sm:text-lg font-medium text-zinc-400 italic">SimpleClaw</p>
                             <p class="text-2xl sm:text-3xl font-semibold text-white tabular-nums">&lt;1 мин</p>
-                            <span class="flex items-center gap-2"><span class="text-lg sm:text-xl font-semibold text-emerald-400">2999 ₽/мес</span><span class="text-base sm:text-lg text-zinc-500 line-through">7999 ₽</span></span>
+                            
                             <p class="text-sm sm:text-base text-zinc-400">Выберите модель, подключите Telegram, разверните — готово.</p>
                             <p class="text-sm text-emerald-400/80">$15 API-кредитов включено ежемесячно</p>
                         </div>
@@ -413,11 +413,31 @@
             <!-- Footer -->
             <div class="w-full px-4 sm:px-6 pt-12 pb-8 flex flex-col gap-6 max-w-5xl mx-auto items-center text-center">
                 <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm">
-                    <a href="/articles/how-to-install-openclaw.html" class="text-zinc-400 hover:text-white transition-colors">Как установить OpenClaw</a>
+                    <a href="/articles/how-to-install-openclaw.html" class="text-zinc-400 hover:text-white transition-colors">Как установить</a>
                     <div class="size-1 rounded-full bg-current opacity-60"></div>
                     <a href="/articles/what-is-openclaw.html" class="text-zinc-400 hover:text-white transition-colors">Что такое OpenClaw</a>
                     <div class="size-1 rounded-full bg-current opacity-60"></div>
                     <a href="/articles/top-5-ways-to-use-openclaw.html" class="text-zinc-400 hover:text-white transition-colors">Топ 5 способов</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-security-guide.html" class="text-zinc-400 hover:text-white transition-colors">Безопасность</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-token-optimization.html" class="text-zinc-400 hover:text-white transition-colors">Оптимизация токенов</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-vs-chatgpt.html" class="text-zinc-400 hover:text-white transition-colors">OpenClaw vs ChatGPT</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-telegram-setup.html" class="text-zinc-400 hover:text-white transition-colors">Telegram-бот</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-browser-automation.html" class="text-zinc-400 hover:text-white transition-colors">Автоматизация</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-for-business.html" class="text-zinc-400 hover:text-white transition-colors">Для бизнеса</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-models-comparison.html" class="text-zinc-400 hover:text-white transition-colors">Сравнение моделей</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-privacy-selfhosted.html" class="text-zinc-400 hover:text-white transition-colors">Приватность</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-skills-plugins.html" class="text-zinc-400 hover:text-white transition-colors">Скиллы и плагины</a>
+                    <div class="size-1 rounded-full bg-current opacity-60"></div>
+                    <a href="/articles/openclaw-email-calendar.html" class="text-zinc-400 hover:text-white transition-colors">Почта и календарь</a>
                 </div>
                 <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm sm:text-base">
                     <span class="text-white font-medium">Тарасов Святослав</span>

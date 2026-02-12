@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Безопасность OpenClaw: как защитить свои данные | SimpleClaw</title>
+    <meta name="description" content="Полное руководство по безопасности OpenClaw. Настройка доступов, шифрование данных, защита API-ключей и лучшие практики для self-hosted AI-ассистента.">
+    <link rel="canonical" href="https://install-openclow.ru/articles/openclaw-security-guide.html">
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <meta property="og:title" content="Безопасность OpenClaw: как защитить свои данные">
+    <meta property="og:description" content="Полное руководство по безопасности OpenClaw. Настройка доступов, шифрование данных, защита API-ключей и лучшие практики для self-hosted AI-ассистента.">
+    <meta property="og:type" content="article">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:url" content="https://install-openclow.ru/articles/openclaw-security-guide.html">
+    <meta property="og:site_name" content="SimpleClaw">
+    <meta property="og:image" content="/articles/images/server-rack.jpg">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Безопасность OpenClaw: как защитить свои данные">
+    <meta name="twitter:description" content="Полное руководство по безопасности OpenClaw. Настройка доступов, шифрование данных, защита API-ключей и лучшие практики для self-hosted AI-ассистента.">
+    <meta name="twitter:image" content="/articles/images/server-rack.jpg">
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Безопасность OpenClaw: как защитить свои данные",
+        "description": "Полное руководство по безопасности OpenClaw. Настройка доступов, шифрование данных, защита API-ключей и лучшие практики для self-hosted AI-ассистента.",
+        "url": "https://install-openclow.ru/articles/openclaw-security-guide.html",
+        "publisher": {
+            "@type": "Organization",
+            "name": "SimpleClaw"
+        },
+        "datePublished": "2026-02-11",
+        "dateModified": "2026-02-11",
+        "inLanguage": "ru"
+    }
+    </script>
+
+    <meta name="theme-color" content="#07080a">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+            background: #07080a; color: #d4d4d8;
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.7; min-height: 100vh;
+        }
+        .container { max-width: 768px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+        a { color: #10b981; text-decoration: none; transition: color .2s; }
+        a:hover { color: #34d399; }
+        .back { display: inline-flex; align-items: center; gap: .5rem; color: #a1a1aa; font-size: .875rem; margin-bottom: 2rem; }
+        .back:hover { color: #fff; }
+        h1 { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1.3; margin-bottom: .75rem; }
+        h2 { font-size: 1.375rem; font-weight: 700; color: #fff; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.125rem; font-weight: 600; color: #e4e4e7; margin-top: 2rem; margin-bottom: .75rem; }
+        p { margin-bottom: 1rem; }
+        ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+        li { margin-bottom: .5rem; }
+        .byline { display: flex; align-items: center; gap: .75rem; margin-bottom: 2rem; color: #71717a; font-size: .875rem; }
+        .byline img { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; }
+        .byline .author { color: #a1a1aa; font-weight: 500; }
+        .byline .sep { margin: 0 .25rem; }
+        .lead { font-size: 1.125rem; color: #a1a1aa; margin-bottom: 2rem; }
+        .cta-box {
+            position: relative; background: #0d1117;
+            border: 1px solid rgba(255,255,255,.08);
+            border-left: 3px solid #10b981; border-radius: 12px;
+            padding: 2rem 2.25rem; margin: 3rem 0;
+            transition: border-color .3s ease, box-shadow .3s ease;
+            overflow: hidden;
+        }
+        .cta-box::before {
+            content: ''; position: absolute; top: 0; right: 0;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle at top right, rgba(16,185,129,.07) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .cta-box:hover {
+            border-color: rgba(16,185,129,.25);
+            box-shadow: 0 0 40px rgba(16,185,129,.05);
+        }
+        .cta-box .cta-heading {
+            font-size: 1.25rem; font-weight: 700; color: #f0f0f0;
+            margin-bottom: .5rem; line-height: 1.4;
+        }
+        .cta-box .cta-desc {
+            font-size: .9375rem; color: #8b8b9e;
+            margin-bottom: 1.5rem; line-height: 1.6;
+        }
+        .cta-btn {
+            display: inline-flex; align-items: center; gap: .5rem;
+            background: #10b981; color: #fff; font-weight: 600;
+            font-size: .875rem; padding: .625rem 1.5rem;
+            border-radius: 8px; text-decoration: none;
+            transition: background .2s, transform .15s, box-shadow .2s;
+        }
+        .cta-btn:hover {
+            background: #059669; color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(16,185,129,.25);
+        }
+        .cta-btn svg { transition: transform .2s; }
+        .cta-btn:hover svg { transform: translateX(3px); }.info-box {
+            background: #172554; border: 1px solid #1e3a5f; border-radius: .75rem;
+            padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+        }
+        .info-box p { color: #93c5fd; margin: 0; }
+        .article-img {
+            width: 100%; border-radius: .75rem; margin: 1.5rem 0;
+            display: block;
+        }
+        .article-img-caption {
+            text-align: center; color: #71717a; font-size: .8125rem;
+            margin-top: -.75rem; margin-bottom: 1.5rem;
+        }
+        .footer {
+            margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #27272a;
+            text-align: center; color: #71717a; font-size: .875rem;
+        }
+        @media (max-width: 640px) {
+            h1 { font-size: 1.5rem; }
+            h2 { font-size: 1.125rem; }
+            .container { padding: 1.5rem 1rem 3rem; }
+        }
+    </style>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-G8GBMRVTD7"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-G8GBMRVTD7');
+    </script>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back">&larr; Назад на главную</a>
+
+        <h1>Безопасность OpenClaw: как защитить свои данные</h1>
+
+        <div class="byline">
+            <img src="/articles/images/openclaw-logo.png" alt="SimpleClaw">
+            <span class="author">Команда SimpleClaw</span>
+            <span class="sep">&middot;</span>
+            <span>11 февраля 2026</span>
+            <span class="sep">&middot;</span>
+            <span>10 мин чтения</span>
+        </div>
+
+        <p class="lead">Утечка одного API-ключа обходится в тысячи долларов. Незакрытый порт базы данных превращает ваш self-hosted AI-ассистент в открытую книгу для злоумышленников. С каждым месяцем атаки на self-hosted сервисы становятся всё изощрённее: боты сканируют GitHub за минуты, а автоматические скрипты проверяют стандартные порты круглосуточно. Безопасность OpenClaw -- это не опциональная надстройка, а фундамент, без которого все остальные преимущества self-hosted решения теряют смысл. В этом руководстве вы найдёте пошаговые инструкции по защите каждого компонента: от хранения секретов и настройки Docker до сетевой изоляции и мониторинга аномалий. Следуйте нашему чеклисту -- и ваша инсталляция будет защищена на уровне корпоративных стандартов.</p>
+
+        <img src="/articles/images/server-rack.jpg" alt="Серверная стойка с оборудованием" class="article-img">
+        <p class="article-img-caption">Self-hosted решения дают полный контроль над безопасностью, но требуют грамотной настройки</p>
+
+        <h2>Почему безопасность OpenClaw критически важна для self-hosted AI</h2>
+
+        <p>Одно из главных преимуществ OpenClaw перед облачными сервисами -- все данные остаются на вашем сервере. Ни один запрос, ни одно сообщение не покидает вашу инфраструктуру без вашего ведома. Однако это преимущество работает только при корректной настройке защиты.</p>
+
+        <p>Типичная <a href="/articles/how-to-install-openclaw.html">установка OpenClaw</a> включает несколько компонентов: веб-интерфейс, серверную часть на Node.js, базу данных для хранения истории переписок и интеграции с внешними API. Каждый из этих компонентов -- потенциальная точка атаки, если его не защитить.</p>
+
+        <p>Представьте: через ассистент проходят финансовые отчёты, стратегические планы, персональные данные клиентов. Если злоумышленник получит доступ к вашей инсталляции, он получит историю всех разговоров и API-ключи для генерации запросов за ваш счёт.</p>
+
+        <p>Именно поэтому к безопасности OpenClaw нужно относиться так же серьёзно, как к защите любого корпоративного приложения. Тем более что <a href="/articles/openclaw-for-business.html">для бизнеса</a> утечка данных из AI-ассистента может обернуться не только финансовыми, но и репутационными потерями.</p>
+
+        <div class="info-box">
+            <p>Главное правило: относитесь к OpenClaw так, как если бы это было приложение с доступом к самым чувствительным данным вашей организации. Потому что, скорее всего, так оно и есть.</p>
+        </div>
+
+        <h2>Как защитить API-ключи от утечки?</h2>
+
+        <p>API-ключи для языковых моделей (Anthropic, OpenAI, Google) -- это ваши деньги в буквальном смысле. Утечка одного ключа приводит к счетам на тысячи долларов за считанные часы. Боты, сканирующие публичные репозитории, находят утекшие ключи за минуты.</p>
+
+        <h3>Файл .env и управление секретами</h3>
+
+        <p>OpenClaw хранит API-ключи в файле <code>.env</code>, который никогда не должен попадать в систему контроля версий. Убедитесь, что <code>.gitignore</code> содержит соответствующие записи.</p>
+
+        <p>Но даже этого недостаточно -- файл <code>.env</code> хранится на диске в открытом виде. Любой пользователь с доступом к серверу может его прочитать. Для серьёзных инсталляций используйте специализированные менеджеры секретов:</p>
+
+        <ul>
+            <li><strong>Docker Secrets</strong> -- встроенный механизм для Docker Swarm, который хранит секреты в зашифрованном виде и монтирует их как файлы внутри контейнера.</li>
+            <li><strong>HashiCorp Vault</strong> -- полноценный менеджер секретов с аудитом доступа, автоматической ротацией ключей и гранулярными политиками. Идеален для команд.</li>
+            <li><strong>SOPS (Secrets OPerationS)</strong> -- инструмент от Mozilla для хранения зашифрованных секретов прямо в репозитории. Расшифровка происходит только на сервере при наличии ключа.</li>
+        </ul>
+
+        <h3>Ротация ключей</h3>
+
+        <p>Установите правило: менять API-ключи не реже одного раза в 90 дней. У большинства провайдеров можно создать новый ключ до отзыва старого, что позволяет выполнить ротацию без простоя.</p>
+
+        <p>Автоматизируйте процесс через скрипт: запросить новый ключ через API провайдера, обновить конфигурацию OpenClaw, проверить работоспособность, отозвать старый ключ. Также обязательно настройте лимиты расходов -- это последняя линия обороны на случай утечки.</p>
+
+        <p>Если вы хотите минимизировать финансовые риски при работе с ключами, изучите наше руководство по <a href="/articles/openclaw-token-optimization.html">оптимизации расхода токенов</a>. Правильные лимиты расходов и мониторинг потребления -- важная часть стратегии безопасности.</p>
+
+        <h2>Настройка доступа и аутентификация</h2>
+
+        <p>По умолчанию веб-интерфейс OpenClaw не требует аутентификации. Это допустимо только при работе на локальной машине. Если система доступна из интернета -- настройка аутентификации обязательна.</p>
+
+        <h3>Базовая аутентификация через reverse proxy</h3>
+
+        <p>Самый простой способ защитить OpenClaw -- поставить перед ним reverse proxy (Nginx или Caddy) с базовой HTTP-аутентификацией. Метод не требует изменений в самом OpenClaw и настраивается за несколько минут.</p>
+
+        <p>Создайте файл с паролями через утилиту <code>htpasswd</code> и укажите его в конфигурации Nginx для соответствующего блока <code>location</code>.</p>
+
+        <h3>Аутентификация через OAuth / SSO</h3>
+
+        <p>Для корпоративной среды лучше использовать OAuth 2.0 через Authelia, Authentik или Keycloak. Это позволит интегрировать OpenClaw в существующую систему единого входа (SSO) и управлять доступом централизованно.</p>
+
+        <p>Пользователи смогут входить через Google Workspace, Microsoft Entra ID или LDAP-каталог. При этом помните о защите API-эндпоинтов -- веб-интерфейс не единственная точка входа.</p>
+
+        <p>OpenClaw также предоставляет REST API для интеграций, включая <a href="/articles/openclaw-skills-plugins.html">скиллы и плагины</a>. Эти эндпоинты тоже должны быть защищены токенами, которые хранятся так же тщательно, как и API-ключи провайдеров.</p>
+
+        <img src="/articles/images/terminal.jpg" alt="Терминал с настройкой безопасности" class="article-img">
+        <p class="article-img-caption">Правильная настройка доступов -- основа безопасности любого self-hosted приложения</p>
+
+        <h2>Шифрование данных: в покое и в движении</h2>
+
+        <p>Шифрование делится на две категории: при передаче (in transit) и при хранении (at rest). Для полноценной безопасности OpenClaw необходимы оба.</p>
+
+        <h3>HTTPS -- обязательный минимум</h3>
+
+        <p>Весь трафик между браузером и сервером OpenClaw должен идти через HTTPS. Caddy автоматически получит TLS-сертификат от Let's Encrypt. Для Nginx потребуется настроить Certbot.</p>
+
+        <p>Без HTTPS все запросы к AI, включая конфиденциальные данные, передаются в открытом виде и могут быть перехвачены в любой точке маршрута.</p>
+
+        <h3>Шифрование базы данных</h3>
+
+        <p>OpenClaw хранит историю разговоров в базе данных. Злоумышленник с доступом к файлам базы (например, через резервную копию) прочитает всю переписку с AI.</p>
+
+        <p>На Linux оптимальный вариант -- LUKS (Linux Unified Key Setup). Он шифрует раздел на уровне блочного устройства, что прозрачно для приложений. При использовании облачных провайдеров (AWS, Google Cloud, Hetzner) включите шифрование дисков через их встроенные средства.</p>
+
+        <h3>Шифрование резервных копий</h3>
+
+        <p>Резервные копии -- часто забываемый вектор утечки. Вы можете идеально защитить рабочий сервер, но незашифрованный бэкап на внешнем диске обнуляет всю работу.</p>
+
+        <p>Используйте <code>gpg</code> или <code>age</code> для шифрования бэкапов перед отправкой в хранилище. Автоматизируйте процесс через cron-задачу: дамп базы, шифрование, загрузка в S3-совместимое хранилище.</p>
+
+        <h2>Какие настройки Docker обеспечат максимальную защиту?</h2>
+
+        <p>OpenClaw работает в Docker-контейнерах, и правильная настройка контейнеризации -- критически важный уровень безопасности. Docker по умолчанию предоставляет определённую изоляцию, но её необходимо усилить.</p>
+
+        <h3>Принцип наименьших привилегий</h3>
+
+        <p>Никогда не запускайте контейнеры OpenClaw с флагом <code>--privileged</code>. Он отключает все ограничения безопасности и даёт контейнеру полный доступ к хост-системе. Вместо этого настройте минимально необходимые capabilities:</p>
+
+        <ul>
+            <li>Убедитесь, что процессы внутри контейнера работают от непривилегированного пользователя (не root). Проверьте это через <code>docker exec</code>.</li>
+            <li>Ограничьте ресурсы через <code>--memory</code> и <code>--cpus</code>, чтобы предотвратить атаки типа "отказ в обслуживании" на хост.</li>
+            <li>Используйте read-only файловую систему (<code>--read-only</code>), монтируя только необходимые тома для записи.</li>
+        </ul>
+
+        <h3>Сетевая изоляция контейнеров</h3>
+
+        <p>Создайте отдельную Docker-сеть для OpenClaw. Не подключайте контейнеры к стандартной bridge-сети. Контейнер с веб-интерфейсом должен быть доступен только через reverse proxy.</p>
+
+        <p>Контейнер с базой данных не должен быть доступен из внешней сети вообще. Используйте <code>docker-compose</code> с явным указанием сетей и не публикуйте порты базы данных на хосте.</p>
+
+        <img src="/articles/images/ai-chat.jpg" alt="AI-ассистент в безопасной среде" class="article-img">
+        <p class="article-img-caption">Безопасность OpenClaw начинается с правильной изоляции контейнеров и грамотного управления доступами</p>
+
+        <h3>Обновление образов</h3>
+
+        <p>Регулярно обновляйте Docker-образы. Уязвимости в базовых образах обнаруживаются постоянно, и разработчики OpenClaw оперативно выпускают обновления.</p>
+
+        <p>Настройте уведомления о доступных обновлениях через Watchtower, но обновляйтесь вручную после проверки changelog. О том, как правильно <a href="/articles/openclaw-privacy-selfhosted.html">настроить self-hosted окружение</a> с учётом приватности, читайте в отдельном руководстве.</p>
+
+        <h2>Как настроить сетевую безопасность для OpenClaw?</h2>
+
+        <p>Сетевой уровень -- это первое, что видит атакующий. Грамотная настройка файрвола и сетевых правил отсекает большинство автоматизированных атак ещё до того, как они дойдут до приложения.</p>
+
+        <h3>Настройка файрвола</h3>
+
+        <p>Используйте <code>ufw</code> или <code>iptables</code> для ограничения входящих соединений. Откройте только необходимые порты: 80 и 443 для HTTP/HTTPS, а также 22 для SSH (лучше сменить на нестандартный).</p>
+
+        <p>Все остальные порты должны быть закрыты. Особенно важно убедиться, что порты Docker-контейнеров (3000 для OpenClaw, 5432 для PostgreSQL) не доступны из интернета напрямую.</p>
+
+        <h3>Fail2Ban и защита от брутфорса</h3>
+
+        <p>Установите Fail2Ban для автоматической блокировки IP-адресов, которые пытаются подобрать пароли. Настройте мониторинг логов SSH, Nginx и самого OpenClaw.</p>
+
+        <p>Типичная конфигурация -- блокировка IP после 5 неудачных попыток входа на 30 минут. Для особо важных инсталляций используйте гео-блокировку, разрешив доступ только из стран, где находятся ваши пользователи.</p>
+
+        <h3>VPN для удалённого доступа</h3>
+
+        <p>Если OpenClaw используется ограниченным кругом лиц, закройте веб-интерфейс от публичного интернета полностью. Настройте VPN (WireGuard -- отличный выбор) и разрешите доступ только через туннель.</p>
+
+        <p>Это радикально сокращает поверхность атаки, оставляя доступным из интернета только VPN-порт.</p>
+
+        <div class="info-box">
+            <p>WireGuard настраивается за 10 минут и потребляет минимум ресурсов. Для команды из 5-10 человек это идеальное решение, которое закрывает большинство вопросов сетевой безопасности.</p>
+        </div>
+
+        <h2>Мониторинг и аудит безопасности OpenClaw</h2>
+
+        <p>Безопасность -- не одноразовая настройка, а непрерывный процесс. Вы должны знать, что происходит с вашей инсталляцией OpenClaw в любой момент времени.</p>
+
+        <h3>Логирование</h3>
+
+        <p>Настройте централизованное логирование. Логи OpenClaw, Nginx, Docker и операционной системы должны собираться в одном месте и храниться минимум 30 дней.</p>
+
+        <p>Используйте Loki + Grafana для небольших инсталляций или ELK (Elasticsearch, Logstash, Kibana) для крупных. Настройте алерты: множественные неудачные попытки входа, необычный расход токенов, доступ из незнакомых IP.</p>
+
+        <h3>Мониторинг расхода токенов</h3>
+
+        <p>Внезапный рост расхода токенов может свидетельствовать о компрометации API-ключей. Настройте мониторинг через дашборды провайдеров и собственные метрики OpenClaw.</p>
+
+        <p>Установите пороговые значения и алерты. Если расход за час превышает среднесуточный -- немедленно расследуйте инцидент.</p>
+
+        <h3>Регулярные аудиты</h3>
+
+        <p>Раз в месяц проводите аудит: все ли компоненты обновлены, нет ли новых открытых портов, актуальны ли ключи, работает ли ротация сертификатов.</p>
+
+        <p>Автоматизируйте проверки -- сканирование портов через <code>nmap</code>, проверку TLS-сертификатов, тест доступности эндпоинтов. Составьте чеклист и следуйте ему неукоснительно.</p>
+
+        <h2>Чеклист безопасности OpenClaw</h2>
+
+        <p>Подведём итоги. Вот минимальный набор мер для безопасной работы OpenClaw:</p>
+
+        <ol>
+            <li><strong>API-ключи</strong> хранятся в менеджере секретов или зашифрованном файле, а не в открытом <code>.env</code>.</li>
+            <li><strong>Аутентификация</strong> настроена для веб-интерфейса и API-эндпоинтов.</li>
+            <li><strong>HTTPS</strong> включён для всех соединений, HTTP-трафик перенаправляется на HTTPS.</li>
+            <li><strong>Файрвол</strong> настроен, открыты только необходимые порты (80, 443, SSH).</li>
+            <li><strong>Docker-контейнеры</strong> работают от непривилегированного пользователя, без флага <code>--privileged</code>.</li>
+            <li><strong>База данных</strong> не доступна из внешней сети, данные на зашифрованном разделе.</li>
+            <li><strong>Резервные копии</strong> создаются автоматически и шифруются перед отправкой в хранилище.</li>
+            <li><strong>Логирование и мониторинг</strong> настроены, алерты работают.</li>
+            <li><strong>Обновления</strong> устанавливаются регулярно, есть процедура ротации ключей.</li>
+            <li><strong>Fail2Ban</strong> или аналогичная защита от брутфорса активирована.</li>
+        </ol>
+
+        <p>Безопасность -- это марафон, а не спринт. Начните с базовых мер из этого чеклиста и постепенно усиливайте защиту. Каждый реализованный пункт делает вашу инсталляцию значительно безопаснее.</p>
+
+        <p>Преимущество self-hosted решения в том, что вы полностью контролируете каждый аспект защиты. А чтобы ваша инсталляция была не только безопасной, но и экономичной, изучите наш гайд по <a href="/articles/openclaw-token-optimization.html">оптимизации токенов</a> -- правильная настройка лимитов расхода напрямую связана с защитой от несанкционированного использования ключей.</p>
+
+        <div class="cta-box">
+            <div class="cta-heading">Не хотите настраивать всё вручную?</div>
+            <p class="cta-desc">SimpleClaw разворачивает OpenClaw с правильными настройками безопасности из коробки.</p>
+            <a href="/" class="cta-btn">
+                Попробовать SimpleClaw
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2026 SimpleClaw. Все права защищены.</p>
+            <p style="margin-top: .5rem;">
+                <a href="/">Главная</a> &middot;
+                <a href="/articles/what-is-openclaw.html">Что такое OpenClaw</a> &middot;
+                <a href="/articles/how-to-install-openclaw.html">Как установить</a> &middot;
+                <a href="/articles/openclaw-token-optimization.html">Оптимизация токенов</a> &middot;
+                <a href="/articles/openclaw-privacy-selfhosted.html">Приватность и self-hosting</a> &middot;
+                <a href="/articles/openclaw-for-business.html">Для бизнеса</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

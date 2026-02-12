@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Какую AI-модель выбрать для OpenClaw: Claude, GPT или Gemini | SimpleClaw</title>
+    <meta name="description" content="Сравнение AI-моделей для OpenClaw: Claude, GPT-4o, Gemini. Качество ответов, скорость, стоимость токенов и рекомендации по выбору.">
+    <link rel="canonical" href="https://install-openclow.ru/articles/openclaw-models-comparison.html">
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta property="og:title" content="Какую AI-модель выбрать для OpenClaw: Claude, GPT или Gemini">
+    <meta property="og:description" content="Сравнение AI-моделей для OpenClaw: Claude, GPT-4o, Gemini. Качество ответов, скорость, стоимость токенов и рекомендации по выбору.">
+    <meta property="og:type" content="article">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:url" content="https://install-openclow.ru/articles/openclaw-models-comparison.html">
+    <meta property="og:site_name" content="SimpleClaw">
+    <meta property="og:image" content="https://install-openclow.ru/og-image.png">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Какую AI-модель выбрать для OpenClaw: Claude, GPT или Gemini">
+    <meta name="twitter:description" content="Сравнение AI-моделей для OpenClaw: Claude, GPT-4o, Gemini. Качество ответов, скорость, стоимость токенов и рекомендации по выбору.">
+    <meta name="twitter:image" content="https://install-openclow.ru/og-image.png">
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Какую AI-модель выбрать для OpenClaw: Claude, GPT или Gemini",
+        "description": "Сравнение AI-моделей для OpenClaw: Claude, GPT-4o, Gemini. Качество ответов, скорость, стоимость токенов и рекомендации по выбору.",
+        "url": "https://install-openclow.ru/articles/openclaw-models-comparison.html",
+        "publisher": {
+            "@type": "Organization",
+            "name": "SimpleClaw",
+            "url": "https://install-openclow.ru/"
+        },
+        "datePublished": "2026-02-11",
+        "dateModified": "2026-02-11",
+        "inLanguage": "ru"
+    }
+    </script>
+
+    <meta name="theme-color" content="#07080a">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-G8GBMRVTD7"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-G8GBMRVTD7');
+    </script>
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Inter", ui-sans-serif, system-ui, sans-serif; background: #07080a; color: #d4d4d8; -webkit-font-smoothing: antialiased; line-height: 1.7; min-height: 100vh; }
+        .container { max-width: 768px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+        a { color: #10b981; text-decoration: none; transition: color .2s; }
+        a:hover { color: #34d399; }
+        .back { display: inline-flex; align-items: center; gap: .5rem; color: #a1a1aa; font-size: .875rem; margin-bottom: 2rem; }
+        .back:hover { color: #fff; }
+        h1 { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1.3; margin-bottom: .75rem; }
+        h2 { font-size: 1.375rem; font-weight: 700; color: #fff; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.125rem; font-weight: 600; color: #e4e4e7; margin-top: 2rem; margin-bottom: .75rem; }
+        p { margin-bottom: 1rem; }
+        ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+        li { margin-bottom: .5rem; }
+        .byline { display: flex; align-items: center; gap: .75rem; margin-bottom: 2rem; color: #71717a; font-size: .875rem; }
+        .byline img { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; }
+        .byline .author { color: #a1a1aa; font-weight: 500; }
+        .byline .sep { margin: 0 .25rem; }
+        .lead { font-size: 1.125rem; color: #a1a1aa; margin-bottom: 2rem; }
+        .cta-box {
+            position: relative; background: #0d1117;
+            border: 1px solid rgba(255,255,255,.08);
+            border-left: 3px solid #10b981; border-radius: 12px;
+            padding: 2rem 2.25rem; margin: 3rem 0;
+            transition: border-color .3s ease, box-shadow .3s ease;
+            overflow: hidden;
+        }
+        .cta-box::before {
+            content: ''; position: absolute; top: 0; right: 0;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle at top right, rgba(16,185,129,.07) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .cta-box:hover {
+            border-color: rgba(16,185,129,.25);
+            box-shadow: 0 0 40px rgba(16,185,129,.05);
+        }
+        .cta-box .cta-heading {
+            font-size: 1.25rem; font-weight: 700; color: #f0f0f0;
+            margin-bottom: .5rem; line-height: 1.4;
+        }
+        .cta-box .cta-desc {
+            font-size: .9375rem; color: #8b8b9e;
+            margin-bottom: 1.5rem; line-height: 1.6;
+        }
+        .cta-btn {
+            display: inline-flex; align-items: center; gap: .5rem;
+            background: #10b981; color: #fff; font-weight: 600;
+            font-size: .875rem; padding: .625rem 1.5rem;
+            border-radius: 8px; text-decoration: none;
+            transition: background .2s, transform .15s, box-shadow .2s;
+        }
+        .cta-btn:hover {
+            background: #059669; color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(16,185,129,.25);
+        }
+        .cta-btn svg { transition: transform .2s; }
+        .cta-btn:hover svg { transform: translateX(3px); }.info-box { background: #172554; border: 1px solid #1e3a5f; border-radius: .75rem; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+        .info-box p { color: #93c5fd; margin: 0; }
+        .article-img { width: 100%; border-radius: .75rem; margin: 1.5rem 0; display: block; }
+        .footer { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #27272a; text-align: center; color: #71717a; font-size: .875rem; }
+        @media (max-width: 640px) { h1 { font-size: 1.5rem; } h2 { font-size: 1.125rem; } .container { padding: 1.5rem 1rem 3rem; } }
+        .compare-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: .875rem; }
+        .compare-table th, .compare-table td { padding: .75rem 1rem; text-align: left; border-bottom: 1px solid #27272a; }
+        .compare-table th { color: #fff; font-weight: 600; background: #18181b; }
+        .compare-table td { color: #a1a1aa; }
+        .compare-table tr:hover td { background: #18181b33; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg> На главную</a>
+
+        <h1>Сравнение моделей OpenClaw: Claude, GPT и Gemini — какую выбрать</h1>
+
+        <div class="byline"><img src="/articles/images/openclaw-logo.png" alt="SimpleClaw"><div><span class="author">Команда SimpleClaw</span><span class="sep">&middot;</span> 11 февраля 2026 <span class="sep">&middot;</span> 12 мин чтения</div></div>
+
+        <img src="/articles/images/ai-chat.jpg" alt="Сравнение моделей OpenClaw — выбор AI-модели" class="article-img">
+
+        <p class="lead">Вы подключили OpenClaw, написали первый промт и получили ответ. Но какая модель стоит за этим ответом — и насколько она подходит именно для ваших задач? Разница между Claude Opus и Gemini Flash может составить десятикратную разницу в стоимости и кардинально отличаться в качестве. Одна модель идеально генерирует код, другая лучше работает с русским текстом, третья экономит бюджет на рутинных задачах. Сравнение моделей OpenClaw — ключевой шаг к тому, чтобы платить меньше и получать лучшие результаты. В этом руководстве мы детально разберём каждую модель по качеству, скорости и стоимости, дадим конкретные рекомендации для разных сценариев и покажем, как настроить интеллектуальную маршрутизацию, которая сэкономит до 70% бюджета. Если вы ещё не знакомы с платформой, начните со статьи <a href="/articles/what-is-openclaw.html">Что такое OpenClaw</a>.</p>
+
+        <h2>Какая модель лучше всего подходит для OpenClaw?</h2>
+
+        <p>Однозначного ответа нет — лучшая модель зависит от вашей задачи, бюджета и требований к скорости. Но есть чёткие ориентиры, проверенные на практике тысячами пользователей.</p>
+
+        <p>Для генерации и рефакторинга кода лидирует <strong>Claude Sonnet</strong>. Он стабильно выдаёт работоспособный код на Python, TypeScript, Go и других языках, хорошо понимает контекст и учитывает существующую кодовую базу. Для архитектурных решений и сложного дебага есть <strong>Claude Opus</strong> — флагманская модель, лучшая в длинных аналитических задачах.</p>
+
+        <p><strong>GPT-4o</strong> конкурирует с Claude в большинстве задач и особенно силён в мультимодальном анализе — работа с текстом, изображениями и аудио в одном запросе. <strong>Gemini Pro</strong> выигрывает при работе с фактической информацией и имеет огромное окно контекста в 1 миллион токенов.</p>
+
+        <p>Для повседневных задач — быстрые ответы, классификация, суммаризация — хватает бюджетных моделей: <strong>Claude Haiku</strong>, <strong>GPT-4o-mini</strong> или <strong>Gemini Flash</strong>. Они работают в 3-5 раз быстрее и стоят в 10-20 раз дешевле флагманов. Подробнее о том, как экономить на API-вызовах, читайте в нашем <a href="/articles/openclaw-token-optimization.html">руководстве по оптимизации токенов</a>.</p>
+
+        <h2>Обзор всех поддерживаемых моделей</h2>
+
+        <p>Одно из ключевых преимуществ OpenClaw — мультимодельная архитектура. Вместо привязки к одному провайдеру вы получаете единый интерфейс для моделей от Anthropic, OpenAI, Google и сообщества открытых решений.</p>
+
+        <h3>Anthropic Claude</h3>
+        <p><strong>Claude Opus</strong> — флагман, демонстрирующий лучшие результаты в сложном рассуждении и генерации кода. Отлично удерживает контекст на протяжении тысяч токенов. <strong>Claude Sonnet</strong> — сбалансированный вариант, оптимальный для большинства пользователей. <strong>Claude Haiku</strong> — самая быстрая и дешёвая модель в линейке, идеальная для простых задач.</p>
+
+        <h3>OpenAI GPT</h3>
+        <p><strong>GPT-4o</strong> — мультимодальная модель с высокой скоростью при сохранении качества уровня GPT-4. Хорошо работает с текстом, изображениями и аудио. <strong>GPT-4o-mini</strong> — облегчённая версия, значительно дешевле, но способная решать большинство повседневных задач.</p>
+
+        <h3>Google Gemini</h3>
+        <p><strong>Gemini Pro</strong> сильна в работе с фактами и мультимодальном анализе. <strong>Gemini Flash</strong> — быстрая и экономичная альтернатива, оптимизированная для минимальной задержки и потоковой обработки запросов.</p>
+
+        <h3>Открытые модели</h3>
+        <p><strong>Llama</strong> (Meta) и другие открытые модели можно запускать локально через Ollama или vLLM. Это единственный вариант, при котором данные вообще не покидают ваш сервер. Качество уступает коммерческим моделям, но для суммаризации, классификации и шаблонного текста их достаточно.</p>
+
+        <h2>Сколько стоит использование разных моделей?</h2>
+
+        <p>Стоимость — один из главных факторов при выборе модели. Ниже приведена таблица с ключевыми характеристиками моделей, доступных в OpenClaw. Цена указана за миллион токенов (ввод/вывод).</p>
+
+        <table class="compare-table">
+            <thead>
+                <tr>
+                    <th>Модель</th>
+                    <th>Качество</th>
+                    <th>Скорость</th>
+                    <th>Ввод / Вывод</th>
+                    <th>Контекст</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Claude Opus</td>
+                    <td>Отличное</td>
+                    <td>Средняя</td>
+                    <td>$15 / $75</td>
+                    <td>200K</td>
+                </tr>
+                <tr>
+                    <td>Claude Sonnet</td>
+                    <td>Высокое</td>
+                    <td>Быстрая</td>
+                    <td>$3 / $15</td>
+                    <td>200K</td>
+                </tr>
+                <tr>
+                    <td>Claude Haiku</td>
+                    <td>Хорошее</td>
+                    <td>Очень быстрая</td>
+                    <td>$0.25 / $1.25</td>
+                    <td>200K</td>
+                </tr>
+                <tr>
+                    <td>GPT-4o</td>
+                    <td>Высокое</td>
+                    <td>Быстрая</td>
+                    <td>$2.50 / $10</td>
+                    <td>128K</td>
+                </tr>
+                <tr>
+                    <td>GPT-4o-mini</td>
+                    <td>Хорошее</td>
+                    <td>Очень быстрая</td>
+                    <td>$0.15 / $0.60</td>
+                    <td>128K</td>
+                </tr>
+                <tr>
+                    <td>Gemini Pro</td>
+                    <td>Высокое</td>
+                    <td>Средняя</td>
+                    <td>$1.25 / $5</td>
+                    <td>1M</td>
+                </tr>
+                <tr>
+                    <td>Gemini Flash</td>
+                    <td>Хорошее</td>
+                    <td>Очень быстрая</td>
+                    <td>$0.075 / $0.30</td>
+                    <td>1M</td>
+                </tr>
+                <tr>
+                    <td>Llama 3 70B</td>
+                    <td>Хорошее</td>
+                    <td>Зависит от GPU</td>
+                    <td>Бесплатно*</td>
+                    <td>128K</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box">
+            <p>* Llama и другие открытые модели бесплатны по стоимости токенов, но требуют собственного оборудования. Затраты на GPU-сервер могут составлять от $50 до $500+ в месяц.</p>
+        </div>
+
+        <p>Теперь посмотрим, во что это выливается на практике в трёх типичных сценариях.</p>
+
+        <h3>Персональное использование</h3>
+        <p>Средний пользователь отправляет 30-50 запросов в день. При среднем размере в 500 токенов ввода и 1000 токенов вывода месячный объём составит примерно 1.5 млн токенов ввода и 3 млн вывода. На Claude Sonnet это обойдётся в $49.50 в месяц.</p>
+
+        <p>При использовании Haiku для простых запросов (50% трафика) и Sonnet для сложных — стоимость снижается до $26 в месяц. С GPT-4o-mini в качестве базовой модели — около $12.</p>
+
+        <h3>Небольшая команда (5-10 человек)</h3>
+        <p>Команда из 8 разработчиков генерирует 200-400 запросов в день. При маршрутизации 60% через Haiku, 30% через Sonnet и 10% через Opus месячная стоимость составит $150-300. Без маршрутизации, только на Sonnet, — $400-500. Экономия достигает 40-60%.</p>
+
+        <h3>Бизнес-чат-бот для клиентов</h3>
+        <p>Клиентский чат-бот обрабатывает 2000-5000 запросов в день. Используя Gemini Flash для первичной обработки (80%) и Claude Sonnet для эскалации, компания удерживает расходы в $200-600 в месяц. Только на GPT-4o — $2000-4000. Подробнее о внедрении AI в бизнес-процессы читайте в статье <a href="/articles/openclaw-for-business.html">OpenClaw для бизнеса</a>.</p>
+
+        <img src="/articles/images/robot.jpg" alt="AI-модели и их возможности — сравнение моделей OpenClaw" class="article-img">
+
+        <h2>Сравнение моделей OpenClaw по качеству ответов</h2>
+
+        <p>Качество — понятие многогранное. Разные модели показывают разные сильные стороны в зависимости от задачи.</p>
+
+        <h3>Рассуждение и анализ</h3>
+        <p>В задачах с цепочкой логических рассуждений Claude Opus и GPT-4o показывают наилучшие результаты. Opus особенно хорош в длинных аналитических задачах — удерживает контекст и строит последовательные аргументы.</p>
+
+        <p>GPT-4o конкурирует по качеству, особенно в математических и научных задачах. Gemini Pro уступает в сложном рассуждении, но выигрывает при работе с фактами благодаря интеграции с поисковой базой Google.</p>
+
+        <h3>Генерация кода</h3>
+        <p>Claude Sonnet и Opus стабильно генерируют работоспособный код на Python, TypeScript, Go и других языках. GPT-4o также силён, особенно на популярных языках.</p>
+
+        <p>Gemini Flash подходит для простых задач — генерация сниппетов, дописывание функций, объяснение кода. Для архитектурных решений лучше использовать модели верхнего уровня. Это особенно важно при настройке <a href="/articles/openclaw-vs-chatgpt.html">альтернативы ChatGPT</a> для рабочих процессов.</p>
+
+        <h3>Работа с текстом на русском языке</h3>
+        <p>Claude демонстрирует наиболее естественный русский — минимум калек с английского, хорошая стилистика. GPT-4o также хорошо работает, хотя иногда допускает англицизмы.</p>
+
+        <p>Gemini Pro показывает приемлемое качество, но в сложных текстах может давать менее связные формулировки. Открытые модели на русском в целом слабее коммерческих аналогов.</p>
+
+        <h2>Скорость и задержка при сравнении моделей OpenClaw</h2>
+
+        <p>Скорость модели складывается из задержки до первого токена (TTFT) и скорости генерации (TPS). Для интерактивных чат-ботов критична TTFT — пользователь не хочет ждать несколько секунд до начала ответа.</p>
+
+        <p>Самые быстрые модели — Claude Haiku, GPT-4o-mini и Gemini Flash. Все три обеспечивают TTFT менее 500 мс и скорость 80-120 токенов в секунду. Идеальны для чат-интерфейсов с мгновенным откликом.</p>
+
+        <p>Claude Sonnet и GPT-4o занимают среднюю позицию: TTFT около 1-2 секунд, 40-70 TPS. Для большинства задач баланс качества и отзывчивости оптимальный.</p>
+
+        <p>Claude Opus — самая медленная коммерческая модель с TTFT до 3-5 секунд. Но для сложных задач, где качество критично, эта задержка оправдана.</p>
+
+        <img src="/articles/images/server-rack.jpg" alt="Серверная инфраструктура для AI-моделей" class="article-img">
+
+        <h2>Стратегии маршрутизации моделей</h2>
+
+        <p>Одно из самых мощных преимуществ OpenClaw — автоматическая маршрутизация запросов между моделями. Вместо одной модели для всех задач вы создаёте интеллектуальную систему, подбирающую оптимальную модель для каждого запроса.</p>
+
+        <h3>Каскадная маршрутизация</h3>
+        <p>Все запросы сначала обрабатывает дешёвая быстрая модель (Haiku или GPT-4o-mini). Если ответ неудовлетворительный или запрос слишком сложен, он перенаправляется на Sonnet или GPT-4o. Экономия — до 70% бюджета.</p>
+
+        <h3>Маршрутизация по типу задачи</h3>
+        <p>Запросы с кодом направляются на Claude Sonnet, фактические вопросы — на Gemini Pro, быстрые справочные — на Haiku. Классификатор работает на ключевых словах, тегах в промте или лёгкой модели.</p>
+
+        <h3>Ценовые лимиты</h3>
+        <p>OpenClaw позволяет устанавливать дневные и месячные лимиты расходов. Когда лимит приближается, система переключается на дешёвые модели. Бюджет под контролем, качество — максимальное в рамках доступных средств.</p>
+
+        <h2>Как переключить модель в OpenClaw?</h2>
+
+        <p>Смена модели занимает несколько секунд. В веб-интерфейсе откройте настройки чата и выберите модель из выпадающего списка. Переключение мгновенное: следующий запрос обработает новая модель, а история диалога сохранится.</p>
+
+        <p>Для API-интеграций модель указывается в параметре запроса. OpenClaw обеспечивает единый формат API вне зависимости от провайдера — переписывать код при смене модели не нужно. Это одно из ключевых отличий от прямого использования <a href="/articles/openclaw-vs-chatgpt.html">ChatGPT или Claude напрямую</a>.</p>
+
+        <p>Глобальные настройки задаются в конфигурационном файле. Здесь же настраиваются правила маршрутизации, лимиты и фоллбэки. Если основной провайдер недоступен, OpenClaw автоматически перенаправит запрос на резервную модель. Чтобы всё заработало, потребуется <a href="/articles/how-to-install-openclaw.html">установить OpenClaw</a> на свой сервер.</p>
+
+        <div class="info-box">
+            <p>Совет: начните с Claude Sonnet или GPT-4o в качестве модели по умолчанию. Через неделю проанализируйте статистику в панели OpenClaw и определите, какие задачи перевести на дешёвые модели.</p>
+        </div>
+
+        <h2>Рекомендации по типу пользователя</h2>
+
+        <h3>Для разработчиков</h3>
+        <p>Основная модель — Claude Sonnet. Для рутины (тесты, документация, простые функции) подключите Haiku. Для архитектурных решений и сложного дебага держите Opus как эскалационный вариант.</p>
+
+        <h3>Для бизнеса</h3>
+        <p>Начните с GPT-4o-mini или Gemini Flash как базовой модели. Для сложных обращений настройте эскалацию на Claude Sonnet. Обязательно установите бюджетные лимиты и мониторьте расходы через дашборд.</p>
+
+        <h3>Для обычных пользователей</h3>
+        <p>GPT-4o-mini или Claude Haiku достаточно для 90% повседневных задач — ответы на вопросы, суммаризация, перевод. Для особых случаев переключайтесь на мощную модель прямо в чате.</p>
+
+        <h3>Для тех, кто ценит приватность</h3>
+        <p>Запускайте открытые модели (Llama 3) локально через Ollama. Данные не покинут ваш сервер. Подробнее об этом подходе — в нашем <a href="/articles/openclaw-privacy-selfhosted.html">руководстве по приватности и self-hosting</a>.</p>
+
+        <div class="cta-box">
+            <div class="cta-heading">Не можете определиться с моделью?</div>
+            <p class="cta-desc">SimpleClaw настраивает умный роутинг между моделями — дорогая для сложного, дешёвая для простого.</p>
+            <a href="/" class="cta-btn">
+                Попробовать с роутингом
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2025 SimpleClaw. Все права защищены.</p>
+            <p style="margin-top: .5rem;">
+                <a href="/">Главная</a> &middot;
+                <a href="/articles/what-is-openclaw.html">Что такое OpenClaw</a> &middot;
+                <a href="/articles/openclaw-token-optimization.html">Оптимизация токенов</a> &middot;
+                <a href="/articles/openclaw-vs-chatgpt.html">OpenClaw vs ChatGPT</a> &middot;
+                <a href="/articles/openclaw-for-business.html">Для бизнеса</a> &middot;
+                <a href="/articles/openclaw-privacy-selfhosted.html">Приватность</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

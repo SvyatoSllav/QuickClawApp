@@ -63,11 +63,32 @@ class ServerManager:
         """Install Chromium browser inside OpenClaw container for browser automation"""
         logger.info(f'Installing Chromium in container on {self.server.ip_address}...')
 
-        self.exec_command(
-            'docker exec -u root openclaw apt-get update && '
-            'docker exec -u root openclaw apt-get install -y chromium fonts-liberation',
-            timeout=180
+        # Split into separate commands with error checking
+        out, err, code = self.exec_command(
+            'docker exec -u root openclaw apt-get update',
+            timeout=120
         )
+        if code != 0:
+            logger.warning(f'apt-get update failed (code {code}): {err[:300]}')
+            # Try apk for Alpine-based containers
+            out, err, code = self.exec_command(
+                'docker exec -u root openclaw apk update && '
+                'docker exec -u root openclaw apk add --no-cache chromium font-noto',
+                timeout=180
+            )
+            if code != 0:
+                logger.error(f'Browser install failed on {self.server.ip_address}: {err[:500]}')
+                return False
+        else:
+            out, err, code = self.exec_command(
+                'docker exec -u root openclaw apt-get install -y chromium fonts-liberation',
+                timeout=300
+            )
+            if code != 0:
+                logger.error(f'Chromium install failed on {self.server.ip_address}: {err[:500]}')
+                return False
+
+        logger.info(f'Chromium installed successfully on {self.server.ip_address}')
 
         browser_commands = [
             'docker exec openclaw node /app/openclaw.mjs browser create-profile --name headless --color "#00FF00" --driver openclaw 2>/dev/null || true',
@@ -80,6 +101,7 @@ class ServerManager:
             self.exec_command(cmd)
 
         logger.info(f'Browser configured on {self.server.ip_address}')
+        return True
 
     def configure_token_optimization(self, model_slug='claude-opus-4.5'):
         """Configure OpenClaw for optimal token usage to reduce costs."""
