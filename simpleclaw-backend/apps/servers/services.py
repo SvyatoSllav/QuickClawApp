@@ -166,6 +166,9 @@ class ServerManager:
 
             # --- Concurrency limit ---
             f'{cli} config set agents.defaults.maxConcurrent 2',
+
+            # --- Enable web search (uses headless browser) ---
+            f'{cli} config set web.enabled true',
         ]
 
         for cmd in optimization_commands:
@@ -356,6 +359,9 @@ limits:
             # Recreate to pick up new .env (restart doesn't reload env vars)
             self.exec_command(f'cd {path} && docker compose up -d --force-recreate')
             time.sleep(8)
+
+            # Reinstall Chromium (lost when container is recreated from image)
+            self.install_browser_in_container()
 
             self._fix_permissions()
 
@@ -820,8 +826,7 @@ def assign_server_to_user_sync(user_id):
                     notify_user(
                         tg_bot_user.chat_id,
                         f'🎉 Ваш бот готов!\n\n'
-                        f'Напишите <b>@{bot_username}</b> — он уже работает '
-                        f'и ждёт ваших сообщений.',
+                        f'Напишите <b>@{bot_username}</b>',
                     )
                 except Exception:
                     pass  # User may not be a Telegram bot user

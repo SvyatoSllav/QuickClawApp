@@ -94,7 +94,7 @@ DEPLOYING = (
 DEPLOY_READY = (
     "Ваш бот готов!\n"
     "\n"
-    "Напишите <b>@{username}</b> — он уже работает и ждёт ваших сообщений."
+    "Напишите <b>@{username}</b>"
 )
 
 DEPLOY_IN_PROGRESS = (
