@@ -114,6 +114,7 @@ def create_payment_for_user(tg_bot_user):
                 user=tg_bot_user.user,
                 telegram_token=tg_bot_user.pending_bot_token,
                 selected_model=tg_bot_user.selected_model,
+                amount=2999,
             )
         finally:
             # Restore original credentials

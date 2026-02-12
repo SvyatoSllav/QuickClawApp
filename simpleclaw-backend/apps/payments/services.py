@@ -20,9 +20,9 @@ def _notify_admin(message):
     send_telegram_message(ADMIN_TELEGRAM_ID, f'🤖 SimpleClaw\n\n{message}')
 
 
-def create_first_payment(user, telegram_token='', selected_model='claude-sonnet-4'):
+def create_first_payment(user, telegram_token='', selected_model='claude-sonnet-4', amount=None):
     """Create first payment with optional recurring setup"""
-    amount = str(settings.SUBSCRIPTION_PRICE_RUB)
+    amount = str(amount or settings.SUBSCRIPTION_PRICE_RUB)
     idempotence_key = str(uuid.uuid4())
 
     yoo_payment = YooPayment.create({

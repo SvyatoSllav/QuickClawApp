@@ -47,7 +47,7 @@ def token_cancel_keyboard():
 
 def payment_keyboard(url):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('💳 Оплатить 990 ₽', url=url)],
+        [InlineKeyboardButton('💳 Оплатить', url=url)],
         [InlineKeyboardButton('✅ Проверить оплату', callback_data='check_payment')],
     ])
 
