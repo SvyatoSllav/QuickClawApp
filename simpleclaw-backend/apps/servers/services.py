@@ -106,62 +106,55 @@ class ServerManager:
     def configure_token_optimization(self, model_slug='claude-sonnet-4'):
         """Configure OpenClaw for optimal token usage to reduce costs.
 
-        Implements optimizations from TOKEN_OPTIMISATION_PLAN.md (Option A):
-        - Context limit (contextTokens 50k)
-        - Heartbeat disable (biggest silent cost driver)
-        - Sub-agent routing to cheap model (deepseek-reasoner)
-        - Image model routing to cheap model (gemini-2.5-flash)
-        - Compaction in safeguard mode
-        - Context pruning with keepLastAssistants
+        Optimizations applied:
+        - contextTokens: default (200K, managed by OpenClaw per model)
+        - Heartbeat disabled (biggest silent cost driver)
+        - Sub-agent routing to gemini-3-flash-preview (cheap + fast)
+        - Image model routing to gemini-2.5-flash
+        - Compaction with memoryFlush (saves context before compaction)
+        - Context pruning with cache-ttl 1h
         - Concurrency limits
-
-        Note: maxHistoryMessages, params.cacheControlTtl, temperature, showUsage
-        are not supported by current OpenClaw version.
+        - Cheap fallback models (gemini-2.5-flash → haiku)
         """
         logger.info(f'Configuring token optimization on {self.server.ip_address}...')
 
         if 'claude' in model_slug.lower():
             fallback_models = [
-                'openrouter/anthropic/claude-opus-4.5',
+                'openrouter/google/gemini-2.5-flash',
                 'openrouter/anthropic/claude-haiku-4.5',
             ]
         elif 'gpt' in model_slug.lower():
             fallback_models = [
-                'openrouter/openai/gpt-4o-mini',
+                'openrouter/google/gemini-2.5-flash',
                 'openrouter/openai/gpt-4o-mini',
             ]
         elif 'gemini' in model_slug.lower():
             fallback_models = [
                 'openrouter/google/gemini-2.5-flash',
-                'openrouter/google/gemini-2.5-flash',
+                'openrouter/anthropic/claude-haiku-4.5',
             ]
         else:
             fallback_models = [
-                'openrouter/anthropic/claude-sonnet-4',
+                'openrouter/google/gemini-2.5-flash',
                 'openrouter/anthropic/claude-haiku-4.5',
             ]
 
         cli = 'docker exec openclaw node /app/openclaw.mjs'
 
         optimization_commands = [
-            # --- Context limit (60-75% savings) ---
-            f'{cli} config set agents.defaults.contextTokens 50000',
-
             # --- Heartbeat: disable entirely (up to 30%+ savings) ---
-            # Each heartbeat is a full API call with entire session context.
-            # At default intervals: ~48 API calls/day/agent doing nothing.
             f"""{cli} config set agents.defaults.heartbeat '{{"every": "0m"}}'""",
 
-            # --- Sub-agent model: cheap model (90% savings on sub-agent calls) ---
-            f"""{cli} config set agents.defaults.subagents '{{"model": "openrouter/deepseek/deepseek-reasoner", "maxConcurrent": 2, "archiveAfterMinutes": 60}}'""",
+            # --- Sub-agent model: gemini-3-flash (cheap + fast) ---
+            f"""{cli} config set agents.defaults.subagents '{{"model": "openrouter/google/gemini-3-flash-preview", "maxConcurrent": 2, "archiveAfterMinutes": 60}}'""",
 
-            # --- Image model: cheap model (98% savings on image processing) ---
+            # --- Image model: cheap model ---
             f"""{cli} config set agents.defaults.imageModel '{{"primary": "openrouter/google/gemini-2.5-flash", "fallbacks": ["openrouter/openai/gpt-4o-mini"]}}'""",
 
-            # --- Compaction: safeguard mode (prevents context overflow) ---
-            f"""{cli} config set agents.defaults.compaction '{{"mode": "safeguard"}}'""",
+            # --- Compaction with memoryFlush (saves context before compaction) ---
+            f"""{cli} config set agents.defaults.compaction '{{"mode": "default", "memoryFlush": {{"enabled": true, "softThresholdTokens": 30000}}}}'""",
 
-            # --- Context pruning with keepLastAssistants (20-40% savings) ---
+            # --- Context pruning with keepLastAssistants ---
             f"""{cli} config set agents.defaults.contextPruning '{{"mode": "cache-ttl", "ttl": "1h", "keepLastAssistants": 3}}'""",
 
             # --- Concurrency limit ---
@@ -302,7 +295,7 @@ volumes:
             self.server.save()
             return False
 
-    def quick_deploy_user(self, openrouter_key, telegram_token, model_slug):
+    def quick_deploy_user(self, openrouter_key, telegram_token, model_slug, telegram_owner_id=None):
         """Fast user deployment on an already-warmed server (~30-60s).
 
         Skips Chromium install, doctor, token optimization (already done by
@@ -324,6 +317,9 @@ OPENCLAW_GATEWAY_TOKEN={gateway_token}
 LOG_LEVEL=info
 """
 
+        # Build allowFrom — restrict to owner's Telegram ID if known
+        allow_from = f'["{telegram_owner_id}"]' if telegram_owner_id else '["*"]'
+
         # User-specific config with telegram channel
         config_content = f"""provider: openrouter
 model: {openrouter_model}
@@ -340,7 +336,7 @@ channels:
     enabled: true
     botToken: {telegram_token}
     dmPolicy: open
-    allowFrom: ["*"]
+    allowFrom: {allow_from}
     groupPolicy: allowlist
     streamMode: partial
 
@@ -372,7 +368,7 @@ limits:
             self.configure_token_optimization(model_slug)
 
             # Apply user-specific config (auth-profiles, telegram) with retry
-            config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model)
+            config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model, telegram_owner_id)
 
             if not config_ok:
                 from .tasks import send_telegram_message, ADMIN_TELEGRAM_ID
@@ -413,7 +409,7 @@ limits:
             'docker exec -u root openclaw chown -R node:node /home/node/.openclaw'
         )
 
-    def _apply_config(self, openrouter_key, openrouter_model):
+    def _apply_config(self, openrouter_key, openrouter_model, telegram_owner_id=None):
         """
         Apply all critical config settings once.
         Does NOT verify — call _verify_config() after.
@@ -439,9 +435,10 @@ limits:
         )
         self.exec_command('rm -f /tmp/_openclaw_auth.json')
 
-        # Write telegram-allowFrom.json with wildcard to bypass pairing check
+        # Write telegram-allowFrom.json to bypass pairing check
         # This is the store-level allowFrom that OpenClaw merges with config allowFrom
-        allow_from_json = json.dumps({"version": 1, "allowFrom": ["*"]})
+        allow_from_list = [str(telegram_owner_id)] if telegram_owner_id else ["*"]
+        allow_from_json = json.dumps({"version": 1, "allowFrom": allow_from_list})
         self.upload_file(allow_from_json, '/tmp/_openclaw_allowfrom.json')
         self.exec_command(
             'docker exec -u root openclaw mkdir -p /home/node/.openclaw/credentials'
@@ -462,14 +459,15 @@ limits:
         )
 
         # Set allowFrom first, then dmPolicy (order matters for OpenClaw validation)
+        allow_from_val = json.dumps([str(telegram_owner_id)] if telegram_owner_id else ["*"])
         self.exec_command(
-            'docker exec openclaw node /app/openclaw.mjs config set channels.telegram.allowFrom \'["*"]\''
+            f"docker exec openclaw node /app/openclaw.mjs config set channels.telegram.allowFrom '{allow_from_val}'"
         )
         self.exec_command(
             'docker exec openclaw node /app/openclaw.mjs config set channels.telegram.dmPolicy open'
         )
 
-    def _verify_config(self, openrouter_key, openrouter_model):
+    def _verify_config(self, openrouter_key, openrouter_model, telegram_owner_id=None):
         """
         Verify that all critical OpenClaw settings are correctly applied.
         Returns (ok: bool, failures: list[str]).
@@ -521,16 +519,17 @@ limits:
         if 'starting provider' not in out:
             failures.append(f'telegram provider not started (last telegram log: {out.strip()!r})')
 
-        # 7. telegram-allowFrom.json must have wildcard
+        # 7. telegram-allowFrom.json must have correct allowFrom
         out, _, code = self.exec_command(
             'docker exec openclaw cat /home/node/.openclaw/credentials/telegram-allowFrom.json 2>/dev/null'
         )
-        if code != 0 or '"*"' not in out:
-            failures.append(f'telegram-allowFrom.json missing wildcard (content={out.strip()!r})')
+        expected_id = f'"{telegram_owner_id}"' if telegram_owner_id else '"*"'
+        if code != 0 or expected_id not in out:
+            failures.append(f'telegram-allowFrom.json missing {expected_id} (content={out.strip()!r})')
 
         return (len(failures) == 0, failures)
 
-    def _apply_config_with_retry(self, openrouter_key, openrouter_model):
+    def _apply_config_with_retry(self, openrouter_key, openrouter_model, telegram_owner_id=None):
         """
         Apply config, restart container so running process loads it,
         then verify. Retry on failure.
@@ -550,7 +549,7 @@ limits:
             self._fix_permissions()
 
             # Apply all settings (writes JSON files + CLI config set)
-            self._apply_config(openrouter_key, openrouter_model)
+            self._apply_config(openrouter_key, openrouter_model, telegram_owner_id)
 
             # Restart container so the running process picks up new config
             logger.info(f'Restarting container to apply config...')
@@ -561,13 +560,13 @@ limits:
             self._fix_permissions()
 
             # Re-apply config after restart (OpenClaw may reset defaults on startup)
-            self._apply_config(openrouter_key, openrouter_model)
+            self._apply_config(openrouter_key, openrouter_model, telegram_owner_id)
 
             # Wait for Telegram provider to start
             time.sleep(8)
 
             # Verify
-            ok, failures = self._verify_config(openrouter_key, openrouter_model)
+            ok, failures = self._verify_config(openrouter_key, openrouter_model, telegram_owner_id)
             if ok:
                 logger.info(
                     f'Config verified OK on attempt {attempt} '
@@ -592,7 +591,7 @@ limits:
         )
         return False
 
-    def deploy_openclaw(self, openrouter_key, telegram_token, model_slug):
+    def deploy_openclaw(self, openrouter_key, telegram_token, model_slug, telegram_owner_id=None):
         """Настроить и запустить OpenClaw на сервере"""
         import secrets
         import time
@@ -609,6 +608,9 @@ OPENCLAW_GATEWAY_TOKEN={gateway_token}
 LOG_LEVEL=info
 """
 
+        # Build allowFrom — restrict to owner's Telegram ID if known
+        allow_from = f'["{telegram_owner_id}"]' if telegram_owner_id else '["*"]'
+
         config_content = f"""provider: openrouter
 model: {openrouter_model}
 api_key: {openrouter_key}
@@ -624,7 +626,7 @@ channels:
     enabled: true
     botToken: {telegram_token}
     dmPolicy: open
-    allowFrom: ["*"]
+    allowFrom: {allow_from}
     groupPolicy: allowlist
     streamMode: partial
 
@@ -698,7 +700,7 @@ volumes:
             self.configure_token_optimization(model_slug)
 
             # Apply config with restart + verify (includes restart cycle)
-            config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model)
+            config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model, telegram_owner_id)
 
             if not config_ok:
                 from .tasks import send_telegram_message, ADMIN_TELEGRAM_ID
@@ -795,6 +797,13 @@ def assign_server_to_user_sync(user_id):
     )
 
     if profile.telegram_bot_token:
+        # Get the owner's Telegram ID to restrict bot access
+        telegram_owner_id = None
+        try:
+            telegram_owner_id = user.telegram_bot_user.telegram_id
+        except Exception:
+            pass
+
         manager = ServerManager(available_server)
         try:
             # Use quick deploy on warmed servers (~30s), full deploy as fallback (~5-10min)
@@ -803,12 +812,14 @@ def assign_server_to_user_sync(user_id):
                     openrouter_key=profile.openrouter_api_key,
                     telegram_token=profile.telegram_bot_token,
                     model_slug=profile.selected_model,
+                    telegram_owner_id=telegram_owner_id,
                 )
             else:
                 result = manager.deploy_openclaw(
                     openrouter_key=profile.openrouter_api_key,
                     telegram_token=profile.telegram_bot_token,
                     model_slug=profile.selected_model,
+                    telegram_owner_id=telegram_owner_id,
                 )
             if result:
                 available_server.openclaw_running = True
@@ -890,9 +901,16 @@ def redeploy_openclaw_sync(user_id):
     if not server or server.status not in ('active', 'error'):
         return
 
+    telegram_owner_id = None
+    try:
+        telegram_owner_id = user.telegram_bot_user.telegram_id
+    except Exception:
+        pass
+
     manager = ServerManager(server)
     manager.deploy_openclaw(
         openrouter_key=profile.openrouter_api_key,
         telegram_token=profile.telegram_bot_token,
         model_slug=profile.selected_model,
+        telegram_owner_id=telegram_owner_id,
     )
