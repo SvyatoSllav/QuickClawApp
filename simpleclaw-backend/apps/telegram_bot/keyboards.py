@@ -25,7 +25,7 @@ def deploying_keyboard():
 def model_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(
-            '⚡ Claude',
+            '⚡ Claude (Рекомендуем)',
             callback_data='model:claude-sonnet-4',
         )],
         [InlineKeyboardButton(
