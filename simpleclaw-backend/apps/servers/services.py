@@ -181,18 +181,8 @@ class ServerManager:
             self.exec_command(cmd)
 
         logger.info(f'Chrome headless configured on {self.server.ip_address}')
-
-        # Configure Lightpanda as primary browser (CDP sidecar)
-        cli = 'docker exec openclaw node /app/openclaw.mjs'
-        lightpanda_commands = [
-            f'{cli} browser create-profile --name lightpanda --driver cdp 2>/dev/null || true',
-            f'{cli} config set browser.profiles.lightpanda.cdpUrl ws://lightpanda:9222',
-            f'{cli} config set browser.defaultProfile lightpanda',
-        ]
-        for cmd in lightpanda_commands:
-            self.exec_command(cmd)
-
-        logger.info(f'Lightpanda configured as primary browser on {self.server.ip_address}')
+        # NOTE: Lightpanda browser profile is configured by configure_searxng_provider()
+        # which writes directly to openclaw.json (must be called LAST in deploy pipelines).
         return True
 
     def _upload_docker_files(self, path):
@@ -413,9 +403,8 @@ limits:
             self.exec_command('docker exec openclaw node /app/openclaw.mjs doctor --fix')
             self.exec_command('docker exec openclaw node /app/openclaw.mjs config set gateway.mode local')
 
-            # Apply token optimization + SearXNG provider
+            # Apply token optimization
             self.configure_token_optimization()
-            self.configure_searxng_provider()
 
             # Install session watchdog (auto-recovers from Gemini thought signature errors)
             self.install_session_watchdog()
@@ -426,10 +415,14 @@ limits:
             except Exception as e:
                 logger.warning(f'ClawdMatrix install failed during warm deploy (non-fatal): {e}')
 
-            # Start browser profile
+            # Start browser with headless profile (CLI still works at this point)
             self.exec_command(
-                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile lightpanda'
+                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
             )
+
+            # LAST: write SearXNG + Lightpanda config directly to openclaw.json
+            # (breaks CLI commands — must be the final step)
+            self.configure_searxng_provider()
 
             self.server.openclaw_running = True
             self.server.last_error = ''
@@ -517,7 +510,6 @@ limits:
                 f'docker exec openclaw node /app/openclaw.mjs models set {openrouter_model}'
             )
             self.configure_token_optimization(model_slug)
-            self.configure_searxng_provider()
             self.install_session_watchdog()
 
             # Apply user-specific config (auth-profiles, telegram) with retry
@@ -549,10 +541,13 @@ limits:
             except Exception as e:
                 logger.warning(f'ClawdMatrix setup failed during quick deploy (non-fatal): {e}')
 
-            # Start browser
+            # Start browser with headless profile (CLI still works at this point)
             self.exec_command(
-                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile lightpanda'
+                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
             )
+
+            # LAST: write SearXNG + Lightpanda config directly to openclaw.json
+            self.configure_searxng_provider()
 
             self.server.openclaw_running = True
             self.server.status = 'active'
@@ -848,7 +843,6 @@ limits:
 
             # Configure token optimization
             self.configure_token_optimization(model_slug)
-            self.configure_searxng_provider()
             self.install_session_watchdog()
 
             # Install and optionally enable ClawdMatrix
@@ -879,10 +873,13 @@ limits:
                 self.server.save()
                 return False
 
-            # Start the browser
+            # Start the browser with headless profile (CLI still works at this point)
             self.exec_command(
-                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile lightpanda'
+                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
             )
+
+            # LAST: write SearXNG + Lightpanda config directly to openclaw.json
+            self.configure_searxng_provider()
 
             self.server.openclaw_running = True
             self.server.status = 'active'
@@ -915,17 +912,12 @@ limits:
         logger.info(f'SearXNG settings uploaded to {self.server.ip_address}')
 
     def configure_searxng_provider(self):
-        """Configure OpenClaw to use SearXNG as the web search provider.
+        """Configure SearXNG + Lightpanda by writing directly to openclaw.json.
 
-        Writes directly to openclaw.json because the CLI config set doesn't
-        support the tools.web.search config path (schema validation rejects it),
-        even though the runtime reads it from openclaw.json correctly.
+        MUST be called LAST in all deploy pipelines because once the SearXNG
+        config is in openclaw.json, the CLI schema validator rejects it and
+        ALL subsequent CLI commands fail with exit code 1.
         """
-        # Enable web tools via CLI (this one works)
-        self.exec_command(
-            'docker exec openclaw node /app/openclaw.mjs config set web.enabled true'
-        )
-
         # Read current openclaw.json
         out, _, code = self.exec_command(
             'docker exec openclaw cat /home/node/.openclaw/openclaw.json 2>/dev/null'
@@ -940,13 +932,21 @@ limits:
             logger.warning(f'Invalid openclaw.json on {self.server.ip_address}')
             return
 
-        # Merge tools.web.search config
+        # SearXNG as web search provider
         config.setdefault('tools', {})
         config['tools'].setdefault('web', {})
         config['tools']['web']['search'] = {
             'provider': 'searxng',
             'searxng': {'baseUrl': 'http://searxng:8080'},
         }
+
+        # Lightpanda as primary browser (CDP sidecar)
+        config.setdefault('browser', {})
+        config['browser'].setdefault('profiles', {})
+        config['browser']['profiles']['lightpanda'] = {
+            'cdpUrl': 'ws://lightpanda:9222',
+        }
+        config['browser']['defaultProfile'] = 'lightpanda'
 
         # Write back via docker cp
         new_json = json.dumps(config, indent=2)
@@ -959,22 +959,11 @@ limits:
         )
         self.exec_command('rm -f /tmp/_openclaw_config.json')
 
-        logger.info(f'SearXNG provider configured on {self.server.ip_address}')
+        logger.info(f'SearXNG + Lightpanda configured on {self.server.ip_address}')
 
     def configure_lightpanda_browser(self):
-        """Configure OpenClaw to use Lightpanda as primary browser via CDP."""
-        cli = 'docker exec openclaw node /app/openclaw.mjs'
-
-        commands = [
-            f'{cli} browser create-profile --name lightpanda --driver cdp 2>/dev/null || true',
-            f'{cli} config set browser.profiles.lightpanda.cdpUrl ws://lightpanda:9222',
-            f'{cli} config set browser.defaultProfile lightpanda',
-        ]
-
-        for cmd in commands:
-            self.exec_command(cmd)
-
-        logger.info(f'Lightpanda browser configured on {self.server.ip_address}')
+        """Configure Lightpanda browser. Delegates to configure_searxng_provider()."""
+        self.configure_searxng_provider()
 
     def verify_searxng(self):
         """Verify SearXNG + Lightpanda are running and accessible.
@@ -1011,12 +1000,19 @@ limits:
         if code != 0 or '"results"' not in out:
             failures.append(f'SearXNG API not responding (code={code})')
 
-        # 5. OpenClaw config has searxng provider
-        out, _, _ = self.exec_command(
-            'docker exec openclaw node /app/openclaw.mjs config get tools.web.search.provider 2>/dev/null'
+        # 5. OpenClaw config has searxng provider (read JSON directly — CLI rejects the key)
+        out, _, code = self.exec_command(
+            'docker exec openclaw cat /home/node/.openclaw/openclaw.json 2>/dev/null'
         )
-        if 'searxng' not in out.strip().lower():
-            failures.append(f'search provider={out.strip()!r} (expected searxng)')
+        provider = ''
+        if code == 0 and out.strip():
+            try:
+                cfg = json.loads(out)
+                provider = cfg.get('tools', {}).get('web', {}).get('search', {}).get('provider', '')
+            except json.JSONDecodeError:
+                pass
+        if provider != 'searxng':
+            failures.append(f'search provider={provider!r} (expected searxng)')
 
         return (len(failures) == 0, failures)
 
@@ -1042,9 +1038,8 @@ limits:
         # Wait for SearXNG to start
         time.sleep(10)
 
-        # Configure OpenClaw to use SearXNG + Lightpanda
+        # Configure OpenClaw to use SearXNG + Lightpanda (writes to openclaw.json)
         self.configure_searxng_provider()
-        self.configure_lightpanda_browser()
 
         logger.info(f'SearXNG + Lightpanda installed on {self.server.ip_address}')
         return True

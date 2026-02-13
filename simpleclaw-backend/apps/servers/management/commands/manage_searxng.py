@@ -89,7 +89,6 @@ class Command(BaseCommand):
                         f'cd {path} && docker compose restart searxng'
                     )
                     manager.configure_searxng_provider()
-                    manager.configure_lightpanda_browser()
                     success += 1
                     self.stdout.write(self.style.SUCCESS(f'  OK — reconfigured'))
 
