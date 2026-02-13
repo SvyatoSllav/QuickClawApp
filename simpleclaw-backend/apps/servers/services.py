@@ -990,10 +990,13 @@ limits:
         self.configure_searxng_provider()
 
     def _clean_invalid_searxng_config(self):
-        """Remove old invalid config from openclaw.json (searxng provider, broken profiles)."""
-        out, _, code = self.exec_command(
-            'docker exec openclaw cat /home/node/.openclaw/openclaw.json 2>/dev/null'
-        )
+        """Remove old invalid config from openclaw.json (searxng provider, broken profiles).
+
+        Reads/writes directly from the Docker volume on the host filesystem,
+        so this works even when the openclaw container is crash-looping.
+        """
+        vol_path = '/var/lib/docker/volumes/openclaw_config/_data/openclaw.json'
+        out, _, code = self.exec_command(f'cat {vol_path} 2>/dev/null')
         if code != 0 or not out.strip():
             return
         try:
@@ -1013,24 +1016,21 @@ limits:
 
         # Fix browser profiles: remove incomplete lightpanda profile (missing color)
         profiles = config.get('browser', {}).get('profiles', {})
-        if 'lightpanda' in profiles:
+        if 'lightpanda' in profiles and 'color' not in profiles['lightpanda']:
             del profiles['lightpanda']
             changed = True
-        # Reset default profile to headless if it was lightpanda
-        if config.get('browser', {}).get('defaultProfile') == 'lightpanda':
+        # Reset default profile to headless if it was lightpanda (and profile was removed)
+        if config.get('browser', {}).get('defaultProfile') == 'lightpanda' and 'lightpanda' not in profiles:
             config['browser']['defaultProfile'] = 'headless'
             changed = True
 
         if changed:
             new_json = json.dumps(config, indent=2)
             self.upload_file(new_json, '/tmp/_oc_fix.json')
-            self.exec_command(
-                'docker cp /tmp/_oc_fix.json openclaw:/home/node/.openclaw/openclaw.json'
-            )
-            self.exec_command(
-                'docker exec -u root openclaw chown node:node /home/node/.openclaw/openclaw.json'
-            )
+            self.exec_command(f'cp /tmp/_oc_fix.json {vol_path}')
             self.exec_command('rm -f /tmp/_oc_fix.json')
+            # Restart container so it picks up the fixed config
+            self.exec_command('docker restart openclaw 2>/dev/null')
             logger.info(f'Cleaned invalid config on {self.server.ip_address}')
 
     def verify_searxng(self):
@@ -1112,14 +1112,24 @@ limits:
             logger.error(f'SearXNG install failed on {self.server.ip_address}: {err[:500]}')
             return False
 
-        # Wait for containers to start and doctor --fix to complete
-        time.sleep(30)
-
-        # Clean old invalid config from openclaw.json (searxng provider, broken profiles)
+        # Clean old invalid config (reads/writes volume directly, works even if container is restarting)
         self._clean_invalid_searxng_config()
 
-        # Wait briefly for container to pick up cleaned config
-        time.sleep(5)
+        # Wait for openclaw container to be running and ready
+        for _ in range(12):
+            time.sleep(10)
+            out, _, _ = self.exec_command(
+                'docker inspect openclaw --format={{.State.Status}} 2>/dev/null'
+            )
+            if out.strip() == 'running':
+                # Verify CLI works
+                _, _, code = self.exec_command(
+                    'docker exec openclaw node /app/openclaw.mjs config get browser.headless 2>/dev/null'
+                )
+                if code == 0:
+                    break
+        else:
+            logger.warning(f'openclaw container not ready after 120s on {self.server.ip_address}')
 
         # Configure OpenClaw: provider=brave (adapter translates to SearXNG)
         self.configure_searxng_provider()
