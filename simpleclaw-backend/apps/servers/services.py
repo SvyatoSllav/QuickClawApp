@@ -971,7 +971,8 @@ limits:
         commands = [
             f'{cli} config set tools.web.search.provider brave',
             f'{cli} config set tools.web.search.enabled true',
-            # Lightpanda as primary browser (CDP sidecar)
+            # Lightpanda as primary browser (CDP sidecar) — color is required by schema
+            f'{cli} browser create-profile --name lightpanda --driver cdp --color "#0066CC" 2>/dev/null || true',
             f'{cli} config set browser.profiles.lightpanda.cdpUrl ws://lightpanda:9222',
             f'{cli} config set browser.defaultProfile lightpanda',
         ]
