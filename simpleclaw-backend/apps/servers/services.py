@@ -25,6 +25,9 @@ RUN apt-get update -qq && \\
     apt-get install -y -qq --no-install-recommends google-chrome-stable && \\
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Redirect Brave Search API to local SearXNG adapter
+RUN sed -i 's|https://api.search.brave.com/res/v1/web/search|http://searxng-adapter:3000/res/v1/web/search|g' /app/dist/*.js
+
 USER node
 """
 
@@ -63,6 +66,16 @@ DOCKER_COMPOSE_WITH_CHROME = """services:
       - LIGHTPANDA_DISABLE_TELEMETRY=true
     mem_limit: 512m
 
+  searxng-adapter:
+    image: node:20-alpine
+    container_name: searxng-adapter
+    restart: unless-stopped
+    volumes:
+      - ./searxng-adapter.js:/app/adapter.js:ro
+    command: node /app/adapter.js
+    depends_on:
+      - searxng
+
   valkey:
     image: docker.io/valkey/valkey:8-alpine
     container_name: searxng-redis
@@ -98,6 +111,39 @@ server:
 
 redis:
   url: "redis://searxng-redis:6379/0"
+"""
+
+# SearXNG-to-Brave API adapter — translates Brave Search format to SearXNG
+SEARXNG_ADAPTER_JS = """\
+const http = require('http');
+const SEARXNG = 'http://searxng:8080/search';
+
+http.createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url, 'http://localhost:3000');
+    const q = url.searchParams.get('q') || '';
+    const count = parseInt(url.searchParams.get('count') || '5', 10);
+    const lang = url.searchParams.get('search_lang') || '';
+    const searxParams = new URLSearchParams({ q, format: 'json' });
+    if (lang) searxParams.set('language', lang);
+
+    const resp = await fetch(`${SEARXNG}?${searxParams}`);
+    const data = await resp.json();
+
+    const results = (data.results || []).slice(0, count).map(r => ({
+      title: r.title || '',
+      url: r.url || '',
+      description: r.content || '',
+      age: r.publishedDate || undefined,
+    }));
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ web: { results } }));
+  } catch (e) {
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ web: { results: [] } }));
+  }
+}).listen(3000, '0.0.0.0');
 """
 
 logger = logging.getLogger(__name__)
@@ -181,15 +227,15 @@ class ServerManager:
             self.exec_command(cmd)
 
         logger.info(f'Chrome headless configured on {self.server.ip_address}')
-        # NOTE: Lightpanda browser profile is configured by configure_searxng_provider()
-        # which writes directly to openclaw.json (must be called LAST in deploy pipelines).
+        # NOTE: Lightpanda browser profile is configured by configure_searxng_provider().
         return True
 
     def _upload_docker_files(self, path):
-        """Upload Dockerfile, docker-compose, and SearXNG settings to server"""
+        """Upload Dockerfile, docker-compose, SearXNG settings, and adapter to server"""
         self.upload_file(DOCKERFILE_CONTENT, f'{path}/Dockerfile')
         self.upload_file(DOCKER_COMPOSE_WITH_CHROME, f'{path}/docker-compose.yml')
         self._upload_searxng_settings()
+        self.upload_file(SEARXNG_ADAPTER_JS, f'{path}/searxng-adapter.js')
 
     def configure_token_optimization(self, model_slug='claude-sonnet-4'):
         """Configure OpenClaw for optimal token usage to reduce costs.
@@ -253,7 +299,7 @@ class ServerManager:
             # --- Enable web search ---
             f'{cli} config set web.enabled true',
             # NOTE: SearXNG provider is configured via configure_searxng_provider()
-            # which writes directly to openclaw.json (CLI config set rejects the key)
+            # which sets provider=brave (adapter translates to SearXNG)
 
             # --- Bootstrap file size limit (reduces system prompt bloat) ---
             f'{cli} config set agents.defaults.bootstrapMaxChars 20000',
@@ -354,6 +400,7 @@ fi
         env_content = f"""OPENROUTER_API_KEY=placeholder
 TELEGRAM_BOT_TOKEN=placeholder
 OPENCLAW_GATEWAY_TOKEN={gateway_token}
+BRAVE_API_KEY=local-searxng
 LOG_LEVEL=info
 """
 
@@ -420,8 +467,7 @@ limits:
                 'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
             )
 
-            # LAST: write SearXNG + Lightpanda config directly to openclaw.json
-            # (breaks CLI commands — must be the final step)
+            # Configure SearXNG (via Brave adapter) + Lightpanda browser
             self.configure_searxng_provider()
 
             self.server.openclaw_running = True
@@ -455,6 +501,7 @@ limits:
         env_content = f"""OPENROUTER_API_KEY={openrouter_key}
 TELEGRAM_BOT_TOKEN={telegram_token}
 OPENCLAW_GATEWAY_TOKEN={gateway_token}
+BRAVE_API_KEY=local-searxng
 LOG_LEVEL=info
 """
 
@@ -546,7 +593,7 @@ limits:
                 'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
             )
 
-            # LAST: write SearXNG + Lightpanda config directly to openclaw.json
+            # Configure SearXNG (via Brave adapter) + Lightpanda browser
             self.configure_searxng_provider()
 
             self.server.openclaw_running = True
@@ -766,6 +813,7 @@ limits:
         env_content = f"""OPENROUTER_API_KEY={openrouter_key}
 TELEGRAM_BOT_TOKEN={telegram_token}
 OPENCLAW_GATEWAY_TOKEN={gateway_token}
+BRAVE_API_KEY=local-searxng
 LOG_LEVEL=info
 """
 
@@ -878,7 +926,7 @@ limits:
                 'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
             )
 
-            # LAST: write SearXNG + Lightpanda config directly to openclaw.json
+            # Configure SearXNG (via Brave adapter) + Lightpanda browser
             self.configure_searxng_provider()
 
             self.server.openclaw_running = True
@@ -912,58 +960,62 @@ limits:
         logger.info(f'SearXNG settings uploaded to {self.server.ip_address}')
 
     def configure_searxng_provider(self):
-        """Configure SearXNG + Lightpanda by writing directly to openclaw.json.
+        """Configure SearXNG (via Brave adapter) + Lightpanda browser.
 
-        MUST be called LAST in all deploy pipelines because once the SearXNG
-        config is in openclaw.json, the CLI schema validator rejects it and
-        ALL subsequent CLI commands fail with exit code 1.
+        Uses CLI commands — all valid since provider is 'brave' (the adapter
+        translates Brave API requests to SearXNG). BRAVE_API_KEY env var
+        satisfies the API key check; the Dockerfile sed-patches the Brave
+        endpoint URL to point to the local adapter.
         """
-        # Read current openclaw.json
-        out, _, code = self.exec_command(
-            'docker exec openclaw cat /home/node/.openclaw/openclaw.json 2>/dev/null'
-        )
-        if code != 0 or not out.strip():
-            logger.warning(f'Cannot read openclaw.json on {self.server.ip_address}')
-            return
-
-        try:
-            config = json.loads(out)
-        except json.JSONDecodeError:
-            logger.warning(f'Invalid openclaw.json on {self.server.ip_address}')
-            return
-
-        # SearXNG as web search provider
-        config.setdefault('tools', {})
-        config['tools'].setdefault('web', {})
-        config['tools']['web']['search'] = {
-            'provider': 'searxng',
-            'searxng': {'baseUrl': 'http://searxng:8080'},
-        }
-
-        # Lightpanda as primary browser (CDP sidecar)
-        config.setdefault('browser', {})
-        config['browser'].setdefault('profiles', {})
-        config['browser']['profiles']['lightpanda'] = {
-            'cdpUrl': 'ws://lightpanda:9222',
-        }
-        config['browser']['defaultProfile'] = 'lightpanda'
-
-        # Write back via docker cp
-        new_json = json.dumps(config, indent=2)
-        self.upload_file(new_json, '/tmp/_openclaw_config.json')
-        self.exec_command(
-            'docker cp /tmp/_openclaw_config.json openclaw:/home/node/.openclaw/openclaw.json'
-        )
-        self.exec_command(
-            'docker exec -u root openclaw chown node:node /home/node/.openclaw/openclaw.json'
-        )
-        self.exec_command('rm -f /tmp/_openclaw_config.json')
+        cli = 'docker exec openclaw node /app/openclaw.mjs'
+        commands = [
+            f'{cli} config set tools.web.search.provider brave',
+            f'{cli} config set tools.web.search.enabled true',
+            # Lightpanda as primary browser (CDP sidecar)
+            f'{cli} config set browser.profiles.lightpanda.cdpUrl ws://lightpanda:9222',
+            f'{cli} config set browser.defaultProfile lightpanda',
+        ]
+        for cmd in commands:
+            out, err, code = self.exec_command(cmd)
+            if code != 0:
+                logger.warning(f'SearXNG/Lightpanda config failed: {cmd[-60:]} err={err[:200]}')
 
         logger.info(f'SearXNG + Lightpanda configured on {self.server.ip_address}')
 
     def configure_lightpanda_browser(self):
         """Configure Lightpanda browser. Delegates to configure_searxng_provider()."""
         self.configure_searxng_provider()
+
+    def _clean_invalid_searxng_config(self):
+        """Remove old invalid tools.web.search.searxng config from openclaw.json."""
+        out, _, code = self.exec_command(
+            'docker exec openclaw cat /home/node/.openclaw/openclaw.json 2>/dev/null'
+        )
+        if code != 0 or not out.strip():
+            return
+        try:
+            config = json.loads(out)
+        except json.JSONDecodeError:
+            return
+        search = config.get('tools', {}).get('web', {}).get('search', {})
+        changed = False
+        if 'searxng' in search:
+            del search['searxng']
+            changed = True
+        if search.get('provider') == 'searxng':
+            search['provider'] = 'brave'
+            changed = True
+        if changed:
+            new_json = json.dumps(config, indent=2)
+            self.upload_file(new_json, '/tmp/_oc_fix.json')
+            self.exec_command(
+                'docker cp /tmp/_oc_fix.json openclaw:/home/node/.openclaw/openclaw.json'
+            )
+            self.exec_command(
+                'docker exec -u root openclaw chown node:node /home/node/.openclaw/openclaw.json'
+            )
+            self.exec_command('rm -f /tmp/_oc_fix.json')
+            logger.info(f'Cleaned invalid SearXNG config on {self.server.ip_address}')
 
     def verify_searxng(self):
         """Verify SearXNG + Lightpanda are running and accessible.
@@ -992,53 +1044,65 @@ limits:
         if 'running' not in out.strip():
             failures.append(f'lightpanda container status={out.strip()!r}')
 
-        # 4. SearXNG JSON API responds from within openclaw container
+        # 4. SearXNG adapter container running
         out, _, code = self.exec_command(
-            'docker exec openclaw wget -qO- "http://searxng:8080/search?q=test&format=json" 2>/dev/null | head -c 200',
+            'docker inspect searxng-adapter --format={{.State.Status}} 2>/dev/null'
+        )
+        if 'running' not in out.strip():
+            failures.append(f'searxng-adapter container status={out.strip()!r}')
+
+        # 5. Adapter responds with Brave-format JSON
+        out, _, code = self.exec_command(
+            'docker exec openclaw wget -qO- "http://searxng-adapter:3000/res/v1/web/search?q=test&count=3" 2>/dev/null | head -c 300',
             timeout=15,
         )
-        if code != 0 or '"results"' not in out:
-            failures.append(f'SearXNG API not responding (code={code})')
+        if code != 0 or '"web"' not in out:
+            failures.append(f'SearXNG adapter not responding (code={code})')
 
-        # 5. OpenClaw config has searxng provider (read JSON directly — CLI rejects the key)
-        out, _, code = self.exec_command(
-            'docker exec openclaw cat /home/node/.openclaw/openclaw.json 2>/dev/null'
+        # 6. OpenClaw config has brave provider (adapter translates to SearXNG)
+        out, _, _ = self.exec_command(
+            'docker exec openclaw node /app/openclaw.mjs config get tools.web.search.provider 2>/dev/null'
         )
-        provider = ''
-        if code == 0 and out.strip():
-            try:
-                cfg = json.loads(out)
-                provider = cfg.get('tools', {}).get('web', {}).get('search', {}).get('provider', '')
-            except json.JSONDecodeError:
-                pass
-        if provider != 'searxng':
-            failures.append(f'search provider={provider!r} (expected searxng)')
+        if 'brave' not in out.strip().lower():
+            failures.append(f'search provider not set to brave')
 
         return (len(failures) == 0, failures)
 
     def install_searxng(self):
-        """Install SearXNG + Lightpanda on an existing server (retrofit)."""
+        """Install SearXNG + Lightpanda on an existing server (retrofit).
+
+        Rebuilds the Docker image (sed-patches Brave URL to local adapter),
+        starts all containers including the adapter, and configures OpenClaw.
+        """
         import time
         path = self.server.openclaw_path
 
         logger.info(f'Installing SearXNG + Lightpanda on {self.server.ip_address}...')
 
-        # Upload updated docker-compose + SearXNG settings
+        # Upload Dockerfile (with sed patch), docker-compose, SearXNG settings, adapter
         self._upload_docker_files(path)
 
-        # Bring up new services (additive — won't touch running openclaw)
+        # Add BRAVE_API_KEY to .env if missing
+        self.exec_command(
+            f'grep -q BRAVE_API_KEY {path}/.env || echo "BRAVE_API_KEY=local-searxng" >> {path}/.env'
+        )
+
+        # Rebuild image (applies sed patch) + start all containers
         out, err, code = self.exec_command(
-            f'cd {path} && docker compose up -d',
-            timeout=120,
+            f'cd {path} && docker compose up -d --build',
+            timeout=300,
         )
         if code != 0:
             logger.error(f'SearXNG install failed on {self.server.ip_address}: {err[:500]}')
             return False
 
-        # Wait for SearXNG to start
-        time.sleep(10)
+        # Wait for containers to start
+        time.sleep(15)
 
-        # Configure OpenClaw to use SearXNG + Lightpanda (writes to openclaw.json)
+        # Clean old invalid SearXNG config from openclaw.json (if present)
+        self._clean_invalid_searxng_config()
+
+        # Configure OpenClaw: provider=brave (adapter translates to SearXNG)
         self.configure_searxng_provider()
 
         logger.info(f'SearXNG + Lightpanda installed on {self.server.ip_address}')

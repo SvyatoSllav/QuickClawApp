@@ -86,8 +86,9 @@ class Command(BaseCommand):
                     manager._upload_searxng_settings()
                     path = server.openclaw_path
                     manager.exec_command(
-                        f'cd {path} && docker compose restart searxng'
+                        f'cd {path} && docker compose restart searxng searxng-adapter'
                     )
+                    manager._clean_invalid_searxng_config()
                     manager.configure_searxng_provider()
                     success += 1
                     self.stdout.write(self.style.SUCCESS(f'  OK — reconfigured'))
