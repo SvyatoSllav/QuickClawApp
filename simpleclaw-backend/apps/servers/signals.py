@@ -88,23 +88,15 @@ def install_openclaw_async(server_id):
         # Create OpenClaw directory
         manager.exec_command(f'mkdir -p {server.openclaw_path}')
 
-        # Create docker-compose.yml
-        docker_compose = '''services:
-  openclaw:
-    image: ghcr.io/openclaw/openclaw:latest
-    container_name: openclaw
-    restart: unless-stopped
-    env_file:
-      - .env
-    volumes:
-      - ./openclaw-config.yaml:/app/config.yaml
-      - ./data:/app/data
-      - config:/home/node/.openclaw
-volumes:
-  config:
-    name: openclaw_config
-'''
-        manager.upload_file(docker_compose, f'{server.openclaw_path}/docker-compose.yml')
+        # Upload Dockerfile, docker-compose (with SearXNG + Lightpanda), and SearXNG settings
+        from .services import DOCKERFILE_CONTENT, DOCKER_COMPOSE_WITH_CHROME
+        manager.upload_file(DOCKERFILE_CONTENT, f'{server.openclaw_path}/Dockerfile')
+        manager.upload_file(DOCKER_COMPOSE_WITH_CHROME, f'{server.openclaw_path}/docker-compose.yml')
+        manager.exec_command(f'mkdir -p {server.openclaw_path}/searxng')
+        import secrets as secrets_mod
+        from .services import SEARXNG_SETTINGS_YML
+        settings_content = SEARXNG_SETTINGS_YML.format(secret_key=secrets_mod.token_hex(32))
+        manager.upload_file(settings_content, f'{server.openclaw_path}/searxng/settings.yml')
 
         # Deploy OpenClaw if profile has telegram token
         profile = server.profile

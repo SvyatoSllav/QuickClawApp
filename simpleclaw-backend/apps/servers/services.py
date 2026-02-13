@@ -28,7 +28,7 @@ RUN apt-get update -qq && \\
 USER node
 """
 
-# docker-compose с shm_size для Chrome headless
+# docker-compose: OpenClaw + SearXNG + Lightpanda + Valkey
 DOCKER_COMPOSE_WITH_CHROME = """services:
   openclaw:
     build: .
@@ -42,9 +42,62 @@ DOCKER_COMPOSE_WITH_CHROME = """services:
       - ./openclaw-config.yaml:/app/config.yaml
       - ./data:/app/data
       - config:/home/node/.openclaw
+    depends_on:
+      - searxng
+      - lightpanda
+
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080
+
+  lightpanda:
+    image: lightpanda/browser:nightly
+    container_name: lightpanda
+    restart: unless-stopped
+    environment:
+      - LIGHTPANDA_DISABLE_TELEMETRY=true
+    mem_limit: 512m
+
+  valkey:
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: searxng-redis
+    restart: unless-stopped
+    command: valkey-server --save 30 1 --loglevel warning
+
 volumes:
   config:
     name: openclaw_config
+"""
+
+# SearXNG settings.yml — minimal private instance with JSON API enabled
+SEARXNG_SETTINGS_YML = """\
+use_default_settings: true
+
+general:
+  instance_name: "OpenClaw Search"
+  debug: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+server:
+  bind_address: "0.0.0.0"
+  port: 8080
+  secret_key: "{secret_key}"
+  limiter: false
+  image_proxy: false
+
+redis:
+  url: "redis://searxng-redis:6379/0"
 """
 
 logger = logging.getLogger(__name__)
@@ -128,12 +181,25 @@ class ServerManager:
             self.exec_command(cmd)
 
         logger.info(f'Chrome headless configured on {self.server.ip_address}')
+
+        # Configure Lightpanda as primary browser (CDP sidecar)
+        cli = 'docker exec openclaw node /app/openclaw.mjs'
+        lightpanda_commands = [
+            f'{cli} browser create-profile --name lightpanda --driver cdp 2>/dev/null || true',
+            f'{cli} config set browser.profiles.lightpanda.cdpUrl ws://lightpanda:9222',
+            f'{cli} config set browser.defaultProfile lightpanda',
+        ]
+        for cmd in lightpanda_commands:
+            self.exec_command(cmd)
+
+        logger.info(f'Lightpanda configured as primary browser on {self.server.ip_address}')
         return True
 
     def _upload_docker_files(self, path):
-        """Загрузка Dockerfile и docker-compose.yml с Chrome headless на сервер"""
+        """Upload Dockerfile, docker-compose, and SearXNG settings to server"""
         self.upload_file(DOCKERFILE_CONTENT, f'{path}/Dockerfile')
         self.upload_file(DOCKER_COMPOSE_WITH_CHROME, f'{path}/docker-compose.yml')
+        self._upload_searxng_settings()
 
     def configure_token_optimization(self, model_slug='claude-sonnet-4'):
         """Configure OpenClaw for optimal token usage to reduce costs.
@@ -194,8 +260,12 @@ class ServerManager:
             # --- Concurrency limit ---
             f'{cli} config set agents.defaults.maxConcurrent 2',
 
-            # --- Enable web search (uses headless browser) ---
+            # --- Enable web search ---
             f'{cli} config set web.enabled true',
+
+            # --- SearXNG as web search provider ---
+            f'{cli} config set tools.web.search.provider searxng',
+            f'{cli} config set tools.web.search.searxng.baseUrl http://searxng:8080',
 
             # --- Bootstrap file size limit (reduces system prompt bloat) ---
             f'{cli} config set agents.defaults.bootstrapMaxChars 20000',
@@ -359,7 +429,7 @@ limits:
 
             # Start browser profile
             self.exec_command(
-                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
+                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile lightpanda'
             )
 
             self.server.openclaw_running = True
@@ -431,6 +501,9 @@ limits:
             self.upload_file(env_content, f'{path}/.env')
             self.upload_file(config_content, f'{path}/openclaw-config.yaml')
 
+            # Ensure latest docker-compose with SearXNG + Lightpanda
+            self._upload_docker_files(path)
+
             # Recreate to pick up new .env (restart doesn't reload env vars)
             self.exec_command(f'cd {path} && docker compose up -d --force-recreate')
             time.sleep(8)
@@ -478,7 +551,7 @@ limits:
 
             # Start browser
             self.exec_command(
-                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
+                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile lightpanda'
             )
 
             self.server.openclaw_running = True
@@ -807,7 +880,7 @@ limits:
 
             # Start the browser
             self.exec_command(
-                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
+                'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile lightpanda'
             )
 
             self.server.openclaw_running = True
@@ -824,6 +897,126 @@ limits:
             logger.error(f'Исключение при деплое OpenClaw на {self.server.ip_address}: {e}')
             return False
 
+
+    # ─── SearXNG + Lightpanda ────────────────────────────────────────
+
+    def _upload_searxng_settings(self):
+        """Upload SearXNG settings.yml to the server."""
+        import secrets as secrets_mod
+        path = self.server.openclaw_path
+
+        self.exec_command(f'mkdir -p {path}/searxng')
+
+        secret_key = secrets_mod.token_hex(32)
+        settings_content = SEARXNG_SETTINGS_YML.format(secret_key=secret_key)
+
+        self.upload_file(settings_content, f'{path}/searxng/settings.yml')
+        logger.info(f'SearXNG settings uploaded to {self.server.ip_address}')
+
+    def configure_searxng_provider(self):
+        """Configure OpenClaw to use SearXNG as the web search provider."""
+        cli = 'docker exec openclaw node /app/openclaw.mjs'
+
+        commands = [
+            f'{cli} config set web.enabled true',
+            f'{cli} config set tools.web.search.provider searxng',
+            f'{cli} config set tools.web.search.searxng.baseUrl http://searxng:8080',
+        ]
+
+        for cmd in commands:
+            out, err, code = self.exec_command(cmd)
+            if code != 0:
+                logger.warning(f'SearXNG config failed: {cmd[:80]}... err={err[:200]}')
+
+        logger.info(f'SearXNG provider configured on {self.server.ip_address}')
+
+    def configure_lightpanda_browser(self):
+        """Configure OpenClaw to use Lightpanda as primary browser via CDP."""
+        cli = 'docker exec openclaw node /app/openclaw.mjs'
+
+        commands = [
+            f'{cli} browser create-profile --name lightpanda --driver cdp 2>/dev/null || true',
+            f'{cli} config set browser.profiles.lightpanda.cdpUrl ws://lightpanda:9222',
+            f'{cli} config set browser.defaultProfile lightpanda',
+        ]
+
+        for cmd in commands:
+            self.exec_command(cmd)
+
+        logger.info(f'Lightpanda browser configured on {self.server.ip_address}')
+
+    def verify_searxng(self):
+        """Verify SearXNG + Lightpanda are running and accessible.
+        Returns (ok: bool, failures: list[str]).
+        """
+        failures = []
+
+        # 1. SearXNG container running
+        out, _, code = self.exec_command(
+            'docker inspect searxng --format={{.State.Status}} 2>/dev/null'
+        )
+        if 'running' not in out.strip():
+            failures.append(f'searxng container status={out.strip()!r}')
+
+        # 2. Valkey (Redis) container running
+        out, _, code = self.exec_command(
+            'docker inspect searxng-redis --format={{.State.Status}} 2>/dev/null'
+        )
+        if 'running' not in out.strip():
+            failures.append(f'valkey container status={out.strip()!r}')
+
+        # 3. Lightpanda container running
+        out, _, code = self.exec_command(
+            'docker inspect lightpanda --format={{.State.Status}} 2>/dev/null'
+        )
+        if 'running' not in out.strip():
+            failures.append(f'lightpanda container status={out.strip()!r}')
+
+        # 4. SearXNG JSON API responds from within openclaw container
+        out, _, code = self.exec_command(
+            'docker exec openclaw wget -qO- "http://searxng:8080/search?q=test&format=json" 2>/dev/null | head -c 200',
+            timeout=15,
+        )
+        if code != 0 or '"results"' not in out:
+            failures.append(f'SearXNG API not responding (code={code})')
+
+        # 5. OpenClaw config has searxng provider
+        out, _, _ = self.exec_command(
+            'docker exec openclaw node /app/openclaw.mjs config get tools.web.search.provider 2>/dev/null'
+        )
+        if 'searxng' not in out.strip().lower():
+            failures.append(f'search provider={out.strip()!r} (expected searxng)')
+
+        return (len(failures) == 0, failures)
+
+    def install_searxng(self):
+        """Install SearXNG + Lightpanda on an existing server (retrofit)."""
+        import time
+        path = self.server.openclaw_path
+
+        logger.info(f'Installing SearXNG + Lightpanda on {self.server.ip_address}...')
+
+        # Upload updated docker-compose + SearXNG settings
+        self._upload_docker_files(path)
+
+        # Bring up new services (additive — won't touch running openclaw)
+        out, err, code = self.exec_command(
+            f'cd {path} && docker compose up -d',
+            timeout=120,
+        )
+        if code != 0:
+            logger.error(f'SearXNG install failed on {self.server.ip_address}: {err[:500]}')
+            return False
+
+        # Wait for SearXNG to start
+        time.sleep(10)
+
+        # Configure OpenClaw to use SearXNG + Lightpanda
+        self.configure_searxng_provider()
+        self.configure_lightpanda_browser()
+
+        logger.info(f'SearXNG + Lightpanda installed on {self.server.ip_address}')
+        return True
 
     # ─── ClawdMatrix Engine ──────────────────────────────────────────
 
