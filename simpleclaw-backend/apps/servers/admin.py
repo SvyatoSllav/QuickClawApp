@@ -4,8 +4,8 @@ from .models import Server
 
 @admin.register(Server)
 class ServerAdmin(admin.ModelAdmin):
-    list_display = ['ip_address', 'status', 'openclaw_running', 'profile', 'last_health_check']
-    list_filter = ['status', 'openclaw_running']
+    list_display = ['ip_address', 'status', 'openclaw_running', 'clawdmatrix_installed', 'profile', 'last_health_check']
+    list_filter = ['status', 'openclaw_running', 'clawdmatrix_installed']
     search_fields = ['ip_address', 'profile__user__email']
     readonly_fields = ['created_at', 'updated_at', 'last_health_check']
     fieldsets = (

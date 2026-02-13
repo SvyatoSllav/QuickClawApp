@@ -335,6 +335,12 @@ volumes:
             # Install session watchdog (auto-recovers from Gemini thought signature errors)
             self.install_session_watchdog()
 
+            # Pre-install ClawdMatrix so it's ready for quick_deploy_user
+            try:
+                self.install_clawdmatrix()
+            except Exception as e:
+                logger.warning(f'ClawdMatrix install failed during warm deploy (non-fatal): {e}')
+
             # Start browser profile
             self.exec_command(
                 'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
@@ -440,6 +446,19 @@ limits:
                 self.server.last_error = 'Quick deploy config verification failed'
                 self.server.save()
                 return False
+
+            # ClawdMatrix: enable/disable based on user profile
+            try:
+                profile = self.server.profile
+                if profile and profile.clawdmatrix_enabled:
+                    self.install_clawdmatrix()
+                    self.enable_clawdmatrix(
+                        custom_skills=profile.clawdmatrix_custom_skills or None,
+                    )
+                else:
+                    self.disable_clawdmatrix()
+            except Exception as e:
+                logger.warning(f'ClawdMatrix setup failed during quick deploy (non-fatal): {e}')
 
             # Start browser
             self.exec_command(
@@ -758,6 +777,17 @@ volumes:
             self.configure_token_optimization(model_slug)
             self.install_session_watchdog()
 
+            # Install and optionally enable ClawdMatrix
+            try:
+                self.install_clawdmatrix()
+                profile = self.server.profile
+                if profile and profile.clawdmatrix_enabled:
+                    self.enable_clawdmatrix(
+                        custom_skills=profile.clawdmatrix_custom_skills or None,
+                    )
+            except Exception as e:
+                logger.warning(f'ClawdMatrix setup failed during deploy (non-fatal): {e}')
+
             # Apply config with restart + verify (includes restart cycle)
             config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model, telegram_owner_id)
 
@@ -793,6 +823,226 @@ volumes:
             self.server.save()
             logger.error(f'Исключение при деплое OpenClaw на {self.server.ip_address}: {e}')
             return False
+
+
+    # ─── ClawdMatrix Engine ──────────────────────────────────────────
+
+    CLAWDMATRIX_FILES = [
+        'clawd-matrix.js',
+        'triangulator.js',
+        'skills-loader.js',
+        'injector.js',
+        'system-directives.js',
+        'index.js',
+        'types.js',
+        'wrapper.js',
+        'data/domain-map.json',
+        'data/skills.json',
+    ]
+
+    def install_clawdmatrix(self):
+        """Install ClawdMatrix Engine files into the OpenClaw container."""
+        import os
+
+        logger.info(f'Installing ClawdMatrix on {self.server.ip_address}...')
+
+        bundle_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'clawdmatrix', 'bundle',
+        )
+
+        # Create target directory inside container
+        self.exec_command(
+            'docker exec -u root openclaw mkdir -p /app/clawdmatrix/data'
+        )
+
+        for filename in self.CLAWDMATRIX_FILES:
+            local_path = os.path.join(bundle_dir, filename)
+            try:
+                with open(local_path, 'r') as f:
+                    content = f.read()
+            except FileNotFoundError:
+                logger.warning(f'ClawdMatrix file not found: {local_path}')
+                continue
+
+            safe_name = filename.replace('/', '_')
+            tmp_path = f'/tmp/_clawdmatrix_{safe_name}'
+            self.upload_file(content, tmp_path)
+
+            container_path = f'/app/clawdmatrix/{filename}'
+            if '/' in filename:
+                subdir = '/app/clawdmatrix/' + '/'.join(filename.split('/')[:-1])
+                self.exec_command(f'docker exec -u root openclaw mkdir -p {subdir}')
+
+            self.exec_command(f'docker cp {tmp_path} openclaw:{container_path}')
+            self.exec_command(f'rm -f {tmp_path}')
+
+        # Fix permissions
+        self.exec_command(
+            'docker exec -u root openclaw chown -R node:node /app/clawdmatrix'
+        )
+
+        self.server.clawdmatrix_installed = True
+        self.server.save(update_fields=['clawdmatrix_installed'])
+        logger.info(f'ClawdMatrix installed on {self.server.ip_address}')
+
+    def enable_clawdmatrix(self, custom_domain_map=None, custom_skills=None):
+        """Enable ClawdMatrix Engine on the running OpenClaw instance.
+
+        Generates a CLAUDE.md block with ClawdMatrix instructions and injects
+        it into the OpenClaw agent's configuration via the config CLI.
+        """
+        logger.info(f'Enabling ClawdMatrix on {self.server.ip_address}...')
+
+        if not self.server.clawdmatrix_installed:
+            self.install_clawdmatrix()
+
+        # Upload custom domain-map or skills if provided
+        if custom_domain_map:
+            content = json.dumps(custom_domain_map, ensure_ascii=False, indent=2)
+            self.upload_file(content, '/tmp/_custom_domain_map.json')
+            self.exec_command(
+                'docker cp /tmp/_custom_domain_map.json '
+                'openclaw:/app/clawdmatrix/data/domain-map.json'
+            )
+            self.exec_command('rm -f /tmp/_custom_domain_map.json')
+
+        if custom_skills:
+            content = json.dumps(custom_skills, ensure_ascii=False, indent=2)
+            self.upload_file(content, '/tmp/_custom_skills.json')
+            self.exec_command(
+                'docker cp /tmp/_custom_skills.json '
+                'openclaw:/app/clawdmatrix/data/skills.json'
+            )
+            self.exec_command('rm -f /tmp/_custom_skills.json')
+
+        # Fix permissions after any custom file uploads
+        self.exec_command(
+            'docker exec -u root openclaw chown -R node:node /app/clawdmatrix'
+        )
+
+        # Generate CLAUDE.md content using the wrapper CLI
+        out, err, code = self.exec_command(
+            'docker exec openclaw node /app/clawdmatrix/wrapper.js --claude-md',
+            timeout=30,
+        )
+
+        if code != 0 or not out.strip():
+            logger.error(
+                f'ClawdMatrix CLAUDE.md generation failed on {self.server.ip_address}: '
+                f'code={code}, err={err[:300]}'
+            )
+            return False
+
+        claude_md_block = out.strip()
+
+        # Write the CLAUDE.md content to the OpenClaw workspace
+        self.upload_file(claude_md_block, '/tmp/_clawdmatrix_claude.md')
+        self.exec_command(
+            'docker cp /tmp/_clawdmatrix_claude.md '
+            'openclaw:/home/node/.openclaw/CLAUDE.md'
+        )
+        self.exec_command('rm -f /tmp/_clawdmatrix_claude.md')
+        self.exec_command(
+            'docker exec -u root openclaw chown node:node /home/node/.openclaw/CLAUDE.md'
+        )
+
+        logger.info(f'ClawdMatrix enabled on {self.server.ip_address}')
+        return True
+
+    def disable_clawdmatrix(self):
+        """Disable ClawdMatrix Engine without removing files."""
+        logger.info(f'Disabling ClawdMatrix on {self.server.ip_address}...')
+
+        # Remove the CLAUDE.md file that contains ClawdMatrix instructions
+        self.exec_command(
+            'docker exec openclaw rm -f /home/node/.openclaw/CLAUDE.md'
+        )
+
+        logger.info(f'ClawdMatrix disabled on {self.server.ip_address}')
+
+    def verify_clawdmatrix(self):
+        """Verify ClawdMatrix is installed and functioning.
+
+        Returns (success: bool, failures: list[str]).
+        """
+        failures = []
+
+        # Check core files exist
+        out, _, code = self.exec_command(
+            'docker exec openclaw ls /app/clawdmatrix/index.js 2>/dev/null'
+        )
+        if code != 0:
+            failures.append('index.js not found')
+
+        out, _, code = self.exec_command(
+            'docker exec openclaw ls /app/clawdmatrix/data/skills.json 2>/dev/null'
+        )
+        if code != 0:
+            failures.append('skills.json not found')
+
+        out, _, code = self.exec_command(
+            'docker exec openclaw ls /app/clawdmatrix/data/domain-map.json 2>/dev/null'
+        )
+        if code != 0:
+            failures.append('domain-map.json not found')
+
+        # Check skills.json is valid JSON
+        out, _, code = self.exec_command(
+            "docker exec openclaw node -e "
+            "\"JSON.parse(require('fs').readFileSync('/app/clawdmatrix/data/skills.json', 'utf-8'))\""
+        )
+        if code != 0:
+            failures.append(f'skills.json parse error: {out[:200]}')
+
+        # Check wrapper can generate CLAUDE.md
+        out, _, code = self.exec_command(
+            'docker exec openclaw node /app/clawdmatrix/wrapper.js --claude-md 2>/dev/null | head -3'
+        )
+        if code != 0 or 'ClawdMatrix' not in out:
+            failures.append(f'wrapper.js --claude-md failed: {out[:200]}')
+
+        return (len(failures) == 0, failures)
+
+    def update_clawdmatrix_skills(self, domain_map=None, skills=None):
+        """Update ClawdMatrix skill data without full reinstall."""
+        if domain_map:
+            content = json.dumps(domain_map, ensure_ascii=False, indent=2)
+            self.upload_file(content, '/tmp/_domain_map.json')
+            self.exec_command(
+                'docker cp /tmp/_domain_map.json openclaw:/app/clawdmatrix/data/domain-map.json'
+            )
+            self.exec_command('rm -f /tmp/_domain_map.json')
+
+        if skills:
+            content = json.dumps(skills, ensure_ascii=False, indent=2)
+            self.upload_file(content, '/tmp/_skills.json')
+            self.exec_command(
+                'docker cp /tmp/_skills.json openclaw:/app/clawdmatrix/data/skills.json'
+            )
+            self.exec_command('rm -f /tmp/_skills.json')
+
+        self.exec_command(
+            'docker exec -u root openclaw chown -R node:node /app/clawdmatrix'
+        )
+
+        # Re-generate CLAUDE.md with updated data
+        out, _, code = self.exec_command(
+            'docker exec openclaw node /app/clawdmatrix/wrapper.js --claude-md',
+            timeout=30,
+        )
+        if code == 0 and out.strip():
+            self.upload_file(out.strip(), '/tmp/_clawdmatrix_claude.md')
+            self.exec_command(
+                'docker cp /tmp/_clawdmatrix_claude.md '
+                'openclaw:/home/node/.openclaw/CLAUDE.md'
+            )
+            self.exec_command('rm -f /tmp/_clawdmatrix_claude.md')
+            self.exec_command(
+                'docker exec -u root openclaw chown node:node /home/node/.openclaw/CLAUDE.md'
+            )
+
+        logger.info(f'ClawdMatrix skills updated on {self.server.ip_address}')
 
 
 def assign_server_to_user_sync(user_id):

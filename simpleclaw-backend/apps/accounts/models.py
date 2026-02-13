@@ -27,6 +27,9 @@ class UserProfile(models.Model):
     google_id = models.CharField(max_length=255, blank=True, db_index=True)
     avatar_url = models.URLField(blank=True)
 
+    # Apple OAuth
+    apple_id = models.CharField(max_length=255, blank=True, db_index=True)
+
     # Telegram
     telegram_bot_token = models.CharField(max_length=255, blank=True)
     telegram_bot_username = models.CharField(max_length=255, blank=True)
@@ -45,6 +48,14 @@ class UserProfile(models.Model):
     openrouter_key_id = models.CharField(max_length=255, blank=True)
     tokens_used_usd = models.DecimalField(max_digits=8, decimal_places=4, default=0)
     token_limit_usd = models.DecimalField(max_digits=8, decimal_places=2, default=15.00)
+
+    # ClawdMatrix Engine
+    clawdmatrix_enabled = models.BooleanField(default=False, verbose_name='ClawdMatrix Engine')
+    clawdmatrix_custom_skills = models.JSONField(
+        default=dict, blank=True,
+        verbose_name='Custom ClawdMatrix Skills',
+        help_text='Per-user skill overrides (merged with defaults)',
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

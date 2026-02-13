@@ -1,0 +1,138 @@
+{
+  "domains": {
+    "Finance": {
+      "triggers": [
+        "stock", "price", "market", "crypto", "bitcoin", "bull", "bear",
+        "portfolio", "dividend", "hedge", "forex", "trading", "investment",
+        "yield", "equity", "bond", "inflation", "revenue", "profit", "loss",
+        "balance sheet", "cashflow", "valuation", "IPO", "ETF", "futures",
+        "pe ratio", "cap", "forecast",
+        "акции", "цена", "рынок", "крипта", "биткоин", "портфель",
+        "дивиденды", "трейдинг", "инвестиции", "доходность", "облигации",
+        "инфляция", "выручка", "прибыль", "убыток", "баланс", "валюта",
+        "курс", "биржа", "фондовый", "капитал", "бюджет", "финансы"
+      ],
+      "skills": [
+        "Financial_Risk_&_Deployment",
+        "Opportunity_Calculus",
+        "Tree_of_Thoughts_Protocol"
+      ]
+    },
+    "Legal": {
+      "triggers": [
+        "plaintiff", "defendant", "court", "lawsuit", "patent", "contract",
+        "liability", "arbitration", "compliance", "statute", "jurisdiction",
+        "tort", "negligence", "clause", "amendment", "litigation", "verdict",
+        "testimony", "subpoena", "injunction", "settlement", "appeal",
+        "judgment", "intellectual property", "sue",
+        "истец", "ответчик", "суд", "иск", "патент", "контракт", "договор",
+        "ответственность", "арбитраж", "закон", "юрисдикция", "статья",
+        "право", "нарушение", "пункт", "поправка", "решение суда",
+        "показания", "адвокат", "нотариус", "лицензия", "регулирование"
+      ],
+      "skills": [
+        "Legal_Forensics_&_RAG",
+        "Intent_Logic_Extraction",
+        "Constraint_Audit_Loop"
+      ]
+    },
+    "Coding": {
+      "triggers": [
+        "function", "const", "import", "class", "npm", "pip", "git", "docker",
+        "variable", "array", "object", "async", "await", "promise", "callback",
+        "API", "endpoint", "database", "query", "migration", "deploy",
+        "debug", "error", "exception", "refactor", "test", "unittest",
+        "typescript", "python", "javascript", "react", "django", "node",
+        "algorithm", "regex", "loop", "compile", "runtime", "dependency",
+        "=>", "return", "sudo", "bug", "fix",
+        "функция", "переменная", "массив", "объект", "класс", "импорт",
+        "база данных", "запрос", "миграция", "деплой", "баг", "ошибка",
+        "рефакторинг", "тест", "зависимость", "библиотека", "модуль",
+        "компиляция", "отладка", "алгоритм", "код", "программа", "скрипт"
+      ],
+      "skills": [
+        "Workflow_to_Code_Mapping",
+        "Schema_Enforcer",
+        "Systemic_Context_Modeling"
+      ]
+    },
+    "System_Ops": {
+      "triggers": [
+        "token", "memory", "lag", "latency", "deploy", "server", "linux",
+        "CPU", "RAM", "disk", "network", "firewall", "SSH", "nginx",
+        "container", "kubernetes", "k8s", "helm", "terraform", "ansible",
+        "monitoring", "logs", "uptime", "downtime", "backup", "restore",
+        "scaling", "load balancer", "DNS", "SSL", "certificate", "cron",
+        "bloat", "restart", "bash", "shell",
+        "токен", "память", "задержка", "сервер", "линукс", "процессор",
+        "диск", "сеть", "контейнер", "мониторинг", "логи", "бэкап",
+        "масштабирование", "балансировка", "домен", "сертификат",
+        "инфраструктура", "развёртывание", "конфигурация", "хостинг"
+      ],
+      "skills": [
+        "Token_Memory_Optimizer_Router",
+        "Systemic_Context_Modeling",
+        "Fault_Tolerant_Recovery"
+      ]
+    },
+    "Creative_Writing": {
+      "triggers": [
+        "story", "plot", "character", "narrative", "fiction", "novel",
+        "poem", "verse", "dialogue", "scene", "chapter", "protagonist",
+        "antagonist", "setting", "theme", "metaphor", "imagery", "tone",
+        "draft", "manuscript", "screenplay", "lyrics", "essay", "blog",
+        "write a story",
+        "история", "сюжет", "персонаж", "повествование", "роман",
+        "стихотворение", "диалог", "сцена", "глава", "герой", "злодей",
+        "метафора", "образ", "черновик", "рукопись", "сценарий",
+        "рассказ", "проза", "поэзия", "текст", "статья", "эссе"
+      ],
+      "skills": [
+        "Deep_Narrative_Reconstruction",
+        "Semantic_Amplifier",
+        "Concept_Materializer",
+        "Dynamic_Persona_Modulator"
+      ]
+    },
+    "Occult": {
+      "triggers": [
+        "tarot", "horoscope", "zodiac", "astrology", "divination",
+        "rune", "crystal", "chakra", "aura", "meditation", "ritual",
+        "spell", "occult", "esoteric", "mystic", "alchemy", "numerology",
+        "fortune", "spirit", "manifest", "mercury retrograde",
+        "таро", "гороскоп", "зодиак", "астрология", "гадание",
+        "руны", "кристалл", "чакра", "аура", "медитация", "ритуал",
+        "заклинание", "оккультизм", "эзотерика", "мистика", "алхимия",
+        "нумерология", "карта", "знак зодиака", "расклад"
+      ],
+      "skills": [
+        "Soul_Prototype_Architecture",
+        "Ritual_Randomness_Engine",
+        "Deep_Logic_Extraction"
+      ]
+    },
+    "Gaming": {
+      "triggers": [
+        "rpg", "npc", "dps", "tank", "healer", "raid", "speedrun", "meta",
+        "quest", "boss", "loot", "inventory", "level", "XP", "skill tree",
+        "multiplayer", "pvp", "pve", "mmorpg", "fps", "strategy",
+        "Steam", "PlayStation", "Xbox", "Nintendo", "Unity", "Unreal",
+        "dungeon", "nerf", "buff", "game design",
+        "рпг", "нпс", "дпс", "танк", "хилер", "рейд", "спидран",
+        "квест", "босс", "лут", "инвентарь", "уровень", "прокачка",
+        "мультиплеер", "пвп", "пве", "стратегия", "игра", "геймплей"
+      ],
+      "skills": [
+        "Combat_Balance_Matrix",
+        "Economic_Ecosystem_Design",
+        "Meta_Game_Evolution"
+      ]
+    }
+  },
+  "global_defaults": [
+    "Context_Audit_&_Triage",
+    "Intent_Triage_Protocol",
+    "State_Space_Router",
+    "Safety_Brake_Mechanism"
+  ]
+}

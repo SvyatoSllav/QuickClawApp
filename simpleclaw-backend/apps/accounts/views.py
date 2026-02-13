@@ -44,6 +44,87 @@ def decode_google_jwt(token):
         return None
 
 
+def decode_apple_jwt(token):
+    """Decode Apple identity token JWT payload (same approach as Google)"""
+    try:
+        parts = token.split('.')
+        if len(parts) != 3:
+            return None
+
+        payload = parts[1]
+        padding = 4 - len(payload) % 4
+        if padding != 4:
+            payload += '=' * padding
+
+        decoded = base64.urlsafe_b64decode(payload)
+        data = json.loads(decoded)
+
+        return {
+            'email': data.get('email', ''),
+            'apple_id': data.get('sub', ''),
+        }
+    except Exception as e:
+        logger.error(f'Apple JWT decode failed: {e}')
+        return None
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class AppleAuthView(APIView):
+    """Apple OAuth authentication"""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get_authenticators(self):
+        return []
+
+    def post(self, request):
+        token = request.data.get('token', '')
+        name = request.data.get('name', '')
+
+        if not token:
+            return Response({'error': 'Token required'}, status=400)
+
+        token_data = decode_apple_jwt(token)
+        if not token_data or not token_data.get('email'):
+            return Response({'error': 'Invalid Apple token'}, status=400)
+
+        email = token_data['email']
+        apple_id = token_data.get('apple_id', '')
+
+        user = User.objects.filter(email=email).first()
+        created = False
+
+        if not user:
+            base_username = email.split('@')[0][:20]
+            username = base_username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f'{base_username}_{counter}'
+                counter += 1
+
+            user = User.objects.create(
+                email=email,
+                username=username,
+                first_name=name.split(' ')[0] if name else '',
+                last_name=' '.join(name.split(' ')[1:]) if name else '',
+            )
+            created = True
+            logger.info(f'Created new user via Apple: {email}')
+
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        if apple_id:
+            profile.apple_id = apple_id
+        profile.save()
+
+        auth_token, _ = Token.objects.get_or_create(user=user)
+
+        return Response({
+            'token': auth_token.key,
+            'user': UserSerializer(user).data,
+            'created': created,
+        })
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class GoogleAuthView(APIView):
     """Google OAuth authentication"""
@@ -147,8 +228,14 @@ class ProfileView(APIView):
         serializer.is_valid(raise_exception=True)
 
         profile = request.user.profile
+        changed = False
         if 'selected_model' in serializer.validated_data:
             profile.selected_model = serializer.validated_data['selected_model']
+            changed = True
+        if 'clawdmatrix_enabled' in serializer.validated_data:
+            profile.clawdmatrix_enabled = serializer.validated_data['clawdmatrix_enabled']
+            changed = True
+        if changed:
             profile.save()
 
         return Response(UserSerializer(request.user).data)

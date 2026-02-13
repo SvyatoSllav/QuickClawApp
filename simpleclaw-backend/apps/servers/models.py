@@ -34,6 +34,9 @@ class Server(models.Model):
     # OpenClaw path on server
     openclaw_path = models.CharField(max_length=255, default='/root/openclaw')
 
+    # ClawdMatrix Engine
+    clawdmatrix_installed = models.BooleanField(default=False)
+
     # Logs
     last_error = models.TextField(blank=True)
     last_health_check = models.DateTimeField(null=True, blank=True)

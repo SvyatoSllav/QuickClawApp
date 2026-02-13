@@ -4,8 +4,8 @@ from .models import UserProfile, AuditLog
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ['user', 'subscription_status', 'selected_model', 'telegram_bot_validated', 'created_at']
-    list_filter = ['subscription_status', 'selected_model', 'telegram_bot_validated']
+    list_display = ['user', 'subscription_status', 'selected_model', 'telegram_bot_validated', 'clawdmatrix_enabled', 'created_at']
+    list_filter = ['subscription_status', 'selected_model', 'telegram_bot_validated', 'clawdmatrix_enabled']
     search_fields = ['user__email', 'user__username', 'google_id']
     readonly_fields = ['created_at', 'updated_at']
 

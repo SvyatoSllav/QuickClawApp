@@ -18,6 +18,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "subscription_expires_at", "auto_renew", "cancellation_scheduled",
             "cancelled_at", "telegram_bot_username", "telegram_bot_validated",
             "avatar_url", "tokens_used_usd", "token_limit_usd",
+            "clawdmatrix_enabled",
         ]
 
     def get_subscription_status(self, obj):
@@ -85,3 +86,4 @@ class ProfileUpdateSerializer(serializers.Serializer):
         choices=["claude-opus-4.5", "claude-sonnet-4", "gpt-4o", "gemini-2.0-flash"],
         required=False,
     )
+    clawdmatrix_enabled = serializers.BooleanField(required=False)
