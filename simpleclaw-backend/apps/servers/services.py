@@ -5,6 +5,48 @@ import paramiko
 import io
 from django.conf import settings
 
+
+# Dockerfile для сборки образа OpenClaw с Chrome headless
+DOCKERFILE_CONTENT = """FROM ghcr.io/openclaw/openclaw:latest
+
+USER root
+
+RUN apt-get update -qq && \\
+    apt-get install -y -qq --no-install-recommends \\
+    wget gnupg2 ca-certificates \\
+    fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 \\
+    libcups2 libdbus-1-3 libdrm2 libgbm1 libgtk-3-0 \\
+    libnspr4 libnss3 libx11-xcb1 libxcomposite1 libxdamage1 \\
+    libxrandr2 xdg-utils libxss1 libgconf-2-4 \\
+    libpango-1.0-0 libpangocairo-1.0-0 libcairo2 && \\
+    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg && \\
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \\
+    apt-get update -qq && \\
+    apt-get install -y -qq --no-install-recommends google-chrome-stable && \\
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+USER node
+"""
+
+# docker-compose с shm_size для Chrome headless
+DOCKER_COMPOSE_WITH_CHROME = """services:
+  openclaw:
+    build: .
+    image: openclaw-chrome:latest
+    container_name: openclaw
+    restart: unless-stopped
+    shm_size: 2g
+    env_file:
+      - .env
+    volumes:
+      - ./openclaw-config.yaml:/app/config.yaml
+      - ./data:/app/data
+      - config:/home/node/.openclaw
+volumes:
+  config:
+    name: openclaw_config
+"""
+
 logger = logging.getLogger(__name__)
 
 # How many times to retry applying config if verification fails
@@ -60,36 +102,21 @@ class ServerManager:
         logger.info(f'Файл загружен: {remote_path}')
 
     def install_browser_in_container(self):
-        """Install Chromium browser inside OpenClaw container for browser automation"""
-        logger.info(f'Installing Chromium in container on {self.server.ip_address}...')
+        """Настройка Chrome headless внутри контейнера OpenClaw.
+        Chrome уже установлен в образе через Dockerfile, здесь только
+        очистка stale lock-файлов и настройка профиля."""
+        logger.info(f'Configuring Chrome headless on {self.server.ip_address}...')
 
-        # Split into separate commands with error checking
-        out, err, code = self.exec_command(
-            'docker exec -u root openclaw apt-get update',
-            timeout=120
+        # Очистка stale lock-файлов от предыдущих падений Chrome
+        self.exec_command(
+            'docker exec openclaw rm -f '
+            '/home/node/.openclaw/browser/headless/user-data/SingletonLock '
+            '/home/node/.openclaw/browser/headless/user-data/SingletonSocket '
+            '/home/node/.openclaw/browser/headless/user-data/SingletonCookie '
+            '2>/dev/null || true'
         )
-        if code != 0:
-            logger.warning(f'apt-get update failed (code {code}): {err[:300]}')
-            # Try apk for Alpine-based containers
-            out, err, code = self.exec_command(
-                'docker exec -u root openclaw apk update && '
-                'docker exec -u root openclaw apk add --no-cache chromium font-noto',
-                timeout=180
-            )
-            if code != 0:
-                logger.error(f'Browser install failed on {self.server.ip_address}: {err[:500]}')
-                return False
-        else:
-            out, err, code = self.exec_command(
-                'docker exec -u root openclaw apt-get install -y chromium fonts-liberation',
-                timeout=300
-            )
-            if code != 0:
-                logger.error(f'Chromium install failed on {self.server.ip_address}: {err[:500]}')
-                return False
 
-        logger.info(f'Chromium installed successfully on {self.server.ip_address}')
-
+        # Настройка профиля браузера
         browser_commands = [
             'docker exec openclaw node /app/openclaw.mjs browser create-profile --name headless --color "#00FF00" --driver openclaw 2>/dev/null || true',
             'docker exec openclaw node /app/openclaw.mjs config set browser.defaultProfile headless',
@@ -100,8 +127,13 @@ class ServerManager:
         for cmd in browser_commands:
             self.exec_command(cmd)
 
-        logger.info(f'Browser configured on {self.server.ip_address}')
+        logger.info(f'Chrome headless configured on {self.server.ip_address}')
         return True
+
+    def _upload_docker_files(self, path):
+        """Загрузка Dockerfile и docker-compose.yml с Chrome headless на сервер"""
+        self.upload_file(DOCKERFILE_CONTENT, f'{path}/Dockerfile')
+        self.upload_file(DOCKER_COMPOSE_WITH_CHROME, f'{path}/docker-compose.yml')
 
     def configure_token_optimization(self, model_slug='claude-sonnet-4'):
         """Configure OpenClaw for optimal token usage to reduce costs.
@@ -282,34 +314,18 @@ limits:
   max_context_messages: 30
 """
 
-        docker_compose_content = """services:
-  openclaw:
-    image: ghcr.io/openclaw/openclaw:latest
-    container_name: openclaw
-    restart: unless-stopped
-    env_file:
-      - .env
-    volumes:
-      - ./openclaw-config.yaml:/app/config.yaml
-      - ./data:/app/data
-      - config:/home/node/.openclaw
-volumes:
-  config:
-    name: openclaw_config
-"""
-
         try:
             self.connect()
 
             self.upload_file(env_content, f'{path}/.env')
             self.upload_file(config_content, f'{path}/openclaw-config.yaml')
-            self.upload_file(docker_compose_content, f'{path}/docker-compose.yml')
+            self._upload_docker_files(path)
 
             # Stop existing container and clear stale config
             self.exec_command(f'cd {path} && docker compose down 2>/dev/null || true')
             self.exec_command('docker volume rm openclaw_config 2>/dev/null || true')
 
-            out, err, code = self.exec_command(f'cd {path} && docker compose up -d')
+            out, err, code = self.exec_command(f'cd {path} && docker compose up -d --build', timeout=300)
             if code != 0:
                 logger.error(f'warm_deploy_standby: docker compose up failed on {self.server.ip_address}: {err}')
                 return False
@@ -712,36 +728,20 @@ limits:
   max_context_messages: 30
 """
 
-        docker_compose_content = """services:
-  openclaw:
-    image: ghcr.io/openclaw/openclaw:latest
-    container_name: openclaw
-    restart: unless-stopped
-    env_file:
-      - .env
-    volumes:
-      - ./openclaw-config.yaml:/app/config.yaml
-      - ./data:/app/data
-      - config:/home/node/.openclaw
-volumes:
-  config:
-    name: openclaw_config
-"""
-
         try:
             self.connect()
 
             # Upload all config files
             self.upload_file(env_content, f'{path}/.env')
             self.upload_file(config_content, f'{path}/openclaw-config.yaml')
-            self.upload_file(docker_compose_content, f'{path}/docker-compose.yml')
+            self._upload_docker_files(path)
 
             # Stop existing container and clear stale config
             self.exec_command(f'cd {path} && docker compose down 2>/dev/null || true')
             self.exec_command('docker volume rm openclaw_config 2>/dev/null || true')
 
             # Start container
-            out, err, code = self.exec_command(f'cd {path} && docker compose up -d')
+            out, err, code = self.exec_command(f'cd {path} && docker compose up -d --build', timeout=300)
 
             if code != 0:
                 self.server.openclaw_running = False

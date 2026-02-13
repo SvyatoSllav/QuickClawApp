@@ -302,22 +302,10 @@ def setup_standby_server(self, server_id):
         # Create OpenClaw directory
         manager.exec_command(f'mkdir -p {server.openclaw_path}')
 
-        docker_compose = '''services:
-  openclaw:
-    image: ghcr.io/openclaw/openclaw:latest
-    container_name: openclaw
-    restart: unless-stopped
-    env_file:
-      - .env
-    volumes:
-      - ./openclaw-config.yaml:/app/config.yaml
-      - ./data:/app/data
-      - config:/home/node/.openclaw
-volumes:
-  config:
-    name: openclaw_config
-'''
-        manager.upload_file(docker_compose, f'{server.openclaw_path}/docker-compose.yml')
+        # Загрузка Dockerfile и docker-compose с Chrome headless
+        from .services import DOCKERFILE_CONTENT, DOCKER_COMPOSE_WITH_CHROME
+        manager.upload_file(DOCKERFILE_CONTENT, f'{server.openclaw_path}/Dockerfile')
+        manager.upload_file(DOCKER_COMPOSE_WITH_CHROME, f'{server.openclaw_path}/docker-compose.yml')
 
         # Mark as active — warm deploy will be triggered by signal handler
         server.status = 'active'
@@ -485,22 +473,10 @@ def setup_openclaw_server(server_id):
 
         manager.exec_command(f'mkdir -p {server.openclaw_path}')
 
-        docker_compose = '''services:
-  openclaw:
-    image: ghcr.io/openclaw/openclaw:latest
-    container_name: openclaw
-    restart: unless-stopped
-    env_file:
-      - .env
-    volumes:
-      - ./openclaw-config.yaml:/app/config.yaml
-      - ./data:/app/data
-      - config:/home/node/.openclaw
-volumes:
-  config:
-    name: openclaw_config
-'''
-        manager.upload_file(docker_compose, f'{server.openclaw_path}/docker-compose.yml')
+        # Загрузка Dockerfile и docker-compose с Chrome headless
+        from .services import DOCKERFILE_CONTENT, DOCKER_COMPOSE_WITH_CHROME
+        manager.upload_file(DOCKERFILE_CONTENT, f'{server.openclaw_path}/Dockerfile')
+        manager.upload_file(DOCKER_COMPOSE_WITH_CHROME, f'{server.openclaw_path}/docker-compose.yml')
 
         server.status = 'active'
         server.last_error = ''
