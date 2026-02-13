@@ -987,7 +987,7 @@ limits:
         self.configure_searxng_provider()
 
     def _clean_invalid_searxng_config(self):
-        """Remove old invalid tools.web.search.searxng config from openclaw.json."""
+        """Remove old invalid config from openclaw.json (searxng provider, broken profiles)."""
         out, _, code = self.exec_command(
             'docker exec openclaw cat /home/node/.openclaw/openclaw.json 2>/dev/null'
         )
@@ -997,14 +997,27 @@ limits:
             config = json.loads(out)
         except json.JSONDecodeError:
             return
-        search = config.get('tools', {}).get('web', {}).get('search', {})
         changed = False
+
+        # Fix tools.web.search: remove invalid searxng provider/key
+        search = config.get('tools', {}).get('web', {}).get('search', {})
         if 'searxng' in search:
             del search['searxng']
             changed = True
         if search.get('provider') == 'searxng':
             search['provider'] = 'brave'
             changed = True
+
+        # Fix browser profiles: remove incomplete lightpanda profile (missing color)
+        profiles = config.get('browser', {}).get('profiles', {})
+        if 'lightpanda' in profiles:
+            del profiles['lightpanda']
+            changed = True
+        # Reset default profile to headless if it was lightpanda
+        if config.get('browser', {}).get('defaultProfile') == 'lightpanda':
+            config['browser']['defaultProfile'] = 'headless'
+            changed = True
+
         if changed:
             new_json = json.dumps(config, indent=2)
             self.upload_file(new_json, '/tmp/_oc_fix.json')
@@ -1015,7 +1028,7 @@ limits:
                 'docker exec -u root openclaw chown node:node /home/node/.openclaw/openclaw.json'
             )
             self.exec_command('rm -f /tmp/_oc_fix.json')
-            logger.info(f'Cleaned invalid SearXNG config on {self.server.ip_address}')
+            logger.info(f'Cleaned invalid config on {self.server.ip_address}')
 
     def verify_searxng(self):
         """Verify SearXNG + Lightpanda are running and accessible.
@@ -1096,11 +1109,14 @@ limits:
             logger.error(f'SearXNG install failed on {self.server.ip_address}: {err[:500]}')
             return False
 
-        # Wait for containers to start
-        time.sleep(15)
+        # Wait for containers to start and doctor --fix to complete
+        time.sleep(30)
 
-        # Clean old invalid SearXNG config from openclaw.json (if present)
+        # Clean old invalid config from openclaw.json (searxng provider, broken profiles)
         self._clean_invalid_searxng_config()
+
+        # Wait briefly for container to pick up cleaned config
+        time.sleep(5)
 
         # Configure OpenClaw: provider=brave (adapter translates to SearXNG)
         self.configure_searxng_provider()
