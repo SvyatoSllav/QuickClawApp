@@ -67,14 +67,16 @@ DOCKER_COMPOSE_WITH_CHROME = """services:
     mem_limit: 512m
 
   searxng-adapter:
-    image: node:20-alpine
+    image: openclaw-chrome:latest
     container_name: searxng-adapter
     restart: unless-stopped
+    user: node
     volumes:
-      - ./searxng-adapter.js:/app/adapter.js:ro
-    command: node /app/adapter.js
+      - ./searxng-adapter.js:/tmp/adapter.js:ro
+    entrypoint: ["node", "/tmp/adapter.js"]
     depends_on:
       - searxng
+      - openclaw
 
   valkey:
     image: docker.io/valkey/valkey:8-alpine
