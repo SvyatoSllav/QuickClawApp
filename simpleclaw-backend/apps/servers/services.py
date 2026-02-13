@@ -262,10 +262,8 @@ class ServerManager:
 
             # --- Enable web search ---
             f'{cli} config set web.enabled true',
-
-            # --- SearXNG as web search provider ---
-            f'{cli} config set tools.web.search.provider searxng',
-            f'{cli} config set tools.web.search.searxng.baseUrl http://searxng:8080',
+            # NOTE: SearXNG provider is configured via configure_searxng_provider()
+            # which writes directly to openclaw.json (CLI config set rejects the key)
 
             # --- Bootstrap file size limit (reduces system prompt bloat) ---
             f'{cli} config set agents.defaults.bootstrapMaxChars 20000',
@@ -415,8 +413,9 @@ limits:
             self.exec_command('docker exec openclaw node /app/openclaw.mjs doctor --fix')
             self.exec_command('docker exec openclaw node /app/openclaw.mjs config set gateway.mode local')
 
-            # Apply token optimization
+            # Apply token optimization + SearXNG provider
             self.configure_token_optimization()
+            self.configure_searxng_provider()
 
             # Install session watchdog (auto-recovers from Gemini thought signature errors)
             self.install_session_watchdog()
@@ -518,6 +517,7 @@ limits:
                 f'docker exec openclaw node /app/openclaw.mjs models set {openrouter_model}'
             )
             self.configure_token_optimization(model_slug)
+            self.configure_searxng_provider()
             self.install_session_watchdog()
 
             # Apply user-specific config (auth-profiles, telegram) with retry
@@ -848,6 +848,7 @@ limits:
 
             # Configure token optimization
             self.configure_token_optimization(model_slug)
+            self.configure_searxng_provider()
             self.install_session_watchdog()
 
             # Install and optionally enable ClawdMatrix
@@ -914,19 +915,49 @@ limits:
         logger.info(f'SearXNG settings uploaded to {self.server.ip_address}')
 
     def configure_searxng_provider(self):
-        """Configure OpenClaw to use SearXNG as the web search provider."""
-        cli = 'docker exec openclaw node /app/openclaw.mjs'
+        """Configure OpenClaw to use SearXNG as the web search provider.
 
-        commands = [
-            f'{cli} config set web.enabled true',
-            f'{cli} config set tools.web.search.provider searxng',
-            f'{cli} config set tools.web.search.searxng.baseUrl http://searxng:8080',
-        ]
+        Writes directly to openclaw.json because the CLI config set doesn't
+        support the tools.web.search config path (schema validation rejects it),
+        even though the runtime reads it from openclaw.json correctly.
+        """
+        # Enable web tools via CLI (this one works)
+        self.exec_command(
+            'docker exec openclaw node /app/openclaw.mjs config set web.enabled true'
+        )
 
-        for cmd in commands:
-            out, err, code = self.exec_command(cmd)
-            if code != 0:
-                logger.warning(f'SearXNG config failed: {cmd[:80]}... err={err[:200]}')
+        # Read current openclaw.json
+        out, _, code = self.exec_command(
+            'docker exec openclaw cat /home/node/.openclaw/openclaw.json 2>/dev/null'
+        )
+        if code != 0 or not out.strip():
+            logger.warning(f'Cannot read openclaw.json on {self.server.ip_address}')
+            return
+
+        try:
+            config = json.loads(out)
+        except json.JSONDecodeError:
+            logger.warning(f'Invalid openclaw.json on {self.server.ip_address}')
+            return
+
+        # Merge tools.web.search config
+        config.setdefault('tools', {})
+        config['tools'].setdefault('web', {})
+        config['tools']['web']['search'] = {
+            'provider': 'searxng',
+            'searxng': {'baseUrl': 'http://searxng:8080'},
+        }
+
+        # Write back via docker cp
+        new_json = json.dumps(config, indent=2)
+        self.upload_file(new_json, '/tmp/_openclaw_config.json')
+        self.exec_command(
+            'docker cp /tmp/_openclaw_config.json openclaw:/home/node/.openclaw/openclaw.json'
+        )
+        self.exec_command(
+            'docker exec -u root openclaw chown node:node /home/node/.openclaw/openclaw.json'
+        )
+        self.exec_command('rm -f /tmp/_openclaw_config.json')
 
         logger.info(f'SearXNG provider configured on {self.server.ip_address}')
 
