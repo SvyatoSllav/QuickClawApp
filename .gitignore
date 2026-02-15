@@ -24,3 +24,9 @@ db.sqlite3
 
 # Logs
 *.log
+
+# Rust / Tauri
+target/
+
+# OpenClaw source (cloned for reference)
+openclaw-source/
