@@ -26,8 +26,8 @@ pub async fn get_openclaw_status(app: tauri::AppHandle) -> Result<OpenClawStatus
         .command("docker")
         .args([
             "compose",
-            "-f",
-            &format!("{}/docker-compose.yml", dir_str),
+            "--project-directory",
+            &dir_str,
             "ps",
             "--format",
             "{{.Name}}\t{{.State}}\t{{.Status}}",
@@ -71,8 +71,8 @@ pub async fn get_openclaw_logs(app: tauri::AppHandle, lines: u32) -> Result<Stri
         .command("docker")
         .args([
             "compose",
-            "-f",
-            &format!("{}/docker-compose.yml", dir_str),
+            "--project-directory",
+            &dir_str,
             "logs",
             &format!("--tail={}", lines),
             "openclaw",
@@ -95,8 +95,8 @@ pub async fn start_openclaw(app: tauri::AppHandle) -> Result<String, String> {
         .command("docker")
         .args([
             "compose",
-            "-f",
-            &format!("{}/docker-compose.yml", dir_str),
+            "--project-directory",
+            &dir_str,
             "start",
         ])
         .output()
@@ -120,8 +120,8 @@ pub async fn stop_openclaw(app: tauri::AppHandle) -> Result<String, String> {
         .command("docker")
         .args([
             "compose",
-            "-f",
-            &format!("{}/docker-compose.yml", dir_str),
+            "--project-directory",
+            &dir_str,
             "stop",
         ])
         .output()
@@ -145,8 +145,8 @@ pub async fn restart_openclaw(app: tauri::AppHandle) -> Result<String, String> {
         .command("docker")
         .args([
             "compose",
-            "-f",
-            &format!("{}/docker-compose.yml", dir_str),
+            "--project-directory",
+            &dir_str,
             "restart",
         ])
         .output()

@@ -265,7 +265,7 @@ pub async fn deploy_openclaw(app: tauri::AppHandle) -> Result<SetupResult, Strin
     // docker compose up -d --build
     let output = shell
         .command("docker")
-        .args(["compose", "-f", &format!("{}/docker-compose.yml", dir_str), "up", "-d", "--build"])
+        .args(["compose", "--project-directory", &dir_str, "up", "-d", "--build"])
         .output()
         .await
         .map_err(|e| format!("Failed to start Docker: {}", e))?;
@@ -399,7 +399,7 @@ pub async fn teardown_openclaw(app: tauri::AppHandle) -> Result<SetupResult, Str
 
     let output = shell
         .command("docker")
-        .args(["compose", "-f", &format!("{}/docker-compose.yml", dir_str), "down", "-v"])
+        .args(["compose", "--project-directory", &dir_str, "down", "-v"])
         .output()
         .await
         .map_err(|e| format!("Failed to teardown: {}", e))?;
