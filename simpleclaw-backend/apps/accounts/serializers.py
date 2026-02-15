@@ -83,7 +83,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class ProfileUpdateSerializer(serializers.Serializer):
     selected_model = serializers.ChoiceField(
-        choices=["claude-opus-4.5", "claude-sonnet-4", "gpt-4o", "gemini-2.0-flash"],
+        choices=["gemini-3-flash", "claude-sonnet-4", "gpt-4o", "claude-opus-4.5"],
         required=False,
     )
     clawdmatrix_enabled = serializers.BooleanField(required=False)

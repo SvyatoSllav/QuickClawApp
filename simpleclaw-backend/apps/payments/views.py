@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny
 
 from .services import (
     create_first_payment,
+    create_payment_with_token,
     handle_payment_succeeded,
     handle_payment_canceled,
     cancel_subscription,
@@ -26,6 +27,25 @@ class CreatePaymentView(APIView):
             return Response(result)
         except Exception as e:
             logger.error(f'Error creating payment: {e}')
+            return Response({'error': str(e)}, status=400)
+
+
+class CreatePaymentWithTokenView(APIView):
+    def post(self, request):
+        """Create payment using token from YooKassa Android SDK"""
+        try:
+            payment_token = request.data.get('payment_token')
+            if not payment_token:
+                return Response({'error': 'payment_token is required'}, status=400)
+
+            telegram_token = request.data.get('telegram_token', '')
+            selected_model = request.data.get('selected_model', 'gemini-3-flash')
+            result = create_payment_with_token(
+                request.user, payment_token, telegram_token, selected_model
+            )
+            return Response(result)
+        except Exception as e:
+            logger.error(f'Error creating token payment: {e}')
             return Response({'error': str(e)}, status=400)
 
 

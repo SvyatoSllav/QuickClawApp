@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Политика конфиденциальности — SimpleClaw</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            background-color: #07080a;
+            color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 4rem;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #9f9fa9;
+            text-decoration: none;
+            font-size: 0.875rem;
+            margin-bottom: 2rem;
+            transition: color 0.3s;
+        }
+        .back-link:hover {
+            color: #ffffff;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, rgba(255,255,255,0.98) -1.59%, #fff 49.71%, rgba(255,255,255,0.81));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .update-date {
+            color: #71717b;
+            font-size: 0.875rem;
+            margin-bottom: 2.5rem;
+        }
+        h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #e4e4e7;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+        p {
+            color: #9f9fa9;
+            margin-bottom: 1rem;
+        }
+        ul {
+            color: #9f9fa9;
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        .highlight {
+            color: #7d87ff;
+        }
+        .section {
+            padding: 1.5rem;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+        .section h2 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m15 18-6-6 6-6"/>
+            </svg>
+            Назад на главную
+        </a>
+
+        <h1>Политика конфиденциальности</h1>
+        <p class="update-date">Последнее обновление: 12 февраля 2026 г.</p>
+
+        <div class="section">
+            <h2>1. Общие положения</h2>
+            <p>Настоящая Политика конфиденциальности (далее — «Политика») определяет порядок обработки и защиты персональных данных пользователей сервиса SimpleClaw (далее — «Сервис»), предоставляемого ИП Тарасов Святослав Андреевич (далее — «Оператор»).</p>
+            <p>Используя Сервис, вы соглашаетесь с условиями обработки персональных данных, описанными в настоящей Политике.</p>
+        </div>
+
+        <div class="section">
+            <h2>2. Какие данные мы собираем</h2>
+            <p>При использовании Сервиса мы можем собирать следующие данные:</p>
+            <ul>
+                <li><strong>Данные аутентификации:</strong> адрес электронной почты, имя, идентификатор Google или Apple (при входе через OAuth), URL аватара</li>
+                <li><strong>Данные Telegram:</strong> токен бота, username бота, идентификатор Telegram-пользователя, идентификатор чата</li>
+                <li><strong>Настройки сервиса:</strong> выбранная AI-модель</li>
+                <li><strong>Данные подписки:</strong> статус подписки, даты начала и окончания периода, статус автопродления</li>
+                <li><strong>Платёжные данные:</strong> идентификатор платежа в системе ЮKassa, сумма и валюта платежа, статус платежа. Мы не храним данные банковских карт — они обрабатываются исключительно платёжным провайдером ЮKassa.</li>
+                <li><strong>Данные использования:</strong> объём использованных API-токенов (в долларах), лимит токенов</li>
+                <li><strong>Технические данные:</strong> журнал действий (тип действия и временная метка)</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>3. Как мы используем данные</h2>
+            <p>Собранные данные используются исключительно для:</p>
+            <ul>
+                <li>Предоставления доступа к Сервису и управления учётной записью</li>
+                <li>Развёртывания и настройки экземпляра OpenClaw на выделенном сервере</li>
+                <li>Интеграции с Telegram и подключения бота</li>
+                <li>Обработки платежей и управления подпиской</li>
+                <li>Предоставления доступа к AI-моделям через OpenRouter</li>
+                <li>Технической поддержки и отладки</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>4. Хранение и защита данных</h2>
+            <p>Персональные данные хранятся на защищённых серверах с использованием:</p>
+            <ul>
+                <li>Шифрованного соединения (HTTPS/TLS) для всех коммуникаций</li>
+                <li>Токенной аутентификации Django REST Framework</li>
+                <li>Ограниченного доступа к базе данных</li>
+            </ul>
+            <p>Данные переписки с AI-ассистентом обрабатываются на выделенном сервере пользователя и не хранятся на серверах Оператора.</p>
+        </div>
+
+        <div class="section">
+            <h2>5. Третьи стороны</h2>
+            <p>Для работы Сервиса мы используем следующих поставщиков услуг:</p>
+            <ul>
+                <li><strong>Google OAuth / Apple Sign In</strong> — аутентификация пользователей</li>
+                <li><strong>ЮKassa</strong> — обработка платежей</li>
+                <li><strong>OpenRouter</strong> — доступ к AI-моделям (Claude, GPT, Gemini)</li>
+                <li><strong>Telegram Bot API</strong> — интеграция с мессенджером</li>
+            </ul>
+            <p>Мы не передаём персональные данные третьим лицам за исключением указанных поставщиков и случаев, предусмотренных законодательством РФ.</p>
+        </div>
+
+        <div class="section">
+            <h2>6. Сроки хранения данных</h2>
+            <p>Персональные данные хранятся в течение всего периода использования Сервиса. После удаления учётной записи данные удаляются в течение 30 дней.</p>
+            <p>Журнал действий хранится не более 90 дней.</p>
+        </div>
+
+        <div class="section">
+            <h2>7. Права пользователя</h2>
+            <p>В соответствии с Федеральным законом № 152-ФЗ «О персональных данных» вы имеете право:</p>
+            <ul>
+                <li>Получить информацию об обрабатываемых персональных данных</li>
+                <li>Потребовать исправления неточных данных</li>
+                <li>Потребовать удаления персональных данных</li>
+                <li>Отозвать согласие на обработку персональных данных</li>
+            </ul>
+            <p>Для реализации указанных прав направьте запрос на <a href="mailto:tarasov.slavas2@gmail.com" class="highlight">tarasov.slavas2@gmail.com</a>.</p>
+        </div>
+
+        <div class="section">
+            <h2>8. Изменение Политики</h2>
+            <p>Оператор вправе изменять настоящую Политику. Уведомление об изменениях направляется на электронную почту пользователя не менее чем за 7 дней до вступления изменений в силу.</p>
+            <p>Продолжение использования Сервиса после вступления изменений в силу означает согласие с обновлённой Политикой.</p>
+        </div>
+
+        <div class="section">
+            <h2>9. Контакты</h2>
+            <p>По всем вопросам, связанным с обработкой персональных данных:</p>
+            <p>ИП Тарасов Святослав Андреевич</p>
+            <p>Email: <a href="mailto:tarasov.slavas2@gmail.com" class="highlight">tarasov.slavas2@gmail.com</a></p>
+        </div>
+    </div>
+</body>
+</html>

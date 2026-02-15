@@ -13,7 +13,7 @@ USER root
 
 RUN apt-get update -qq && \\
     apt-get install -y -qq --no-install-recommends \\
-    wget gnupg2 ca-certificates \\
+    wget gnupg2 ca-certificates python3-pip \\
     fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 \\
     libcups2 libdbus-1-3 libdrm2 libgbm1 libgtk-3-0 \\
     libnspr4 libnss3 libx11-xcb1 libxcomposite1 libxdamage1 \\
@@ -23,6 +23,7 @@ RUN apt-get update -qq && \\
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \\
     apt-get update -qq && \\
     apt-get install -y -qq --no-install-recommends google-chrome-stable && \\
+    pip install --break-system-packages python-pptx && \\
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Redirect Brave Search API to local SearXNG adapter
@@ -78,6 +79,24 @@ DOCKER_COMPOSE_WITH_CHROME = """services:
       - searxng
       - openclaw
 
+  lightpanda-adapter:
+    image: openclaw-chrome:latest
+    container_name: lightpanda-adapter
+    restart: unless-stopped
+    user: "0"
+    working_dir: /app
+    volumes:
+      - ./lightpanda-cdp-adapter.js:/tmp/adapter.js:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    entrypoint: ["node", "/tmp/adapter.js"]
+    environment:
+      - LP_HOST=lightpanda
+      - LP_PORT=9222
+      - LISTEN_PORT=9223
+      - NODE_PATH=/app/node_modules
+    depends_on:
+      - lightpanda
+
   valkey:
     image: docker.io/valkey/valkey:8-alpine
     container_name: searxng-redis
@@ -113,6 +132,280 @@ server:
 
 redis:
   url: "redis://searxng-redis:6379/0"
+"""
+
+# Lightpanda CDP adapter v24 — WebSocket proxy with:
+# 1. HTTP /json/* endpoints for Playwright discovery + /health endpoint
+# 2. Uses LP's STARTUP session as real page (forwards first session, hides extras)
+# 3. Stubs unsupported methods (Target.attachToBrowserTarget, etc.)
+# 4. Intercepts Target.createTarget (LP is single-page) — emits synthetic CDP events
+# 5. 10s response timeout — returns fast CDP errors instead of hanging
+# 6. Auto-restarts lightpanda container via Docker socket when stuck
+LIGHTPANDA_CDP_ADAPTER_JS = """\
+const http = require('http');
+const WebSocket = require('ws');
+
+const LP_HOST = process.env.LP_HOST || 'lightpanda';
+const LP_PORT = parseInt(process.env.LP_PORT || '9222', 10);
+const LISTEN_PORT = parseInt(process.env.LISTEN_PORT || '9223', 10);
+const SELF_HOST = 'lightpanda-adapter';
+const LP_WS = 'ws://' + LP_HOST + ':' + LP_PORT + '/';
+const BROWSER_SESSION = 'browser-stub-session';
+const CMD_TIMEOUT_MS = 10000;
+
+const STUB_METHODS = new Set([
+  'Target.attachToBrowserTarget', 'Target.detachFromTarget',
+  'Browser.getWindowForTarget', 'Browser.setWindowBounds', 'Browser.getWindowBounds',
+]);
+
+function log(msg) { console.log('[' + new Date().toISOString().substr(11,8) + '] ' + msg); }
+
+var consecutiveTimeouts = 0;
+var restartInProgress = false;
+
+function restartLP() {
+  if (restartInProgress) return;
+  restartInProgress = true;
+  log('Auto-restarting lightpanda container...');
+  var req = http.request({
+    socketPath: '/var/run/docker.sock',
+    path: '/containers/lightpanda/restart?t=2',
+    method: 'POST'
+  }, function(res) {
+    log('LP restart: HTTP ' + res.statusCode);
+    restartInProgress = false;
+    consecutiveTimeouts = 0;
+  });
+  req.on('error', function(err) {
+    log('LP restart failed: ' + err.message);
+    restartInProgress = false;
+  });
+  req.setTimeout(15000, function() { req.destroy(); restartInProgress = false; });
+  req.end();
+}
+
+var httpServer = http.createServer(function(req, res) {
+  var url = new URL(req.url, 'http://localhost:' + LISTEN_PORT);
+  var path = url.pathname.replace(/\\/+$/, '') || '/';
+  res.setHeader('Content-Type', 'application/json');
+  if (path === '/json/version') {
+    res.end(JSON.stringify({
+      Browser: 'Lightpanda/nightly', 'Protocol-Version': '1.3',
+      webSocketDebuggerUrl: 'ws://' + SELF_HOST + ':' + LISTEN_PORT + '/'
+    }));
+  } else if (path === '/json/list' || path === '/json') {
+    res.end(JSON.stringify([{
+      id: 'default', type: 'page', title: 'Lightpanda', url: 'about:blank',
+      webSocketDebuggerUrl: 'ws://' + SELF_HOST + ':' + LISTEN_PORT + '/'
+    }]));
+  } else if (path === '/json/new') {
+    res.end(JSON.stringify({ id: 'default', type: 'page', url: 'about:blank' }));
+  } else if (path === '/health') {
+    var ok = !restartInProgress && consecutiveTimeouts < 3;
+    res.writeHead(ok ? 200 : 503);
+    res.end(JSON.stringify({ healthy: ok, timeouts: consecutiveTimeouts }));
+  } else { res.writeHead(404); res.end('{}'); }
+});
+
+var wss = new WebSocket.Server({ server: httpServer });
+wss.on('connection', function(clientWs) {
+  log('CLIENT connected');
+  var lpWs = new WebSocket(LP_WS);
+  var lpReady = false, pendingQueue = [];
+  var pageSessionId = null, pageTargetId = null;
+  var hiddenSessions = {};
+  var fakeToReal = {}, fakeTargetIds = {}, fakeCounter = 0;
+  var proxiedRequests = {}, proxyIdCounter = 900000;
+  var cmdTimers = {};
+  var pendingCreateTargets = [];
+
+  function cleanup() {
+    Object.keys(cmdTimers).forEach(function(id) { clearTimeout(cmdTimers[id]); });
+    cmdTimers = {};
+  }
+
+  function sendToLP(data) {
+    if (lpReady) lpWs.send(data); else pendingQueue.push(data);
+  }
+
+  function startTimeout(lpId) {
+    cmdTimers[lpId] = setTimeout(function() {
+      var pr = proxiedRequests[lpId];
+      if (!pr) return;
+      delete proxiedRequests[lpId];
+      delete cmdTimers[lpId];
+      consecutiveTimeouts++;
+      log('TIMEOUT lpId=' + lpId + ' clientId=' + pr.originalId + ' (consecutive: ' + consecutiveTimeouts + ')');
+      var err = { id: pr.originalId, error: { code: -32000, message: 'Lightpanda response timeout' } };
+      if (pr.originalSession) err.sessionId = pr.originalSession;
+      if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify(err));
+      if (consecutiveTimeouts >= 2) restartLP();
+    }, CMD_TIMEOUT_MS);
+  }
+
+  lpWs.on('open', function() {
+    log('LP connected');
+    lpReady = true;
+    pendingQueue.forEach(function(m) { lpWs.send(m); });
+    pendingQueue = [];
+  });
+
+  lpWs.on('message', function(data) {
+    var str = data.toString(), msg;
+    consecutiveTimeouts = 0;
+    try { msg = JSON.parse(str); } catch(e) {
+      if (clientWs.readyState === WebSocket.OPEN) clientWs.send(str);
+      return;
+    }
+    // Track sessions but DON'T forward — we expose page via createTarget
+    if (msg.method === 'Target.attachedToTarget' && msg.params && msg.params.sessionId) {
+      if (!pageSessionId) {
+        pageSessionId = msg.params.sessionId;
+        if (msg.params.targetInfo) pageTargetId = msg.params.targetInfo.targetId;
+        log('LP page session: ' + pageSessionId + ' target: ' + pageTargetId + ' (hidden)');
+        // Process queued createTargets
+        pendingCreateTargets.forEach(function(ct) { emitNewPage(ct); });
+        pendingCreateTargets = [];
+      } else {
+        log('Hiding extra session: ' + msg.params.sessionId);
+      }
+      return;
+    }
+    // Hide events on LP's internal sessions — expose only fake sessions
+    if (msg.sessionId === pageSessionId) { return; }
+    // Clear timeout for any response (raw or proxied)
+    if (msg.id) {
+      var rawKey = 'r' + msg.id;
+      if (cmdTimers[rawKey]) { clearTimeout(cmdTimers[rawKey]); delete cmdTimers[rawKey]; }
+      if (cmdTimers[msg.id]) { clearTimeout(cmdTimers[msg.id]); delete cmdTimers[msg.id]; }
+    }
+    if (msg.id && proxiedRequests[msg.id]) {
+      var pr = proxiedRequests[msg.id];
+      delete proxiedRequests[msg.id];
+      msg.id = pr.originalId;
+      msg.sessionId = pr.originalSession;
+      if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify(msg));
+      return;
+    }
+    if (clientWs.readyState === WebSocket.OPEN) { clientWs.send(str); }
+  });
+
+  lpWs.on('close', function() {
+    log('LP disconnected');
+    Object.keys(proxiedRequests).forEach(function(lpId) {
+      if (cmdTimers[lpId]) { clearTimeout(cmdTimers[lpId]); delete cmdTimers[lpId]; }
+      var pr = proxiedRequests[lpId];
+      var err = { id: pr.originalId, error: { code: -32000, message: 'Lightpanda disconnected' } };
+      if (pr.originalSession) err.sessionId = pr.originalSession;
+      if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify(err));
+    });
+    proxiedRequests = {};
+    if (clientWs.readyState === WebSocket.OPEN) clientWs.close();
+  });
+  lpWs.on('error', function(err) { log('LP error: ' + err.message); });
+
+  clientWs.on('message', function(data) {
+    var str = data.toString(), msg;
+    try { msg = JSON.parse(str); } catch(e) { sendToLP(str); return; }
+
+    if (msg.method && STUB_METHODS.has(msg.method)) {
+      var r = { id: msg.id, result: {} };
+      if (msg.method === 'Target.attachToBrowserTarget') r.result = { sessionId: BROWSER_SESSION };
+      if (msg.sessionId) r.sessionId = msg.sessionId;
+      clientWs.send(JSON.stringify(r));
+      return;
+    }
+
+    // LP is single-page: return existing target instead of creating new one
+    if (msg.method === 'Target.createTarget') {
+      if (pageTargetId) {
+        log('createTarget -> returning existing target ' + pageTargetId);
+        var resp = { id: msg.id, result: { targetId: pageTargetId } };
+        if (msg.sessionId) resp.sessionId = msg.sessionId;
+        clientWs.send(JSON.stringify(resp));
+      } else {
+        log('createTarget queued (waiting for LP page session)');
+        pendingCreateTargets.push(msg);
+      }
+      return;
+    }
+
+    if (msg.sessionId === BROWSER_SESSION && msg.method === 'Target.attachToTarget') {
+      fakeCounter++;
+      var fakeSid = 'fake-session-' + fakeCounter;
+      var realSid = pageSessionId || '';
+      fakeToReal[fakeSid] = realSid;
+      var tid = (msg.params && msg.params.targetId) || pageTargetId || 'unknown';
+      log('Fake session ' + fakeSid + ' -> real ' + realSid);
+      clientWs.send(JSON.stringify({
+        method: 'Target.attachedToTarget',
+        params: {
+          sessionId: fakeSid,
+          targetInfo: { targetId: tid, type: 'page', title: '', url: 'about:blank', attached: true, canAccessOpener: false },
+          waitingForDebugger: false
+        },
+        sessionId: BROWSER_SESSION
+      }));
+      clientWs.send(JSON.stringify({ id: msg.id, result: { sessionId: fakeSid }, sessionId: BROWSER_SESSION }));
+      return;
+    }
+
+    if (msg.sessionId && fakeToReal[msg.sessionId] && msg.method === 'Target.getTargetInfo') {
+      var infoTid = fakeTargetIds[msg.sessionId] || pageTargetId || 'unknown';
+      clientWs.send(JSON.stringify({
+        id: msg.id,
+        result: { targetInfo: { targetId: infoTid, type: 'page', title: '', url: 'about:blank', attached: true, canAccessOpener: false, browserContextId: 'BID-1' } },
+        sessionId: msg.sessionId
+      }));
+      return;
+    }
+
+    if (msg.sessionId === BROWSER_SESSION) {
+      var lpId = ++proxyIdCounter;
+      proxiedRequests[lpId] = { originalId: msg.id, originalSession: BROWSER_SESSION };
+      startTimeout(lpId);
+      var f = Object.assign({}, msg); delete f.sessionId; f.id = lpId;
+      sendToLP(JSON.stringify(f));
+      return;
+    }
+
+    if (msg.sessionId && fakeToReal[msg.sessionId]) {
+      var lpId2 = ++proxyIdCounter;
+      proxiedRequests[lpId2] = { originalId: msg.id, originalSession: msg.sessionId };
+      startTimeout(lpId2);
+      var f2 = Object.assign({}, msg); f2.sessionId = fakeToReal[msg.sessionId]; f2.id = lpId2;
+      sendToLP(JSON.stringify(f2));
+      return;
+    }
+
+    // Track raw-forwarded commands for timeout
+    if (msg.id) {
+      var rawKey = 'r' + msg.id;
+      var rawSession = msg.sessionId || null;
+      cmdTimers[rawKey] = setTimeout(function() {
+        delete cmdTimers[rawKey];
+        consecutiveTimeouts++;
+        log('TIMEOUT raw id=' + msg.id + ' method=' + (msg.method || '?') + ' (consecutive: ' + consecutiveTimeouts + ')');
+        var err = { id: msg.id, error: { code: -32000, message: 'Lightpanda response timeout' } };
+        if (rawSession) err.sessionId = rawSession;
+        if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify(err));
+        if (consecutiveTimeouts >= 2) restartLP();
+      }, CMD_TIMEOUT_MS);
+    }
+    sendToLP(str);
+  });
+
+  clientWs.on('close', function() {
+    log('CLIENT disconnected');
+    cleanup();
+    if (lpWs.readyState === WebSocket.OPEN) lpWs.close();
+  });
+  clientWs.on('error', function() {});
+});
+
+httpServer.listen(LISTEN_PORT, '0.0.0.0', function() {
+  log('Lightpanda CDP adapter v24 on :' + LISTEN_PORT + ' -> ' + LP_HOST + ':' + LP_PORT);
+});
 """
 
 # SearXNG-to-Brave API adapter — translates Brave Search format to SearXNG
@@ -220,7 +513,7 @@ class ServerManager:
         # Настройка профиля браузера
         browser_commands = [
             'docker exec openclaw node /app/openclaw.mjs browser create-profile --name headless --color "#00FF00" --driver openclaw 2>/dev/null || true',
-            'docker exec openclaw node /app/openclaw.mjs config set browser.defaultProfile headless',
+            'docker exec openclaw node /app/openclaw.mjs config set browser.defaultProfile lightpanda',
             'docker exec openclaw node /app/openclaw.mjs config set browser.noSandbox true',
             'docker exec openclaw node /app/openclaw.mjs config set browser.headless true',
         ]
@@ -233,11 +526,12 @@ class ServerManager:
         return True
 
     def _upload_docker_files(self, path):
-        """Upload Dockerfile, docker-compose, SearXNG settings, and adapter to server"""
+        """Upload Dockerfile, docker-compose, SearXNG settings, and adapters to server"""
         self.upload_file(DOCKERFILE_CONTENT, f'{path}/Dockerfile')
         self.upload_file(DOCKER_COMPOSE_WITH_CHROME, f'{path}/docker-compose.yml')
         self._upload_searxng_settings()
         self.upload_file(SEARXNG_ADAPTER_JS, f'{path}/searxng-adapter.js')
+        self.upload_file(LIGHTPANDA_CDP_ADAPTER_JS, f'{path}/lightpanda-cdp-adapter.js')
 
     def configure_token_optimization(self, model_slug='claude-sonnet-4'):
         """Configure OpenClaw for optimal token usage to reduce costs.
@@ -458,11 +752,12 @@ limits:
             # Install session watchdog (auto-recovers from Gemini thought signature errors)
             self.install_session_watchdog()
 
-            # Pre-install ClawdMatrix so it's ready for quick_deploy_user
+            # Install ClawdMatrix skills + prune unused built-in skills + deploy CLAUDE.md
             try:
                 self.install_clawdmatrix()
+                self.enable_clawdmatrix()
             except Exception as e:
-                logger.warning(f'ClawdMatrix install failed during warm deploy (non-fatal): {e}')
+                logger.warning(f'ClawdMatrix setup failed during warm deploy (non-fatal): {e}')
 
             # Start browser with headless profile (CLI still works at this point)
             self.exec_command(
@@ -577,16 +872,10 @@ limits:
                 self.server.save()
                 return False
 
-            # ClawdMatrix: enable/disable based on user profile
+            # Install ClawdMatrix skills + prune unused built-in skills + deploy CLAUDE.md
             try:
-                profile = self.server.profile
-                if profile and profile.clawdmatrix_enabled:
-                    self.install_clawdmatrix()
-                    self.enable_clawdmatrix(
-                        custom_skills=profile.clawdmatrix_custom_skills or None,
-                    )
-                else:
-                    self.disable_clawdmatrix()
+                self.install_clawdmatrix()
+                self.enable_clawdmatrix()
             except Exception as e:
                 logger.warning(f'ClawdMatrix setup failed during quick deploy (non-fatal): {e}')
 
@@ -895,14 +1184,10 @@ limits:
             self.configure_token_optimization(model_slug)
             self.install_session_watchdog()
 
-            # Install and optionally enable ClawdMatrix
+            # Install ClawdMatrix skills + prune unused built-in skills + deploy CLAUDE.md
             try:
                 self.install_clawdmatrix()
-                profile = self.server.profile
-                if profile and profile.clawdmatrix_enabled:
-                    self.enable_clawdmatrix(
-                        custom_skills=profile.clawdmatrix_custom_skills or None,
-                    )
+                self.enable_clawdmatrix()
             except Exception as e:
                 logger.warning(f'ClawdMatrix setup failed during deploy (non-fatal): {e}')
 
@@ -962,20 +1247,21 @@ limits:
         logger.info(f'SearXNG settings uploaded to {self.server.ip_address}')
 
     def configure_searxng_provider(self):
-        """Configure SearXNG (via Brave adapter) + Lightpanda browser.
+        """Configure SearXNG (via Brave adapter) + Lightpanda as default browser.
 
-        Uses CLI commands — all valid since provider is 'brave' (the adapter
-        translates Brave API requests to SearXNG). BRAVE_API_KEY env var
-        satisfies the API key check; the Dockerfile sed-patches the Brave
-        endpoint URL to point to the local adapter.
+        Lightpanda is the default browser — fast and lightweight via the CDP
+        adapter (v20). Chrome headless is available as 'headless' profile for
+        complex JS-heavy sites that Lightpanda can't handle.
+
+        Search provider is 'brave' (the adapter translates Brave API requests
+        to SearXNG). BRAVE_API_KEY env var satisfies the API key check.
         """
         cli = 'docker exec openclaw node /app/openclaw.mjs'
         commands = [
             f'{cli} config set tools.web.search.provider brave',
             f'{cli} config set tools.web.search.enabled true',
-            # Lightpanda as primary browser (CDP sidecar) — color is required by schema
             f'{cli} browser create-profile --name lightpanda --driver cdp --color "#0066CC" 2>/dev/null || true',
-            f'{cli} config set browser.profiles.lightpanda.cdpUrl ws://lightpanda:9222',
+            f'{cli} config set browser.profiles.lightpanda.cdpUrl http://lightpanda-adapter:9223',
             f'{cli} config set browser.defaultProfile lightpanda',
         ]
         for cmd in commands:
@@ -983,7 +1269,7 @@ limits:
             if code != 0:
                 logger.warning(f'SearXNG/Lightpanda config failed: {cmd[-60:]} err={err[:200]}')
 
-        logger.info(f'SearXNG + Lightpanda configured on {self.server.ip_address}')
+        logger.info(f'SearXNG + browser configured on {self.server.ip_address}')
 
     def configure_lightpanda_browser(self):
         """Configure Lightpanda browser. Delegates to configure_searxng_provider()."""
@@ -1137,119 +1423,201 @@ limits:
         logger.info(f'SearXNG + Lightpanda installed on {self.server.ip_address}')
         return True
 
-    # ─── ClawdMatrix Engine ──────────────────────────────────────────
+    # ─── ClawdMatrix Engine (On-Demand Skills) ─────────────────────────
+    #
+    # Skills are stored in /home/node/.openclaw/clawdmatrix/ (NOT /app/skills/)
+    # so they don't appear in <available_skills> and don't cost tokens per message.
+    # CLAUDE.md contains domain routing rules that tell the model to `read` the
+    # relevant skill file only when the user's message matches a domain.
 
-    CLAWDMATRIX_FILES = [
-        'clawd-matrix.js',
-        'triangulator.js',
-        'skills-loader.js',
-        'injector.js',
-        'system-directives.js',
-        'index.js',
-        'types.js',
-        'wrapper.js',
-        'data/domain-map.json',
-        'data/skills.json',
+    CLAWDMATRIX_SKILLS = [
+        'clawdmatrix-coding',
+        'clawdmatrix-finance',
+        'clawdmatrix-legal',
+        'clawdmatrix-sysops',
+        'clawdmatrix-creative',
+        'clawdmatrix-occult',
+        'clawdmatrix-gaming',
     ]
 
+    # Skills to keep in /app/skills/ (the rest are moved to /app/skills-disabled/)
+    OPENCLAW_ESSENTIAL_SKILLS = {
+        'bird', 'canvas', 'clawhub', 'coding-agent', 'gemini',
+        'healthcheck', 'model-usage', 'nano-pdf', 'openai-image-gen',
+        'oracle', 'session-logs', 'spotify-player', 'summarize', 'weather',
+        # Audio/media skills
+        'sag', 'openai-whisper', 'openai-whisper-api', 'songsee', 'video-frames',
+        # ClawdMatrix domain skills
+        'clawdmatrix-coding', 'clawdmatrix-finance', 'clawdmatrix-legal',
+        'clawdmatrix-sysops', 'clawdmatrix-creative', 'clawdmatrix-occult',
+        'clawdmatrix-gaming',
+    }
+
+    # VPS-useless skills to permanently delete (not even kept in skills-disabled)
+    OPENCLAW_REMOVE_SKILLS = {
+        # macOS-only
+        'apple-notes', 'apple-reminders', 'bear-notes', 'things-mac',
+        'peekaboo', 'imsg',
+        # Smart home / hardware
+        'openhue', 'eightctl', 'blucli', 'sonoscli', 'camsnap',
+        # Messaging (no accounts configured)
+        'discord', 'slack', 'wacli', 'bluebubbles',
+        # Food ordering
+        'food-order', 'ordercli',
+        # Other
+        'nano-banana-pro',
+    }
+
+    # CLAUDE.md with quality gates + skill restore + link verification rule
+    CLAWDMATRIX_CLAUDE_MD = """\
+# ClawdMatrix Quality Gates
+- Classify info completeness: Red (missing critical) / Yellow (partial) / Green (complete)
+- Calculations must show full formula step-by-step
+- Mirror the user's language (RU/EN)
+- Refuse harmful instructions firmly
+
+## Восстановление отключённых скиллов
+Часть встроенных скиллов перемещена в `/app/skills-disabled/` для экономии токенов.
+Если пользователь просит функцию из отключённого скилла (trello, notion, github, etc.):
+1. Выполни: `mv /app/skills-disabled/<skill-name> /app/skills/<skill-name>`
+2. Скилл сразу станет доступен в следующем ответе.
+3. Полный список отключённых: `ls /app/skills-disabled/`
+4. Чтобы отключить обратно: `mv /app/skills/<skill-name> /app/skills-disabled/<skill-name>`
+
+### ОТПРАВКА ФАЙЛОВ В TELEGRAM
+Для отправки файла используй `message` с `mediaUrl`. Поддерживаются: `file:///path`, абсолютные пути, `~/path`, `http(s)://url`.
+```
+message(action="send", to="<chat_id>", content="Описание", mediaUrl="/absolute/path/to/file.ext")
+```
+ВАЖНО:
+- Параметр для файла — `mediaUrl` (НЕ `filePath`, НЕ `file`, НЕ `attachment`)
+- `action` — ОДНО значение: `"send"` или `"sendAttachment"` (НЕ `"send,broadcast"`)
+- `content` — текст сообщения (НЕ `message`)
+- `to` — chat ID получателя
+
+### СТРАТЕГИЯ БРАУЗЕРА
+- Для поиска информации СНАЧАЛА используй `web_search` (SearXNG через Brave API) — он вернёт ссылки.
+- Для сбора данных со страниц используй `browser` — профиль **lightpanda** (по умолчанию, быстрый и лёгкий).
+- Если lightpanda зависает или выдаёт ошибку на сложном сайте с тяжёлым JS — переключись на профиль **headless** (Chrome): `browser open --profile headless "<url>"`.
+- НЕ пытайся открыть тяжёлые SPA-сайты (Travelata, Level.Travel и т.п.) через lightpanda — сразу используй headless.
+
+### ПРАВИЛО ПРОВЕРКИ ССЫЛОК
+1. НИКОГДА не выдумывай ссылки на YouTube, товары или конкретные страницы сайтов на основе "знаний из головы" или общих результатов поиска.
+2. Для предоставления любой конкретной ссылки (кроме главных страниц доменов) ТЫ ОБЯЗАН:
+   - Открыть страницу через инструмент `browser`.
+   - Скопировать актуальный URL или ID из адресной строки или элементов страницы.
+   - Убедиться, что страница реально загрузилась и содержит ожидаемый контент.
+3. Если ты не проверил ссылку через браузер — прямо сообщи об этом пользователю. Прямые, непроверенные ссылки запрещены.
+""".strip()
+
     def install_clawdmatrix(self):
-        """Install ClawdMatrix Engine files into the OpenClaw container."""
+        """Install ClawdMatrix skill files into the OpenClaw container.
+
+        Deploys SKILL.md files to /app/skills/ as regular OpenClaw skills.
+        Also cleans up old /app/clawdmatrix/ bundle and private directory.
+        """
         import os
 
-        logger.info(f'Installing ClawdMatrix on {self.server.ip_address}...')
+        logger.info(f'Installing ClawdMatrix skills on {self.server.ip_address}...')
 
-        bundle_dir = os.path.join(
+        skills_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            'clawdmatrix', 'bundle',
+            'clawdmatrix', 'skills',
         )
 
-        # Create target directory inside container
-        self.exec_command(
-            'docker exec -u root openclaw mkdir -p /app/clawdmatrix/data'
-        )
+        # Clean up old locations
+        self.exec_command('docker exec -u root openclaw rm -rf /app/clawdmatrix')
+        self.exec_command('docker exec -u root openclaw rm -rf /home/node/.openclaw/clawdmatrix')
 
-        for filename in self.CLAWDMATRIX_FILES:
-            local_path = os.path.join(bundle_dir, filename)
+        # Deploy skill files to /app/skills/ (standard OpenClaw location)
+        for skill_name in self.CLAWDMATRIX_SKILLS:
+            local_path = os.path.join(skills_dir, skill_name, 'SKILL.md')
             try:
                 with open(local_path, 'r') as f:
                     content = f.read()
             except FileNotFoundError:
-                logger.warning(f'ClawdMatrix file not found: {local_path}')
+                logger.warning(f'ClawdMatrix SKILL.md not found: {local_path}')
                 continue
 
-            safe_name = filename.replace('/', '_')
-            tmp_path = f'/tmp/_clawdmatrix_{safe_name}'
+            self.exec_command(
+                f'docker exec -u root openclaw mkdir -p /app/skills/{skill_name}'
+            )
+            tmp_path = f'/tmp/_clawdmatrix_{skill_name}.md'
             self.upload_file(content, tmp_path)
-
-            container_path = f'/app/clawdmatrix/{filename}'
-            if '/' in filename:
-                subdir = '/app/clawdmatrix/' + '/'.join(filename.split('/')[:-1])
-                self.exec_command(f'docker exec -u root openclaw mkdir -p {subdir}')
-
-            self.exec_command(f'docker cp {tmp_path} openclaw:{container_path}')
+            self.exec_command(
+                f'docker cp {tmp_path} openclaw:/app/skills/{skill_name}/SKILL.md'
+            )
             self.exec_command(f'rm -f {tmp_path}')
 
         # Fix permissions
-        self.exec_command(
-            'docker exec -u root openclaw chown -R node:node /app/clawdmatrix'
-        )
+        self.exec_command('docker exec -u root openclaw chown -R node:node /app/skills')
+
+        # Prune unused built-in skills to save tokens
+        self.prune_builtin_skills()
 
         self.server.clawdmatrix_installed = True
         self.server.save(update_fields=['clawdmatrix_installed'])
-        logger.info(f'ClawdMatrix installed on {self.server.ip_address}')
+        logger.info(f'ClawdMatrix on-demand skills installed on {self.server.ip_address}')
+
+    def prune_builtin_skills(self):
+        """Move non-essential built-in skills to /app/skills-disabled/.
+
+        Keeps only OPENCLAW_ESSENTIAL_SKILLS in /app/skills/ to reduce
+        token overhead. VPS-useless skills are permanently deleted.
+        """
+        logger.info(f'Pruning built-in skills on {self.server.ip_address}...')
+        self.exec_command('docker exec -u root openclaw mkdir -p /app/skills-disabled')
+
+        result = self.exec_command('docker exec openclaw ls /app/skills/')
+        if isinstance(result, tuple):
+            all_skills = [s.strip() for s in result[0].strip().split('\n') if s.strip()]
+        else:
+            all_skills = [s.strip() for s in result.strip().split('\n') if s.strip()]
+
+        removed = 0
+        for skill in all_skills:
+            if skill not in self.OPENCLAW_ESSENTIAL_SKILLS:
+                if skill in self.OPENCLAW_REMOVE_SKILLS:
+                    # Permanently delete VPS-useless skills
+                    self.exec_command(
+                        f'docker exec -u root openclaw rm -rf /app/skills/{skill}'
+                    )
+                else:
+                    # Move potentially useful skills to disabled
+                    self.exec_command(
+                        f'docker exec -u root openclaw mv /app/skills/{skill} /app/skills-disabled/{skill}'
+                    )
+                removed += 1
+
+        # Also clean VPS-useless from skills-disabled if present
+        for skill in self.OPENCLAW_REMOVE_SKILLS:
+            self.exec_command(
+                f'docker exec -u root openclaw rm -rf /app/skills-disabled/{skill}'
+            )
+
+        # Give node user ownership so the model can mv skills back on demand
+        self.exec_command('docker exec -u root openclaw chown -R node:node /app/skills')
+        self.exec_command('docker exec -u root openclaw chown -R node:node /app/skills-disabled')
+
+        logger.info(
+            f'Pruned {removed} skills on {self.server.ip_address}, '
+            f'{len(all_skills) - removed} remaining'
+        )
 
     def enable_clawdmatrix(self, custom_domain_map=None, custom_skills=None):
-        """Enable ClawdMatrix Engine on the running OpenClaw instance.
+        """Enable ClawdMatrix Engine with on-demand skill loading.
 
-        Generates a CLAUDE.md block with ClawdMatrix instructions and injects
-        it into the OpenClaw agent's configuration via the config CLI.
+        Deploys skill files to a private directory and writes CLAUDE.md with
+        domain routing rules. The model reads skill files only when a domain
+        matches — zero token cost when not needed.
         """
         logger.info(f'Enabling ClawdMatrix on {self.server.ip_address}...')
 
         if not self.server.clawdmatrix_installed:
             self.install_clawdmatrix()
 
-        # Upload custom domain-map or skills if provided
-        if custom_domain_map:
-            content = json.dumps(custom_domain_map, ensure_ascii=False, indent=2)
-            self.upload_file(content, '/tmp/_custom_domain_map.json')
-            self.exec_command(
-                'docker cp /tmp/_custom_domain_map.json '
-                'openclaw:/app/clawdmatrix/data/domain-map.json'
-            )
-            self.exec_command('rm -f /tmp/_custom_domain_map.json')
-
-        if custom_skills:
-            content = json.dumps(custom_skills, ensure_ascii=False, indent=2)
-            self.upload_file(content, '/tmp/_custom_skills.json')
-            self.exec_command(
-                'docker cp /tmp/_custom_skills.json '
-                'openclaw:/app/clawdmatrix/data/skills.json'
-            )
-            self.exec_command('rm -f /tmp/_custom_skills.json')
-
-        # Fix permissions after any custom file uploads
-        self.exec_command(
-            'docker exec -u root openclaw chown -R node:node /app/clawdmatrix'
-        )
-
-        # Generate CLAUDE.md content using the wrapper CLI
-        out, err, code = self.exec_command(
-            'docker exec openclaw node /app/clawdmatrix/wrapper.js --claude-md',
-            timeout=30,
-        )
-
-        if code != 0 or not out.strip():
-            logger.error(
-                f'ClawdMatrix CLAUDE.md generation failed on {self.server.ip_address}: '
-                f'code={code}, err={err[:300]}'
-            )
-            return False
-
-        claude_md_block = out.strip()
-
-        # Write the CLAUDE.md content to the OpenClaw workspace
-        self.upload_file(claude_md_block, '/tmp/_clawdmatrix_claude.md')
+        # Write CLAUDE.md with quality gates + domain routing + link verification
+        self.upload_file(self.CLAWDMATRIX_CLAUDE_MD, '/tmp/_clawdmatrix_claude.md')
         self.exec_command(
             'docker cp /tmp/_clawdmatrix_claude.md '
             'openclaw:/home/node/.openclaw/CLAUDE.md'
@@ -1263,97 +1631,62 @@ limits:
         return True
 
     def disable_clawdmatrix(self):
-        """Disable ClawdMatrix Engine without removing files."""
+        """Disable ClawdMatrix Engine and clean up all files."""
         logger.info(f'Disabling ClawdMatrix on {self.server.ip_address}...')
 
-        # Remove the CLAUDE.md file that contains ClawdMatrix instructions
         self.exec_command(
             'docker exec openclaw rm -f /home/node/.openclaw/CLAUDE.md'
         )
+        self.exec_command(
+            f'docker exec -u root openclaw rm -rf {self.CLAWDMATRIX_SKILLS_PATH}'
+        )
+        # Clean up old locations too
+        self.exec_command(
+            'docker exec -u root openclaw rm -rf /app/clawdmatrix'
+        )
+        for skill_name in self.CLAWDMATRIX_SKILLS:
+            self.exec_command(
+                f'docker exec -u root openclaw rm -rf /app/skills/{skill_name}'
+            )
 
         logger.info(f'ClawdMatrix disabled on {self.server.ip_address}')
 
     def verify_clawdmatrix(self):
-        """Verify ClawdMatrix is installed and functioning.
+        """Verify ClawdMatrix on-demand skills are installed and functioning.
 
         Returns (success: bool, failures: list[str]).
         """
         failures = []
 
-        # Check core files exist
-        out, _, code = self.exec_command(
-            'docker exec openclaw ls /app/clawdmatrix/index.js 2>/dev/null'
-        )
-        if code != 0:
-            failures.append('index.js not found')
+        # Check each SKILL.md exists in private directory
+        for skill_name in self.CLAWDMATRIX_SKILLS:
+            out, _, code = self.exec_command(
+                f'docker exec openclaw ls {self.CLAWDMATRIX_SKILLS_PATH}/{skill_name}/SKILL.md 2>/dev/null'
+            )
+            if code != 0:
+                failures.append(f'{skill_name}/SKILL.md not found')
 
+        # Check CLAUDE.md exists with domain routing
         out, _, code = self.exec_command(
-            'docker exec openclaw ls /app/clawdmatrix/data/skills.json 2>/dev/null'
+            'docker exec openclaw cat /home/node/.openclaw/CLAUDE.md 2>/dev/null'
         )
-        if code != 0:
-            failures.append('skills.json not found')
+        if code != 0 or 'Quality Gates' not in out:
+            failures.append('CLAUDE.md missing or no quality gates')
+        if 'ПРАВИЛО ПРОВЕРКИ ССЫЛОК' not in out:
+            failures.append('CLAUDE.md missing link verification rule')
 
+        # Verify old /app/skills/clawdmatrix-* are gone (shouldn't be in available_skills)
         out, _, code = self.exec_command(
-            'docker exec openclaw ls /app/clawdmatrix/data/domain-map.json 2>/dev/null'
+            'docker exec openclaw ls /app/skills/ 2>/dev/null | grep clawdmatrix'
         )
-        if code != 0:
-            failures.append('domain-map.json not found')
-
-        # Check skills.json is valid JSON
-        out, _, code = self.exec_command(
-            "docker exec openclaw node -e "
-            "\"JSON.parse(require('fs').readFileSync('/app/clawdmatrix/data/skills.json', 'utf-8'))\""
-        )
-        if code != 0:
-            failures.append(f'skills.json parse error: {out[:200]}')
-
-        # Check wrapper can generate CLAUDE.md
-        out, _, code = self.exec_command(
-            'docker exec openclaw node /app/clawdmatrix/wrapper.js --claude-md 2>/dev/null | head -3'
-        )
-        if code != 0 or 'ClawdMatrix' not in out:
-            failures.append(f'wrapper.js --claude-md failed: {out[:200]}')
+        if out.strip():
+            failures.append(f'Old clawdmatrix entries still in /app/skills/: {out.strip()}')
 
         return (len(failures) == 0, failures)
 
     def update_clawdmatrix_skills(self, domain_map=None, skills=None):
-        """Update ClawdMatrix skill data without full reinstall."""
-        if domain_map:
-            content = json.dumps(domain_map, ensure_ascii=False, indent=2)
-            self.upload_file(content, '/tmp/_domain_map.json')
-            self.exec_command(
-                'docker cp /tmp/_domain_map.json openclaw:/app/clawdmatrix/data/domain-map.json'
-            )
-            self.exec_command('rm -f /tmp/_domain_map.json')
-
-        if skills:
-            content = json.dumps(skills, ensure_ascii=False, indent=2)
-            self.upload_file(content, '/tmp/_skills.json')
-            self.exec_command(
-                'docker cp /tmp/_skills.json openclaw:/app/clawdmatrix/data/skills.json'
-            )
-            self.exec_command('rm -f /tmp/_skills.json')
-
-        self.exec_command(
-            'docker exec -u root openclaw chown -R node:node /app/clawdmatrix'
-        )
-
-        # Re-generate CLAUDE.md with updated data
-        out, _, code = self.exec_command(
-            'docker exec openclaw node /app/clawdmatrix/wrapper.js --claude-md',
-            timeout=30,
-        )
-        if code == 0 and out.strip():
-            self.upload_file(out.strip(), '/tmp/_clawdmatrix_claude.md')
-            self.exec_command(
-                'docker cp /tmp/_clawdmatrix_claude.md '
-                'openclaw:/home/node/.openclaw/CLAUDE.md'
-            )
-            self.exec_command('rm -f /tmp/_clawdmatrix_claude.md')
-            self.exec_command(
-                'docker exec -u root openclaw chown node:node /home/node/.openclaw/CLAUDE.md'
-            )
-
+        """Update ClawdMatrix skills by re-deploying SKILL.md files."""
+        self.install_clawdmatrix()
         logger.info(f'ClawdMatrix skills updated on {self.server.ip_address}')
 
 

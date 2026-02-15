@@ -543,7 +543,7 @@ export default {
             deployPollTimer: null,
             models: [
                 { id: "claude-sonnet-4", name: "Claude Sonnet 4", icon: "https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg", tooltip: "Лучший баланс цены и качества" },
-                { id: "claude-opus-4.5", name: "Claude Opus 4.5", icon: "https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg", tooltip: "Самая эффективная для сложных задач" },
+                { id: "claude-opus-4.5", name: "Claude", icon: "https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg", tooltip: "Самая эффективная для сложных задач" },
                 { id: "gemini-3-flash", name: "Gemini 3 Flash", icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Google_Gemini_icon_2025.svg/960px-Google_Gemini_icon_2025.svg.png", tooltip: "Самая бюджетная и быстрая" },
             ],
             channels: [

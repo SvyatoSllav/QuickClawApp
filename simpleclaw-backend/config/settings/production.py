@@ -97,6 +97,8 @@ CORS_ALLOWED_ORIGINS = [
     'https://install-openclow.ru',
     'http://localhost:5173',
     'http://localhost:8090',
+    'tauri://localhost',
+    'https://tauri.localhost',
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -145,6 +147,7 @@ MODEL_MAPPING = {
     'gpt-4o': 'openai/gpt-4o',
     'gemini-3-flash': 'google/gemini-3-flash-preview',
     'gemini-2.5-flash': 'google/gemini-2.5-flash',
+    'minimax-m2.5': 'minimax/minimax-m2.5',
 }
 
 # SimpleClaw Sales Bot

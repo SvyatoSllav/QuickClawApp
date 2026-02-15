@@ -63,6 +63,46 @@ def create_first_payment(user, telegram_token='', selected_model='claude-sonnet-
     }
 
 
+def create_payment_with_token(user, payment_token, telegram_token='', selected_model='gemini-3-flash'):
+    """Create payment using token from YooKassa Android SDK (no redirect needed)."""
+    amount = str(settings.SUBSCRIPTION_PRICE_RUB)
+    idempotence_key = str(uuid.uuid4())
+
+    yoo_payment = YooPayment.create({
+        'amount': {
+            'value': amount,
+            'currency': 'RUB',
+        },
+        'payment_token': payment_token,
+        'capture': True,
+        'save_payment_method': True,
+        'description': f'Подписка SimpleClaw — {user.email}',
+        'metadata': {
+            'user_id': str(user.id),
+            'telegram_token': telegram_token or '',
+            'selected_model': selected_model or 'gemini-3-flash',
+        },
+    }, idempotence_key)
+
+    payment = Payment.objects.create(
+        user=user,
+        amount=Decimal(amount),
+        status='pending',
+        description='Подписка SimpleClaw (Android SDK)',
+        yookassa_payment_id=yoo_payment.id,
+        yookassa_status=yoo_payment.status,
+        is_recurring=False,
+    )
+
+    logger.info(f'Created token payment {payment.id} for {user.email}, YooKassa ID: {yoo_payment.id}')
+
+    return {
+        'payment_id': payment.id,
+        'yookassa_id': yoo_payment.id,
+        'status': yoo_payment.status,
+    }
+
+
 def create_recurring_payment(subscription):
     """Create recurring payment using saved payment method"""
     if not subscription.yookassa_payment_method_id:
