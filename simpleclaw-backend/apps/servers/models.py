@@ -37,6 +37,9 @@ class Server(models.Model):
     # ClawdMatrix Engine
     clawdmatrix_installed = models.BooleanField(default=False)
 
+    # Gateway token for HTTP chat endpoint
+    gateway_token = models.CharField(max_length=255, blank=True)
+
     # Logs
     last_error = models.TextField(blank=True)
     last_health_check = models.DateTimeField(null=True, blank=True)

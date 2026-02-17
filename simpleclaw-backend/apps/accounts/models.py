@@ -6,12 +6,14 @@ class UserProfile(models.Model):
     """Профиль пользователя с данными подписки и OpenClaw"""
 
     MODEL_CHOICES = [
-        ('gemini-3-flash', 'Gemini 3 Flash'),
         ('claude-sonnet-4', 'Claude Sonnet 4'),
         ('claude-opus-4.5', 'Claude Opus 4.5'),
+        ('claude-sonnet-4.5', 'Claude Sonnet 4.5'),
         ('claude-haiku-4.5', 'Claude Haiku 4.5'),
         ('gpt-4o', 'GPT-4o'),
+        ('gemini-3-flash', 'Gemini 3 Flash'),
         ('gemini-2.5-flash', 'Gemini 2.5 Flash'),
+        ('minimax-m2.5', 'MiniMax M2.5'),
     ]
 
     SUBSCRIPTION_STATUS_CHOICES = [

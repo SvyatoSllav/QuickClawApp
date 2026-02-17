@@ -933,19 +933,6 @@ limits:
         )
         self.exec_command('rm -f /tmp/_openclaw_auth.json')
 
-        # Write telegram-allowFrom.json to bypass pairing check
-        # This is the store-level allowFrom that OpenClaw merges with config allowFrom
-        allow_from_list = [str(telegram_owner_id)] if telegram_owner_id else ["*"]
-        allow_from_json = json.dumps({"version": 1, "allowFrom": allow_from_list})
-        self.upload_file(allow_from_json, '/tmp/_openclaw_allowfrom.json')
-        self.exec_command(
-            'docker exec -u root openclaw mkdir -p /home/node/.openclaw/credentials'
-        )
-        self.exec_command(
-            'docker cp /tmp/_openclaw_allowfrom.json openclaw:/home/node/.openclaw/credentials/telegram-allowFrom.json'
-        )
-        self.exec_command('rm -f /tmp/_openclaw_allowfrom.json')
-
         self._fix_permissions()
 
         # Set provider + model
@@ -956,13 +943,9 @@ limits:
             f'docker exec openclaw node /app/openclaw.mjs models set {openrouter_model}'
         )
 
-        # Set allowFrom first, then dmPolicy (order matters for OpenClaw validation)
-        allow_from_val = json.dumps([str(telegram_owner_id)] if telegram_owner_id else ["*"])
+        # Set dmPolicy to pairing — users must approve via pairing code
         self.exec_command(
-            f"docker exec openclaw node /app/openclaw.mjs config set channels.telegram.allowFrom '{allow_from_val}'"
-        )
-        self.exec_command(
-            'docker exec openclaw node /app/openclaw.mjs config set channels.telegram.dmPolicy open'
+            'docker exec openclaw node /app/openclaw.mjs config set channels.telegram.dmPolicy pairing'
         )
 
     def _verify_config(self, openrouter_key, openrouter_model, telegram_owner_id=None):
@@ -972,12 +955,12 @@ limits:
         """
         failures = []
 
-        # 1. dmPolicy must be "open"
+        # 1. dmPolicy must be "pairing"
         out, _, _ = self.exec_command(
             'docker exec openclaw node /app/openclaw.mjs config get channels.telegram.dmPolicy'
         )
-        if 'open' not in out.strip():
-            failures.append(f'dmPolicy={out.strip()!r} (expected "open")')
+        if 'pairing' not in out.strip():
+            failures.append(f'dmPolicy={out.strip()!r} (expected "pairing")')
 
         # 2. Model must contain openrouter/ — check logs and config.yaml
         out, _, _ = self.exec_command(

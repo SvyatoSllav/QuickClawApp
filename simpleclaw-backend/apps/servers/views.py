@@ -18,6 +18,7 @@ class ServerStatusView(APIView):
             'ip_address': server.ip_address,
             'status': server.status,
             'openclaw_running': server.openclaw_running,
+            'gateway_token': server.gateway_token,
             'last_health_check': server.last_health_check,
         })
 

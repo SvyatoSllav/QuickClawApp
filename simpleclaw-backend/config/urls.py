@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/subscription/', include('apps.payments.subscription_urls')),
     path('api/', include('apps.servers.urls')),
     path('api/', include('apps.servers.desktop_urls')),
+    path('api/', include('apps.servers.mobile_urls')),
     # SEO
     path('', include('apps.seo.urls')),
 ]

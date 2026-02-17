@@ -1,4 +1,5 @@
 import logging
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -123,8 +124,103 @@ class ReactivateSubscriptionView(APIView):
     def post(self, request):
         """Re-enable auto-renewal for cancelled subscription"""
         result = reactivate_subscription(request.user)
-        
+
         if 'error' in result:
             return Response(result, status=400)
-        
+
         return Response(result)
+
+
+class RevenueCatWebhookView(APIView):
+    """RevenueCat webhook for iOS in-app purchases — no auth required"""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        import sys
+        import subprocess
+        from django.contrib.auth.models import User
+
+        try:
+            data = request.data
+            event_type = data.get('event', {}).get('type', '')
+            app_user_id = data.get('event', {}).get('app_user_id', '')
+
+            logger.info(f'RevenueCat webhook: {event_type}, app_user_id: {app_user_id}')
+
+            if not app_user_id:
+                return Response({'status': 'ok'})
+
+            try:
+                user = User.objects.get(id=int(app_user_id))
+            except (User.DoesNotExist, ValueError):
+                logger.error(f'User not found for app_user_id: {app_user_id}')
+                return Response({'status': 'ok'})
+
+            now = timezone.now()
+
+            if event_type in ('INITIAL_PURCHASE', 'RENEWAL', 'PRODUCT_CHANGE'):
+                expiration = data.get('event', {}).get('expiration_at_ms')
+                period_end = None
+                if expiration:
+                    period_end = timezone.datetime.fromtimestamp(
+                        expiration / 1000, tz=timezone.utc
+                    )
+
+                subscription, created = Subscription.objects.get_or_create(
+                    user=user,
+                    defaults={
+                        'is_active': True,
+                        'auto_renew': True,
+                        'status': 'active',
+                        'current_period_start': now,
+                        'current_period_end': period_end or now + timezone.timedelta(days=30),
+                    }
+                )
+
+                if not created:
+                    subscription.is_active = True
+                    subscription.auto_renew = True
+                    subscription.status = 'active'
+                    subscription.current_period_start = now
+                    subscription.current_period_end = period_end or now + timezone.timedelta(days=30)
+                    subscription.cancelled_at = None
+                    subscription.save()
+
+                profile = user.profile
+                profile.subscription_status = 'active'
+                profile.subscription_started_at = now
+                profile.subscription_expires_at = subscription.current_period_end
+                profile.save()
+
+                # Deploy server if first purchase
+                if event_type == 'INITIAL_PURCHASE' and not getattr(profile, 'server', None):
+                    subprocess.Popen(
+                        [sys.executable, 'manage.py', 'deploy_server', str(user.id)],
+                        cwd='/home/simpleclaw-backend',
+                        stdout=open('/var/log/simpleclaw-deploy.log', 'a'),
+                        stderr=subprocess.STDOUT,
+                        start_new_session=True,
+                    )
+                    logger.info(f'Spawned deploy_server for RevenueCat user {user.id}')
+
+            elif event_type in ('CANCELLATION', 'EXPIRATION'):
+                try:
+                    subscription = user.subscription
+                    if event_type == 'EXPIRATION':
+                        subscription.is_active = False
+                        subscription.status = 'expired'
+                    else:
+                        subscription.auto_renew = False
+                        subscription.cancelled_at = now
+                    subscription.save()
+
+                    profile = user.profile
+                    profile.subscription_status = 'cancelled' if event_type == 'EXPIRATION' else 'active'
+                    profile.save()
+                except Subscription.DoesNotExist:
+                    pass
+
+            return Response({'status': 'ok'})
+        except Exception as e:
+            logger.error(f'RevenueCat webhook error: {e}')
+            return Response({'status': 'ok'})
