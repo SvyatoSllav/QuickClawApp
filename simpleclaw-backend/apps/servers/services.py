@@ -579,8 +579,8 @@ class ServerManager:
             # --- Heartbeat: disable entirely (up to 30%+ savings) ---
             f"""{cli} config set agents.defaults.heartbeat '{{"every": "0m"}}'""",
 
-            # --- Sub-agent model: gemini-3-flash (cheap + fast) ---
-            f"""{cli} config set agents.defaults.subagents '{{"model": "openrouter/google/gemini-3-flash-preview", "maxConcurrent": 2, "archiveAfterMinutes": 60}}'""",
+            # --- Sub-agent model: gpt-5-nano (cheapest + fast) ---
+            f"""{cli} config set agents.defaults.subagents '{{"model": "openrouter/openai/gpt-5-nano", "maxConcurrent": 2, "archiveAfterMinutes": 60}}'""",
 
             # --- Image model: cheap model ---
             f"""{cli} config set agents.defaults.imageModel '{{"primary": "openrouter/google/gemini-2.5-flash", "fallbacks": ["openrouter/openai/gpt-4o-mini"]}}'""",
@@ -825,7 +825,7 @@ channels:
     dmPolicy: open
     allowFrom: {allow_from}
     groupPolicy: allowlist
-    streamMode: partial
+    streamMode: off
 
 limits:
   max_tokens_per_message: 4096
@@ -1127,7 +1127,7 @@ channels:
     dmPolicy: open
     allowFrom: {allow_from}
     groupPolicy: allowlist
-    streamMode: partial
+    streamMode: off
 
 limits:
   max_tokens_per_message: 4096
