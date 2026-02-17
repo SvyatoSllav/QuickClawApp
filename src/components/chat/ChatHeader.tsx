@@ -24,14 +24,10 @@ export default function ChatHeader() {
 
   return (
     <View className="relative z-50">
-      <View className="flex-row items-center justify-between px-4 h-14 border-b border-border">
+      <View className="flex-row items-center justify-between px-4 pt-14 h-28 border-b border-border">
         <Button variant="outline" size="icon" onPress={() => setScreen('profile')}>
           <ProfileIcon size={18} color="#fafafa" />
         </Button>
-
-        <Text className="font-bold text-base uppercase" style={{ letterSpacing: 1.5 }}>
-          SimpleClaw
-        </Text>
 
         <Button
           variant="outline"
