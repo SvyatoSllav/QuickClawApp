@@ -40,6 +40,8 @@ DOCKER_COMPOSE_WITH_CHROME = """services:
     container_name: openclaw
     restart: unless-stopped
     shm_size: 2g
+    ports:
+      - "18789:18789"
     env_file:
       - .env
     volumes:
@@ -464,7 +466,7 @@ class ServerManager:
             hostname=self.server.ip_address,
             port=self.server.ssh_port,
             username=self.server.ssh_user,
-            password=self.server.ssh_password,
+            password=self.server.ssh_password or None,
             timeout=30,
         )
         logger.info(f'SSH подключение к {self.server.ip_address} установлено')
@@ -605,6 +607,9 @@ class ServerManager:
 
             # --- Local RAG — semantic memory search across sessions ---
             f"""{cli} config set agents.defaults.memorySearch '{{"enabled": true, "provider": "local", "store": {{"path": "/home/node/.openclaw/memory.db"}}}}'""",
+
+            # --- Enable HTTP chat completions endpoint (for mobile app) ---
+            f"""{cli} config set gateway.http.endpoints.chatCompletions '{{"enabled": true}}'""",
         ]
 
         for cmd in optimization_commands:
@@ -768,6 +773,7 @@ limits:
             self.configure_searxng_provider()
 
             self.server.openclaw_running = True
+            self.server.gateway_token = gateway_token
             self.server.last_error = ''
             self.server.save()
             logger.info(f'Warm deploy complete on {self.server.ip_address}')
@@ -889,6 +895,7 @@ limits:
 
             self.server.openclaw_running = True
             self.server.status = 'active'
+            self.server.gateway_token = gateway_token
             self.server.last_error = ''
             self.server.save()
             logger.info(f'Quick deploy complete on {self.server.ip_address}')
@@ -1218,6 +1225,7 @@ limits:
 
             self.server.openclaw_running = True
             self.server.status = 'active'
+            self.server.gateway_token = gateway_token
             self.server.last_error = ''
             self.server.save()
             logger.info(f'OpenClaw deployed and verified on {self.server.ip_address}')

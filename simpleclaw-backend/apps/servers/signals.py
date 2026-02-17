@@ -24,14 +24,14 @@ def install_openclaw_async(server_id):
         logger.error(f'Server {server_id} not found')
         return
 
-    if not server.ip_address or not server.ssh_password:
+    if not server.ip_address:
         server.status = 'error'
-        server.last_error = 'Missing IP address or SSH password'
+        server.last_error = 'Missing IP address'
         server.save()
-        logger.error(f'Server {server_id}: Missing IP or password')
+        logger.error(f'Server {server_id}: Missing IP address')
         send_telegram_message(
             ADMIN_TELEGRAM_ID,
-            f'🚨 Server {server_id}: Missing IP or SSH password'
+            f'🚨 Server {server_id}: Missing IP address'
         )
         return
 
@@ -155,9 +155,9 @@ def server_post_save(sender, instance, created, **kwargs):
     if not created:
         return
 
-    # Only trigger if server has IP and password (admin added it)
-    if not instance.ip_address or not instance.ssh_password:
-        logger.info(f'Server {instance.id} created without IP/password, skipping installation')
+    # Only trigger if server has IP (admin added it)
+    if not instance.ip_address:
+        logger.info(f'Server {instance.id} created without IP, skipping installation')
         return
 
     # Skip if already active or error
