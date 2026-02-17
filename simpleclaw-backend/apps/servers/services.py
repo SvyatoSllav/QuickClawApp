@@ -757,12 +757,8 @@ limits:
             # Install session watchdog (auto-recovers from Gemini thought signature errors)
             self.install_session_watchdog()
 
-            # Install ClawdMatrix skills + prune unused built-in skills + deploy CLAUDE.md
-            try:
-                self.install_clawdmatrix()
-                self.enable_clawdmatrix()
-            except Exception as e:
-                logger.warning(f'ClawdMatrix setup failed during warm deploy (non-fatal): {e}')
+            # Prune unused built-in skills
+            self.prune_builtin_skills()
 
             # Start browser with headless profile (CLI still works at this point)
             self.exec_command(
@@ -878,12 +874,8 @@ limits:
                 self.server.save()
                 return False
 
-            # Install ClawdMatrix skills + prune unused built-in skills + deploy CLAUDE.md
-            try:
-                self.install_clawdmatrix()
-                self.enable_clawdmatrix()
-            except Exception as e:
-                logger.warning(f'ClawdMatrix setup failed during quick deploy (non-fatal): {e}')
+            # Prune unused built-in skills
+            self.prune_builtin_skills()
 
             # Start browser with headless profile (CLI still works at this point)
             self.exec_command(
@@ -1191,12 +1183,8 @@ limits:
             self.configure_token_optimization(model_slug)
             self.install_session_watchdog()
 
-            # Install ClawdMatrix skills + prune unused built-in skills + deploy CLAUDE.md
-            try:
-                self.install_clawdmatrix()
-                self.enable_clawdmatrix()
-            except Exception as e:
-                logger.warning(f'ClawdMatrix setup failed during deploy (non-fatal): {e}')
+            # Prune unused built-in skills
+            self.prune_builtin_skills()
 
             # Apply config with restart + verify (includes restart cycle)
             config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model, telegram_owner_id)
