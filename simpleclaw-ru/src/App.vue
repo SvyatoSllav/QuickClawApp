@@ -121,6 +121,7 @@
                                     v-model="pairingCode"
                                     type="text"
                                     placeholder="Введите pairing code"
+                                    maxlength="64"
                                     class="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
                                     @keyup.enter="approvePairingCode"
                                 />
@@ -268,6 +269,7 @@
                                     v-model="pairingCode"
                                     type="text"
                                     placeholder="Введите pairing code"
+                                    maxlength="64"
                                     class="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
                                     @keyup.enter="approvePairingCode"
                                 />
@@ -927,8 +929,8 @@ export default {
         async approvePairingCode() {
             const code = this.pairingCode.trim();
             if (!code) return;
-            if (!/^[a-zA-Z0-9_-]+$/.test(code)) {
-                this.pairingError = 'Код может содержать только буквы, цифры, дефис и подчёркивание';
+            if (code.length > 64 || !/^[a-zA-Z0-9_-]+$/.test(code)) {
+                this.pairingError = 'Неверный формат кода';
                 return;
             }
             this.pairingLoading = true;

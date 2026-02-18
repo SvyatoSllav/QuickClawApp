@@ -244,8 +244,8 @@ def approve_pairing_code(user, code):
     import shlex
     from apps.servers.services import ServerManager
 
-    # Валидация кода — только буквы, цифры, дефис, подчёркивание
-    if not re.match(r'^[a-zA-Z0-9_-]+$', code):
+    # Валидация кода — только буквы, цифры, дефис, подчёркивание; макс 64 символа
+    if len(code) > 64 or not re.match(r'^[a-zA-Z0-9_-]+$', code):
         return False, 'Неверный формат кода'
 
     profile = user.profile
@@ -262,9 +262,11 @@ def approve_pairing_code(user, code):
             f'docker exec openclaw node /app/openclaw.mjs pairing approve telegram {safe_code}'
         )
         if exit_code != 0:
-            return False, err or out or 'Неизвестная ошибка'
+            logger.warning('Pairing approve failed: %s', err or out)
+            return False, 'Код не принят. Проверьте код и попробуйте снова.'
         return True, out.strip()
     except Exception as e:
-        return False, str(e)
+        logger.exception('Pairing approve SSH error')
+        return False, 'Внутренняя ошибка. Попробуйте позже.'
     finally:
         manager.disconnect()

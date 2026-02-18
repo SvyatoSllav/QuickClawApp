@@ -5,6 +5,7 @@ import subprocess
 import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -77,16 +78,21 @@ class ServerPoolStatusView(APIView):
         })
 
 
+class PairingThrottle(UserRateThrottle):
+    rate = '10/min'
+
+
 class ApprovePairingView(APIView):
     """POST /api/server/pairing/approve/ — подтвердить код сопряжения OpenClaw"""
+    throttle_classes = [PairingThrottle]
 
     def post(self, request):
         code = request.data.get('code', '').strip()
         if not code:
             return Response({'error': 'Код не указан'}, status=400)
 
-        # Валидация кода — только буквы, цифры, дефис, подчёркивание
-        if not re.match(r'^[a-zA-Z0-9_-]+$', code):
+        # Валидация кода — только буквы, цифры, дефис, подчёркивание; макс 64 символа
+        if len(code) > 64 or not re.match(r'^[a-zA-Z0-9_-]+$', code):
             return Response({'error': 'Неверный формат кода'}, status=400)
 
         profile = request.user.profile
@@ -107,12 +113,12 @@ class ApprovePairingView(APIView):
 
             if exit_code != 0:
                 logger.warning('Pairing approve failed for user %s: %s', request.user.id, err or out)
-                return Response({'error': f'Ошибка: {err or out}'}, status=400)
+                return Response({'error': 'Код не принят. Проверьте код и попробуйте снова.'}, status=400)
 
             logger.info('Pairing approved for user %s', request.user.id)
             return Response({'success': True, 'message': out.strip()})
         except Exception as e:
             logger.exception('Pairing approve error for user %s', request.user.id)
-            return Response({'error': str(e)}, status=500)
+            return Response({'error': 'Внутренняя ошибка. Попробуйте позже.'}, status=500)
         finally:
             manager.disconnect()
