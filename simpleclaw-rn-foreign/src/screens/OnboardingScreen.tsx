@@ -1,5 +1,5 @@
-import React, { useRef, useCallback } from 'react';
-import { View, FlatList, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import React, { useRef, useState, useCallback } from 'react';
+import { View, FlatList, Dimensions, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,8 @@ export default function OnboardingScreen() {
   const currentPage = useOnboardingStore((s) => s.currentPage);
   const setScreen = useNavigationStore((s) => s.setScreen);
   const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding);
+
+  const [listHeight, setListHeight] = useState(0);
 
   const handleGetStarted = useCallback(async () => {
     await completeOnboarding();
@@ -46,12 +48,15 @@ export default function OnboardingScreen() {
         showsHorizontalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        style={{ flex: 1 }}
+        onLayout={(e: LayoutChangeEvent) => setListHeight(e.nativeEvent.layout.height)}
         keyExtractor={(_, i) => String(i)}
         renderItem={({ item }) => (
           <OnboardingPage
             index={item.index}
             title={t(item.titleKey)}
             description={t(item.descKey)}
+            height={listHeight}
           />
         )}
       />

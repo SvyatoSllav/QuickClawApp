@@ -32,6 +32,7 @@ interface AuthState {
   signInApple: () => Promise<void>;
   signInGoogle: () => Promise<void>;
   afterAuthFlow: () => Promise<void>;
+  skipAuth: () => Promise<void>;
   loadProfile: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -103,7 +104,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await setAuthToken('mock-token');
       set({
         authToken: 'mock-token',
-        user: { id: 1, email: 'demo@simpleclaw.com', firstName: 'Demo', lastName: 'User', profile: null },
+        user: { id: 1, email: 'demo@awesomeclaw.com', firstName: 'Demo', lastName: 'User', profile: null },
         isAuthenticated: true,
       });
       await get().afterAuthFlow();
@@ -128,6 +129,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (e) {
       set({ loading: false, error: String(e) });
     }
+  },
+
+  skipAuth: async () => {
+    set({ loading: true, error: null });
+    await setAuthToken('mock-token');
+    set({
+      authToken: 'mock-token',
+      user: { id: 1, email: 'demo@awesomeclaw.com', firstName: 'Demo', lastName: 'User', profile: null },
+      isAuthenticated: true,
+    });
+    await get().afterAuthFlow();
   },
 
   afterAuthFlow: async () => {

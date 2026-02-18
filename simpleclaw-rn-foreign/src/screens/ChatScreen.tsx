@@ -12,16 +12,15 @@ export default function ChatScreen() {
   const ipAddress = useDeployStore((s) => s.ipAddress);
   const messages = useChatStore((s) => s.messages);
   const connectionState = useChatStore((s) => s.connectionState);
-  const connect = useChatStore((s) => s.connect);
-  const disconnect = useChatStore((s) => s.disconnect);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    if (isReady && ipAddress && connectionState === 'disconnected') {
-      connect(ipAddress, '');
+    if (__DEV__) return;
+    if (isReady && ipAddress) {
+      useChatStore.getState().connect(ipAddress, '');
     }
-    return () => disconnect();
-  }, [isReady, ipAddress, connectionState, connect, disconnect]);
+    return () => useChatStore.getState().disconnect();
+  }, [isReady, ipAddress]);
 
   useEffect(() => {
     if (messages.length > 0) {

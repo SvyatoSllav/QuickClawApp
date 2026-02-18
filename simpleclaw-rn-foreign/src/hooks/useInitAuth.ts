@@ -22,7 +22,7 @@ export function useInitAuth() {
           isAuthenticated: hasOnboarded,
           authToken: hasOnboarded ? 'mock-token' : null,
           user: hasOnboarded
-            ? { id: 1, email: 'demo@simpleclaw.com', firstName: 'Demo', lastName: 'User', profile: null }
+            ? { id: 1, email: 'demo@awesomeclaw.com', firstName: 'Demo', lastName: 'User', profile: null }
             : null,
           loading: false,
           error: null,

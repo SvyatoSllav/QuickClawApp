@@ -1,6 +1,6 @@
 export const en = {
   // General
-  appName: 'SimpleClaw',
+  appName: 'AwesomeClaw',
   support: 'Support',
   back: 'Back',
   continue: 'Continue',
@@ -21,7 +21,7 @@ export const en = {
   signInWithApple: 'Sign in with Apple',
   signInWithGoogle: 'Sign in with Google',
   signingIn: 'Signing in...',
-  signInTitle: 'Welcome to SimpleClaw',
+  signInTitle: 'Welcome to AwesomeClaw',
   signInSubtitle: 'Your personal AI agent, always online.',
 
   // Plan
@@ -93,4 +93,10 @@ export const en = {
   pairingSuccessDesc: 'Your bot is ready to use. Send a message in Telegram to start chatting.',
   pairingWaitServer: 'Waiting for server to be ready...',
   pairingExpireNote: 'Codes expire after 1 hour',
+
+  // Sidebar
+  menu: 'Menu',
+  useCases: 'Use Cases',
+  marketplace: 'Marketplace',
+  systemPrompts: 'System Prompts',
 } as const;

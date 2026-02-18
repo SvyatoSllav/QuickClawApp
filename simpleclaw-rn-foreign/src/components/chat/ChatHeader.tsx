@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
+import { Menu } from 'lucide-react-native';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useChatStore } from '../../stores/chatStore';
 import { AVAILABLE_MODELS, ModelId } from '../../types/chat';
-import ProfileIcon from '../icons/ProfileIcon';
 import { getModelIcon, MODEL_COLORS } from '../icons/ModelIcons';
 
 export default function ChatHeader() {
-  const setScreen = useNavigationStore((s) => s.setScreen);
+  const insets = useSafeAreaInsets();
+  const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
   const selectedModel = useChatStore((s) => s.selectedModel);
   const setModel = useChatStore((s) => s.setModel);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -24,14 +26,10 @@ export default function ChatHeader() {
 
   return (
     <View className="relative z-50">
-      <View className="flex-row items-center justify-between px-4 h-14 border-b border-border">
-        <Button variant="outline" size="icon" onPress={() => setScreen('profile')}>
-          <ProfileIcon size={18} color="#fafafa" />
+      <View className="flex-row items-center justify-between px-4 py-2 border-b border-border" style={{ paddingTop: insets.top + 8 }}>
+        <Button variant="outline" size="icon" onPress={toggleSidebar}>
+          <Menu size={18} color="#fafafa" />
         </Button>
-
-        <Text className="font-bold text-base uppercase" style={{ letterSpacing: 1.5 }}>
-          SimpleClaw
-        </Text>
 
         <Button
           variant="outline"

@@ -11,6 +11,10 @@ import AuthScreen from '../src/screens/AuthScreen';
 import PlanScreen from '../src/screens/PlanScreen';
 import ChatScreen from '../src/screens/ChatScreen';
 import ProfileScreen from '../src/screens/ProfileScreen';
+import UseCasesScreen from '../src/screens/UseCasesScreen';
+import MarketplaceScreen from '../src/screens/MarketplaceScreen';
+import SystemPromptsScreen from '../src/screens/SystemPromptsScreen';
+import Sidebar from '../src/components/sidebar/Sidebar';
 import { colors } from '../src/config/colors';
 
 export default function MainScreen() {
@@ -57,12 +61,19 @@ export default function MainScreen() {
         return <ChatScreen />;
       case 'profile':
         return <ProfileScreen />;
+      case 'useCases':
+        return <UseCasesScreen />;
+      case 'marketplace':
+        return <MarketplaceScreen />;
+      case 'systemPrompts':
+        return <SystemPromptsScreen />;
     }
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       {renderScreen()}
+      <Sidebar />
     </SafeAreaView>
   );
 }

@@ -126,7 +126,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 maxProtocol: 3,
                 client: {
                   id: 'simpleclaw-mobile',
-                  displayName: 'SimpleClaw Mobile',
+                  displayName: 'AwesomeClaw Mobile',
                   version: '1.0.0',
                   platform: 'mobile',
                   mode: 'operator',
