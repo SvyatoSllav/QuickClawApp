@@ -98,19 +98,43 @@
                         <button @click="goToProfile" class="bg-zinc-800 hover:bg-zinc-700 text-white font-medium px-6 py-3 rounded-xl transition-colors mt-2">Открыть профиль</button>
                     </div>
 
-                    <!-- Pairing info -->
-                    <div v-if="deployReady" class="max-w-md mx-auto w-full mt-4 p-4 bg-zinc-900/60 border border-zinc-700/50 rounded-xl text-left">
-                        <p class="text-sm text-zinc-300 leading-relaxed">
-                            Если бот прислал вам сообщение вида:
-                        </p>
-                        <div class="mt-2 p-3 bg-zinc-800/80 rounded-lg font-mono text-xs text-zinc-400 leading-relaxed">
-                            OpenClaw: access not configured.<br>
-                            Your Telegram user id: &lt;Ваш телеграм id&gt;<br>
-                            Pairing code: XXXXXXXX
+                    <!-- Код сопряжения -->
+                    <div v-if="deployReady" class="max-w-md mx-auto w-full mt-4 p-4 bg-zinc-900/60 border border-zinc-700/50 rounded-xl text-left flex flex-col gap-3">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 shrink-0"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <h3 class="text-sm font-semibold text-white">Код сопряжения</h3>
                         </div>
-                        <p class="mt-2 text-sm text-zinc-300 leading-relaxed">
-                            Не пугайтесь, это не ошибка — происходит запоминание вашего аккаунта. Это сделано в целях безопасности. Просто подождите пару минут и попробуйте снова.
+                        <p class="text-sm text-zinc-400 leading-relaxed">
+                            Если бот прислал код сопряжения (pairing code), введите его ниже для авторизации.
                         </p>
+                        <div class="p-3 bg-zinc-800/80 rounded-lg font-mono text-xs text-zinc-500 leading-relaxed">
+                            OpenClaw: access not configured.<br>
+                            Your Telegram user id: &lt;Ваш id&gt;<br>
+                            Pairing code: <span class="text-blue-400">XXXXXXXX</span> &larr; этот код
+                        </div>
+                        <div v-if="pairingSuccess" class="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                            <p class="text-sm text-emerald-400 text-center">Код подтверждён! Напишите боту ещё раз.</p>
+                        </div>
+                        <template v-else>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input
+                                    v-model="pairingCode"
+                                    type="text"
+                                    placeholder="Введите pairing code"
+                                    class="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
+                                    @keyup.enter="approvePairingCode"
+                                />
+                                <button
+                                    @click="approvePairingCode"
+                                    :disabled="pairingLoading || !pairingCode.trim()"
+                                    class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shrink-0"
+                                >
+                                    <svg v-if="pairingLoading" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin" style="animation-duration: 1s;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                                    {{ pairingLoading ? 'Проверка...' : 'Подтвердить' }}
+                                </button>
+                            </div>
+                            <p v-if="pairingError" class="text-sm text-red-400">{{ pairingError }}</p>
+                        </template>
                     </div>
 
                     <!-- Error state -->
@@ -220,19 +244,44 @@
                         </div>
                     </div>
 
-                    <!-- Pairing info (shown when bot is active) -->
-                    <div v-if="subscription && subscription.is_active && deployReady" class="bg-zinc-900/50 border border-zinc-700/50 rounded-2xl p-5 flex flex-col gap-2">
-                        <p class="text-sm text-zinc-300 leading-relaxed">
-                            Если бот прислал вам сообщение вида:
-                        </p>
-                        <div class="p-3 bg-zinc-800/80 rounded-lg font-mono text-xs text-zinc-400 leading-relaxed">
-                            OpenClaw: access not configured.<br>
-                            Your Telegram user id: &lt;Ваш телеграм id&gt;<br>
-                            Pairing code: XXXXXXXX
+                    <!-- Код сопряжения (показывается когда бот активен) -->
+                    <div v-if="subscription && subscription.is_active && deployReady" class="bg-zinc-900/50 border border-zinc-700/50 rounded-2xl p-5 flex flex-col gap-3">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 shrink-0"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <h3 class="text-base font-semibold text-white">Код сопряжения</h3>
                         </div>
-                        <p class="text-sm text-zinc-300 leading-relaxed">
-                            Не пугайтесь, это не ошибка — происходит запоминание вашего аккаунта. Это сделано в целях безопасности. Просто подождите пару минут и попробуйте снова.
+                        <p class="text-sm text-zinc-400 leading-relaxed">
+                            Если ваш бот прислал код сопряжения (pairing code), введите его ниже. Это нужно для авторизации вашего аккаунта в OpenClaw.
                         </p>
+                        <div class="p-3 bg-zinc-800/80 rounded-lg font-mono text-xs text-zinc-500 leading-relaxed">
+                            OpenClaw: access not configured.<br>
+                            Your Telegram user id: &lt;Ваш id&gt;<br>
+                            Pairing code: <span class="text-blue-400">XXXXXXXX</span> &larr; этот код
+                        </div>
+                        <!-- Форма ввода кода -->
+                        <div v-if="pairingSuccess" class="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                            <p class="text-sm text-emerald-400 text-center">Код подтверждён! Напишите боту ещё раз.</p>
+                        </div>
+                        <template v-else>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input
+                                    v-model="pairingCode"
+                                    type="text"
+                                    placeholder="Введите pairing code"
+                                    class="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
+                                    @keyup.enter="approvePairingCode"
+                                />
+                                <button
+                                    @click="approvePairingCode"
+                                    :disabled="pairingLoading || !pairingCode.trim()"
+                                    class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shrink-0"
+                                >
+                                    <svg v-if="pairingLoading" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin" style="animation-duration: 1s;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                                    {{ pairingLoading ? 'Проверка...' : 'Подтвердить' }}
+                                </button>
+                            </div>
+                            <p v-if="pairingError" class="text-sm text-red-400">{{ pairingError }}</p>
+                        </template>
                     </div>
 
                     <button @click="closeProfile" class="w-full py-3 px-4 bg-zinc-800 text-white rounded-xl hover:bg-zinc-700 transition-colors">
@@ -541,6 +590,10 @@ export default {
             showProfilePage: false,
             deployStatus: { assigned: false, openclaw_running: false, status: '' },
             deployPollTimer: null,
+            pairingCode: '',
+            pairingLoading: false,
+            pairingSuccess: false,
+            pairingError: '',
             models: [
                 { id: "claude-sonnet-4", name: "Claude Sonnet 4", icon: "https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg", tooltip: "Лучший баланс цены и качества" },
                 { id: "claude-opus-4.5", name: "Claude", icon: "https://upload.wikimedia.org/wikipedia/commons/b/b0/Claude_AI_symbol.svg", tooltip: "Самая эффективная для сложных задач" },
@@ -870,6 +923,29 @@ export default {
                 if (data.confirmation_url) window.location.href = data.confirmation_url;
             } catch (e) { alert('Ошибка: ' + e.message); }
             finally { this.loading = false; }
+        },
+        async approvePairingCode() {
+            const code = this.pairingCode.trim();
+            if (!code) return;
+            if (!/^[a-zA-Z0-9_-]+$/.test(code)) {
+                this.pairingError = 'Код может содержать только буквы, цифры, дефис и подчёркивание';
+                return;
+            }
+            this.pairingLoading = true;
+            this.pairingError = '';
+            this.pairingSuccess = false;
+            try {
+                await this.apiCall('/server/pairing/approve/', {
+                    method: 'POST',
+                    body: JSON.stringify({ code })
+                });
+                this.pairingSuccess = true;
+                this.pairingCode = '';
+            } catch (e) {
+                this.pairingError = e.message || 'Не удалось подтвердить код';
+            } finally {
+                this.pairingLoading = false;
+            }
         },
         formatDate(d) { return d ? new Date(d).toLocaleDateString('ru-RU') : ''; },
         async fetchAvailableServers() {

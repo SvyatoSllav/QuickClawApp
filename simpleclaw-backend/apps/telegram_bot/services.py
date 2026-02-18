@@ -236,3 +236,35 @@ def notify_user(chat_id, text):
     except Exception as e:
         logger.error(f'Failed to notify TG chat {chat_id}: {e}')
         return False
+
+
+def approve_pairing_code(user, code):
+    """Подтвердить код сопряжения OpenClaw на сервере пользователя через SSH."""
+    import re
+    import shlex
+    from apps.servers.services import ServerManager
+
+    # Валидация кода — только буквы, цифры, дефис, подчёркивание
+    if not re.match(r'^[a-zA-Z0-9_-]+$', code):
+        return False, 'Неверный формат кода'
+
+    profile = user.profile
+    server = getattr(profile, 'server', None)
+
+    if not server or not server.openclaw_running:
+        return False, 'Сервер не готов'
+
+    manager = ServerManager(server)
+    try:
+        manager.connect()
+        safe_code = shlex.quote(code)
+        out, err, exit_code = manager.exec_command(
+            f'docker exec openclaw node /app/openclaw.mjs pairing approve telegram {safe_code}'
+        )
+        if exit_code != 0:
+            return False, err or out or 'Неизвестная ошибка'
+        return True, out.strip()
+    except Exception as e:
+        return False, str(e)
+    finally:
+        manager.disconnect()

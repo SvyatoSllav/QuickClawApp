@@ -378,6 +378,36 @@ async def help_handler(update: Update, context):
     )
 
 
+
+# ---------------------------------------------------------------------------
+# Pairing code approval
+# ---------------------------------------------------------------------------
+
+async def pairing_handler(update: Update, context):
+    """Handle /pairing <code> command."""
+    tg_user = update.effective_user
+    tg_bot_user = await _sync(services.get_or_create_telegram_user, tg_user)
+
+    if not tg_bot_user.user:
+        await update.message.reply_text(msg.PAIRING_NO_SERVER, parse_mode='HTML')
+        return
+
+    args = context.args
+    if not args:
+        await update.message.reply_text(msg.PAIRING_USAGE, parse_mode='HTML')
+        return
+
+    code = args[0].strip()
+    success, result = await _sync(services.approve_pairing_code, tg_bot_user.user, code)
+
+    if success:
+        await update.message.reply_text(msg.PAIRING_SUCCESS, parse_mode='HTML')
+    else:
+        await update.message.reply_text(
+            msg.PAIRING_ERROR.format(error=result), parse_mode='HTML'
+        )
+
+
 # ---------------------------------------------------------------------------
 # Application builder
 # ---------------------------------------------------------------------------
@@ -423,6 +453,7 @@ def create_application():
     # Command handlers
     application.add_handler(CommandHandler('profile', profile_command))
     application.add_handler(CommandHandler('help', help_handler))
+    application.add_handler(CommandHandler('pairing', pairing_handler))
 
     return application
 

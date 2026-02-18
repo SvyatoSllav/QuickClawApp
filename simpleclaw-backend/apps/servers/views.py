@@ -1,7 +1,12 @@
+import re
 import sys
+import shlex
 import subprocess
+import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 
 
 class ServerStatusView(APIView):
@@ -70,3 +75,44 @@ class ServerPoolStatusView(APIView):
             'total_active': total_active,
             'total': total_all,
         })
+
+
+class ApprovePairingView(APIView):
+    """POST /api/server/pairing/approve/ — подтвердить код сопряжения OpenClaw"""
+
+    def post(self, request):
+        code = request.data.get('code', '').strip()
+        if not code:
+            return Response({'error': 'Код не указан'}, status=400)
+
+        # Валидация кода — только буквы, цифры, дефис, подчёркивание
+        if not re.match(r'^[a-zA-Z0-9_-]+$', code):
+            return Response({'error': 'Неверный формат кода'}, status=400)
+
+        profile = request.user.profile
+        server = getattr(profile, 'server', None)
+
+        if not server or not server.openclaw_running:
+            return Response({'error': 'Сервер не готов'}, status=404)
+
+        # SSH на сервер пользователя и запуск pairing approve
+        from .services import ServerManager
+        manager = ServerManager(server)
+        try:
+            manager.connect()
+            safe_code = shlex.quote(code)
+            out, err, exit_code = manager.exec_command(
+                f'docker exec openclaw node /app/openclaw.mjs pairing approve telegram {safe_code}'
+            )
+
+            if exit_code != 0:
+                logger.warning('Pairing approve failed for user %s: %s', request.user.id, err or out)
+                return Response({'error': f'Ошибка: {err or out}'}, status=400)
+
+            logger.info('Pairing approved for user %s', request.user.id)
+            return Response({'success': True, 'message': out.strip()})
+        except Exception as e:
+            logger.exception('Pairing approve error for user %s', request.user.id)
+            return Response({'error': str(e)}, status=500)
+        finally:
+            manager.disconnect()
