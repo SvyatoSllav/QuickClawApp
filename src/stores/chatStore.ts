@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import { ModelId, ChatMessage, ChatAttachment } from '../types/chat';
+import { ModelId, ChatMessage, ChatAttachment, AVAILABLE_MODELS } from '../types/chat';
 import apiClient from '../api/client';
+
+type ResponseHandler = (data: { ok: boolean; result?: any; error?: any }) => void;
 
 interface ChatState {
   messages: ChatMessage[];
@@ -9,6 +11,9 @@ interface ChatState {
   connectionState: 'disconnected' | 'connecting' | 'connected';
   ws: WebSocket | null;
   attachments: ChatAttachment[];
+  activeSessionKey: string;
+  isLoadingHistory: boolean;
+  _responseHandlers: Map<string, ResponseHandler>;
 
   setModel: (model: ModelId) => Promise<void>;
   setInputText: (text: string) => void;
@@ -21,9 +26,40 @@ interface ChatState {
   addAttachment: (attachment: ChatAttachment) => void;
   removeAttachment: (index: number) => void;
   clearAttachments: () => void;
+  setActiveSessionKey: (key: string) => void;
+  sendRequest: (method: string, params: Record<string, any>, onResponse?: ResponseHandler) => string | null;
+  loadHistory: (sessionKey: string) => void;
+  syncModelFromServer: (serverModel: string) => void;
 }
 
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+let requestCounter = 0;
+
+/** Resolve a server model string to a known ModelId */
+function resolveServerModel(serverModel: string): ModelId | null {
+  const normalized = serverModel.toLowerCase().replace(/[-._]/g, '');
+
+  // Exact match
+  const exact = AVAILABLE_MODELS.find((m) => m.id === serverModel);
+  if (exact) return exact.id;
+
+  // Normalized substring match
+  const sub = AVAILABLE_MODELS.find(
+    (m) => normalized.includes(m.id.toLowerCase().replace(/[-._]/g, ''))
+      || m.id.toLowerCase().replace(/[-._]/g, '').includes(normalized),
+  );
+  if (sub) return sub.id;
+
+  // Provider keyword match
+  for (const keyword of ['claude', 'gpt', 'gemini', 'minimax'] as const) {
+    if (normalized.includes(keyword)) {
+      const match = AVAILABLE_MODELS.find((m) => m.icon === (keyword === 'gpt' ? 'gpt' : keyword === 'claude' ? 'claude' : keyword === 'gemini' ? 'gemini' : 'minimax'));
+      if (match) return match.id;
+    }
+  }
+
+  return null;
+}
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
@@ -32,6 +68,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   connectionState: 'disconnected',
   ws: null,
   attachments: [],
+  activeSessionKey: 'main',
+  isLoadingHistory: false,
+  _responseHandlers: new Map(),
 
   setModel: async (model) => {
     set({ selectedModel: model });
@@ -52,8 +91,42 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearAttachments: () => set({ attachments: [] }),
 
+  setActiveSessionKey: (key) => set({ activeSessionKey: key }),
+
+  sendRequest: (method, params, onResponse) => {
+    const { ws, connectionState } = get();
+    if (!ws || connectionState !== 'connected') return null;
+
+    const id = `rpc-${++requestCounter}-${Date.now()}`;
+    if (onResponse) {
+      get()._responseHandlers.set(id, onResponse);
+    }
+
+    ws.send(JSON.stringify({ type: 'req', id, method, params }));
+    return id;
+  },
+
+  loadHistory: (sessionKey) => {
+    set({ isLoadingHistory: true });
+    get().sendRequest('chat.history', { sessionKey }, (data) => {
+      if (data.ok && data.result?.messages) {
+        const messages: ChatMessage[] = data.result.messages
+          .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+          .map((m: any, i: number) => ({
+            id: `hist-${i}-${Date.now()}`,
+            role: m.role as 'user' | 'assistant',
+            content: normalizeContent(m.content),
+            timestamp: m.timestamp ?? Date.now(),
+          }));
+        set({ messages, isLoadingHistory: false });
+      } else {
+        set({ isLoadingHistory: false });
+      }
+    });
+  },
+
   sendMessage: () => {
-    const { inputText, ws, connectionState, selectedModel, attachments } = get();
+    const { inputText, ws, connectionState, activeSessionKey, attachments } = get();
     const text = inputText.trim();
     if ((!text && attachments.length === 0) || connectionState !== 'connected' || !ws) return;
 
@@ -72,7 +145,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const requestId = `req-${Date.now()}`;
     const params: Record<string, any> = {
-      sessionKey: 'main',
+      sessionKey: activeSessionKey,
       message: text,
       idempotencyKey: requestId,
     };
@@ -125,14 +198,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 minProtocol: 3,
                 maxProtocol: 3,
                 client: {
-                  id: 'simpleclaw-mobile',
-                  displayName: 'SimpleClaw Mobile',
+                  id: 'gateway-client',
+                  displayName: 'AwesomeClaw',
                   version: '1.0.0',
                   platform: 'mobile',
-                  mode: 'operator',
+                  mode: 'backend',
                 },
-                role: 'operator',
-                scopes: ['operator.read', 'operator.write'],
                 caps: [],
                 auth: { token: gatewayToken },
               },
@@ -142,16 +213,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         // Handle connect response
-        if (data.type === 'res' && data.id === 'connect-init' && data.ok) {
+        if (data.type === 'res' && data.id === 'connect-init' && (data.ok || data.payload)) {
           set({ connectionState: 'connected' });
+          // Fetch agents on connect — this sets session key and loads history
+          const { useAgentStore } = require('./agentStore');
+          useAgentStore.getState().fetchAgents();
           return;
         }
 
-        // Handle chat streaming events
+        // Route RPC responses to registered handlers
+        if (data.type === 'res' && data.id) {
+          const handler = get()._responseHandlers.get(data.id);
+          if (handler) {
+            get()._responseHandlers.delete(data.id);
+            // OpenClaw uses 'payload' instead of 'result'
+            handler({ ok: !!data.ok, result: data.payload, error: data.error });
+            return;
+          }
+        }
+
+        // Handle chat streaming events — filter by active session
         if (data.type === 'event' && data.event === 'chat') {
           const payload = data.payload;
+          const activeKey = get().activeSessionKey;
+
+          // Ignore events from other sessions
+          if (payload.sessionKey && payload.sessionKey !== activeKey) return;
+
           if (payload.state === 'delta' && payload.message?.content) {
-            get().updateLastAssistantMessage(payload.message.content);
+            get().updateLastAssistantMessage(normalizeContent(payload.message.content));
           } else if (payload.state === 'final') {
             // Message complete — nothing extra needed
           }
@@ -209,12 +299,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const msgs = [...s.messages];
       for (let i = msgs.length - 1; i >= 0; i--) {
         if (msgs[i].role === 'assistant') {
-          msgs[i] = { ...msgs[i], content: msgs[i].content + content };
+          msgs[i] = { ...msgs[i], content };
           break;
         }
       }
       return { messages: msgs };
     }),
 
+  syncModelFromServer: (serverModel) => {
+    const resolved = resolveServerModel(serverModel);
+    if (resolved) set({ selectedModel: resolved });
+  },
+
   clearMessages: () => set({ messages: [] }),
 }));
+
+/** Normalize Pi-format content (string or array of parts) to plain string */
+function normalizeContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((part: any) => part.type === 'text' && part.text)
+      .map((part: any) => part.text)
+      .join('');
+  }
+  return '';
+}

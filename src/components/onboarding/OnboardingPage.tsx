@@ -9,11 +9,12 @@ interface OnboardingPageProps {
   title: string;
   description: string;
   index: string;
+  height?: number;
 }
 
-export default function OnboardingPage({ title, description, index }: OnboardingPageProps) {
+export default function OnboardingPage({ title, description, index, height }: OnboardingPageProps) {
   return (
-    <View style={{ width }} className="flex-1 justify-center items-center px-8">
+    <View style={{ width, height: height || undefined }} className="justify-center items-center px-8">
       <Text variant="muted" className="text-xs font-bold mb-3 text-center" style={{ letterSpacing: 2 }}>
         {index}
       </Text>

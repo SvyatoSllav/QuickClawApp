@@ -25,6 +25,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
   _intervalId: null,
 
   startPolling: () => {
+    if (__DEV__) return;
     get().stopPolling();
     get().checkStatus();
     const id = setInterval(() => {
@@ -50,6 +51,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         openclawRunning: serverStatus.openclawRunning,
         status: serverStatus.status ?? '',
         ipAddress: serverStatus.ipAddress ?? null,
+        gatewayToken: serverStatus.gatewayToken ?? null,
         isReady,
       });
 

@@ -32,6 +32,7 @@ interface AuthState {
   signInApple: () => Promise<void>;
   signInGoogle: () => Promise<void>;
   afterAuthFlow: () => Promise<void>;
+  skipAuth: () => Promise<void>;
   loadProfile: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -51,6 +52,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const token = await getAuthToken();
     if (!token) {
       set({ initComplete: true });
+      return;
+    }
+
+    // Restore test session in dev mode
+    if (__DEV__ && token === 'test-token') {
+      // Set all external stores BEFORE initComplete to avoid race conditions
+      // (initComplete triggers re-render; all state must be ready by then)
+      await useOnboardingStore.getState().completeOnboarding();
+      useSubscriptionStore.setState({ isSubscribed: true });
+      useDeployStore.setState({
+        assigned: true,
+        openclawRunning: true,
+        isReady: true,
+        ipAddress: '194.87.226.98',
+        gatewayToken: 'mBDiG-b2PczPIWCywnEp8L0IJ7q-zcPHsBAoAiZq3i0',
+      });
+      set({
+        authToken: token,
+        isAuthenticated: true,
+        user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
+        loading: false,
+        initComplete: true,
+      });
+      useNavigationStore.getState().setScreen('chat');
       return;
     }
 
@@ -98,12 +123,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signInGoogle: async () => {
     set({ loading: true, error: null });
 
-    // Dev mock — auto-auth on click
+    // Dev mock — auto-auth with test account
     if (__DEV__) {
-      await setAuthToken('mock-token');
+      await setAuthToken('test-token');
       set({
-        authToken: 'mock-token',
-        user: { id: 1, email: 'demo@simpleclaw.com', firstName: 'Demo', lastName: 'User', profile: null },
+        authToken: 'test-token',
+        user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
         isAuthenticated: true,
       });
       await get().afterAuthFlow();
@@ -130,8 +155,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  skipAuth: async () => {
+    set({ loading: true, error: null });
+    await setAuthToken('test-token');
+    set({
+      authToken: 'test-token',
+      user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
+      isAuthenticated: true,
+    });
+    await get().afterAuthFlow();
+  },
+
   afterAuthFlow: async () => {
-    // Dev mock — skip real API calls
+    // Dev mock — connect to real OpenClaw server for testing
     if (__DEV__) {
       await useOnboardingStore.getState().completeOnboarding();
       useSubscriptionStore.setState({ isSubscribed: true });
@@ -139,15 +175,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         assigned: true,
         openclawRunning: true,
         isReady: true,
-        ipAddress: '127.0.0.1',
-        gatewayToken: 'mock-gateway-token',
-      });
-      useChatStore.setState({
-        connectionState: 'connected',
-        messages: [
-          { id: 'mock-1', role: 'user', content: 'Hello, what can you do?', timestamp: Date.now() - 60000 },
-          { id: 'mock-2', role: 'assistant', content: 'I can help you with marketing campaigns, business analytics, content creation, and much more. What would you like to work on?', timestamp: Date.now() - 50000 },
-        ],
+        ipAddress: '194.87.226.98',
+        gatewayToken: 'mBDiG-b2PczPIWCywnEp8L0IJ7q-zcPHsBAoAiZq3i0',
       });
       set({ loading: false });
       useNavigationStore.getState().setScreen('chat');

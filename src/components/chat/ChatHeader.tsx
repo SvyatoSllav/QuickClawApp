@@ -1,17 +1,33 @@
 import React, { useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
+import { Menu, ChevronDown } from 'lucide-react-native';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useChatStore } from '../../stores/chatStore';
+import { useSessionStore } from '../../stores/sessionStore';
+import { useAgentStore } from '../../stores/agentStore';
 import { AVAILABLE_MODELS, ModelId } from '../../types/chat';
-import ProfileIcon from '../icons/ProfileIcon';
 import { getModelIcon, MODEL_COLORS } from '../icons/ModelIcons';
+import { colors } from '../../config/colors';
+
+function getActiveSessionTitle(activeKey: string, sessions: { key: string; displayName?: string; derivedTitle?: string }[]): string {
+  const session = sessions.find((s) => s.key === activeKey);
+  if (session) return session.displayName || session.derivedTitle || session.key;
+  if (activeKey === 'main') return 'Main';
+  return activeKey;
+}
 
 export default function ChatHeader() {
-  const setScreen = useNavigationStore((s) => s.setScreen);
+  const insets = useSafeAreaInsets();
+  const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
+  const openSessionDrawer = useNavigationStore((s) => s.openSessionDrawer);
   const selectedModel = useChatStore((s) => s.selectedModel);
   const setModel = useChatStore((s) => s.setModel);
+  const activeSessionKey = useChatStore((s) => s.activeSessionKey);
+  const sessions = useSessionStore((s) => s.sessions);
+  const activeAgent = useAgentStore((s) => s.getActiveAgent());
   const [showDropdown, setShowDropdown] = useState(false);
 
   const currentModel = AVAILABLE_MODELS.find((m) => m.id === selectedModel);
@@ -22,12 +38,27 @@ export default function ChatHeader() {
     setShowDropdown(false);
   };
 
+  const sessionTitle = getActiveSessionTitle(activeSessionKey, sessions);
+
   return (
     <View className="relative z-50">
-      <View className="flex-row items-center justify-between px-4 pt-14 h-28 border-b border-border">
-        <Button variant="outline" size="icon" onPress={() => setScreen('profile')}>
-          <ProfileIcon size={18} color="#fafafa" />
+      <View className="flex-row items-center justify-between px-4 py-2 border-b border-border" style={{ paddingTop: insets.top + 8 }}>
+        <Button variant="outline" size="icon" onPress={toggleSidebar}>
+          <Menu size={18} color="#fafafa" />
         </Button>
+
+        <Pressable
+          onPress={openSessionDrawer}
+          className="flex-1 mx-3 flex-row items-center justify-center gap-1"
+        >
+          {activeAgent?.identity?.emoji ? (
+            <Text className="text-sm">{activeAgent.identity.emoji}</Text>
+          ) : null}
+          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+            {sessionTitle}
+          </Text>
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        </Pressable>
 
         <Button
           variant="outline"
@@ -67,6 +98,7 @@ export default function ChatHeader() {
           </View>
         </>
       )}
+
     </View>
   );
 }
