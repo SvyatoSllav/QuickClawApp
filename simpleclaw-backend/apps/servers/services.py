@@ -711,6 +711,7 @@ model: openrouter/anthropic/claude-sonnet-4
 
 gateway:
   mode: local
+  bind: lan
   auth:
     type: token
     token: {gateway_token}
@@ -747,9 +748,10 @@ limits:
             # Install browser (the slow part — ~3-5 min)
             self.install_browser_in_container()
 
-            # Run doctor + set gateway mode
+            # Run doctor + set gateway mode + bind to LAN for mobile access
             self.exec_command('docker exec openclaw node /app/openclaw.mjs doctor --fix')
             self.exec_command('docker exec openclaw node /app/openclaw.mjs config set gateway.mode local')
+            self.exec_command('docker exec openclaw node /app/openclaw.mjs config set gateway.bind lan')
 
             # Apply token optimization
             self.configure_token_optimization()
@@ -814,6 +816,7 @@ api_key: {openrouter_key}
 
 gateway:
   mode: local
+  bind: lan
   auth:
     type: token
     token: {gateway_token}
@@ -1099,6 +1102,7 @@ api_key: {openrouter_key}
 
 gateway:
   mode: local
+  bind: lan
   auth:
     type: token
     token: {gateway_token}
@@ -1156,6 +1160,7 @@ limits:
             # Run doctor to fix initial setup issues
             self.exec_command('docker exec openclaw node /app/openclaw.mjs doctor --fix')
             self.exec_command('docker exec openclaw node /app/openclaw.mjs config set gateway.mode local')
+            self.exec_command('docker exec openclaw node /app/openclaw.mjs config set gateway.bind lan')
 
             # Set model
             self.exec_command(
