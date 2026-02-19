@@ -762,6 +762,9 @@ limits:
             # Prune unused built-in skills
             self.prune_builtin_skills()
 
+            # Install multi-agent workspace files and config
+            self.install_agents()
+
             # Start browser with headless profile (CLI still works at this point)
             self.exec_command(
                 'docker exec openclaw node /app/openclaw.mjs browser start --browser-profile headless'
@@ -879,6 +882,9 @@ limits:
 
             # Prune unused built-in skills
             self.prune_builtin_skills()
+
+            # Install multi-agent workspace files and config
+            self.install_agents()
 
             # Start browser with headless profile (CLI still works at this point)
             self.exec_command(
@@ -1174,6 +1180,9 @@ limits:
             # Prune unused built-in skills
             self.prune_builtin_skills()
 
+            # Install multi-agent workspace files and config
+            self.install_agents()
+
             # Apply config with restart + verify (includes restart cycle)
             config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model, telegram_owner_id)
 
@@ -1406,6 +1415,92 @@ limits:
 
         logger.info(f'SearXNG + Lightpanda installed on {self.server.ip_address}')
         return True
+
+    # ─── Multi-Agent Support ────────────────────────────────────────────
+
+    AGENT_IDS = ['researcher', 'writer', 'coder', 'analyst', 'assistant']
+    AGENT_FILES = ['SOUL.md', 'IDENTITY.md', 'TOOLS.md']
+
+    def install_agents(self):
+        """Deploy multi-agent workspace files and config to the OpenClaw container.
+
+        Copies SOUL.md, IDENTITY.md, TOOLS.md for each agent into
+        /home/node/.openclaw/agents/{id}/ and applies the agents config
+        via openclaw.json merge.
+        """
+        import os
+
+        logger.info(f'Installing agents on {self.server.ip_address}...')
+
+        agents_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'openclaw-config', 'agents',
+        )
+        agents_config_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'openclaw-config', 'openclaw-agents.json',
+        )
+
+        # Create agent workspace directories and upload files
+        for agent_id in self.AGENT_IDS:
+            container_dir = f'/home/node/.openclaw/agents/{agent_id}'
+            self.exec_command(
+                f'docker exec -u root openclaw mkdir -p {container_dir}'
+            )
+
+            for filename in self.AGENT_FILES:
+                local_path = os.path.join(agents_dir, agent_id, filename)
+                try:
+                    with open(local_path, 'r') as f:
+                        content = f.read()
+                except FileNotFoundError:
+                    logger.warning(f'Agent file not found: {local_path}')
+                    continue
+
+                tmp_path = f'/tmp/_agent_{agent_id}_{filename}'
+                self.upload_file(content, tmp_path)
+                self.exec_command(
+                    f'docker cp {tmp_path} openclaw:{container_dir}/{filename}'
+                )
+                self.exec_command(f'rm -f {tmp_path}')
+
+        # Apply agents config via openclaw.json merge
+        try:
+            with open(agents_config_path, 'r') as f:
+                agents_json = f.read()
+        except FileNotFoundError:
+            logger.error(f'openclaw-agents.json not found at {agents_config_path}')
+            return
+
+        # Read current openclaw.json from the Docker volume
+        vol_path = '/var/lib/docker/volumes/openclaw_config/_data/openclaw.json'
+        out, _, code = self.exec_command(f'cat {vol_path} 2>/dev/null')
+
+        import json as json_mod
+        if code == 0 and out.strip():
+            try:
+                config = json_mod.loads(out)
+            except json_mod.JSONDecodeError:
+                config = {}
+        else:
+            config = {}
+
+        # Merge agents config
+        agents_config = json_mod.loads(agents_json)
+        config['agents'] = agents_config['agents']
+
+        # Write merged config back
+        merged_json = json_mod.dumps(config, indent=2, ensure_ascii=False)
+        self.upload_file(merged_json, '/tmp/_oc_agents.json')
+        self.exec_command(f'cp /tmp/_oc_agents.json {vol_path}')
+        self.exec_command('rm -f /tmp/_oc_agents.json')
+
+        # Fix permissions
+        self.exec_command(
+            'docker exec -u root openclaw chown -R node:node /home/node/.openclaw/agents'
+        )
+
+        logger.info(f'Agents installed on {self.server.ip_address}')
 
     # ─── ClawdMatrix Engine (On-Demand Skills) ─────────────────────────
     #
