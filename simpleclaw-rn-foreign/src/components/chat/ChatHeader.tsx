@@ -11,7 +11,6 @@ import { useAgentStore } from '../../stores/agentStore';
 import { AVAILABLE_MODELS, ModelId } from '../../types/chat';
 import { getModelIcon, MODEL_COLORS } from '../icons/ModelIcons';
 import { colors } from '../../config/colors';
-import SessionDrawer from './SessionDrawer';
 
 function getActiveSessionTitle(activeKey: string, sessions: { key: string; displayName?: string; derivedTitle?: string }[]): string {
   const session = sessions.find((s) => s.key === activeKey);
@@ -23,13 +22,13 @@ function getActiveSessionTitle(activeKey: string, sessions: { key: string; displ
 export default function ChatHeader() {
   const insets = useSafeAreaInsets();
   const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
+  const openSessionDrawer = useNavigationStore((s) => s.openSessionDrawer);
   const selectedModel = useChatStore((s) => s.selectedModel);
   const setModel = useChatStore((s) => s.setModel);
   const activeSessionKey = useChatStore((s) => s.activeSessionKey);
   const sessions = useSessionStore((s) => s.sessions);
   const activeAgent = useAgentStore((s) => s.getActiveAgent());
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showSessions, setShowSessions] = useState(false);
 
   const currentModel = AVAILABLE_MODELS.find((m) => m.id === selectedModel);
   const CurrentModelIcon = currentModel ? getModelIcon(currentModel.icon) : null;
@@ -49,7 +48,7 @@ export default function ChatHeader() {
         </Button>
 
         <Pressable
-          onPress={() => setShowSessions(true)}
+          onPress={openSessionDrawer}
           className="flex-1 mx-3 flex-row items-center justify-center gap-1"
         >
           {activeAgent?.identity?.emoji ? (
@@ -100,7 +99,6 @@ export default function ChatHeader() {
         </>
       )}
 
-      <SessionDrawer visible={showSessions} onClose={() => setShowSessions(false)} />
     </View>
   );
 }

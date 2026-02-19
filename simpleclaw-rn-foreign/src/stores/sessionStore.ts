@@ -21,7 +21,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   fetchSessions: () => {
     set({ isLoading: true });
     const { sendRequest } = useChatStore.getState();
-    sendRequest('sessions.list', {}, (data) => {
+    const activeAgentId = useAgentStore.getState().activeAgentId;
+    sendRequest('sessions.list', activeAgentId ? { agentId: activeAgentId } : {}, (data) => {
       if (data.ok && data.result?.sessions) {
         const activeAgentId = useAgentStore.getState().activeAgentId;
         const prefix = activeAgentId ? `agent:${activeAgentId}:` : '';
@@ -37,6 +38,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
             totalTokens: s.totalTokens,
           }));
         set({ sessions, isLoading: false });
+
+        const serverModel = data.result?.defaults?.model;
+        if (serverModel) {
+          useChatStore.getState().syncModelFromServer(serverModel);
+        }
       } else {
         set({ isLoading: false });
       }
@@ -59,6 +65,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       : `chat-${Date.now()}`;
     const chat = useChatStore.getState();
 
+    // Set key and clear messages immediately for snappy UI
     chat.setActiveSessionKey(key);
     chat.clearMessages();
 
@@ -70,10 +77,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       ],
     }));
 
-    // Optionally set display name via sessions.patch
-    if (displayName) {
-      chat.sendRequest('sessions.patch', { key, displayName });
-    }
+    // Sessions auto-create on first chat.send — no server call needed here
   },
 
   deleteSession: (key) => {

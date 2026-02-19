@@ -7,6 +7,7 @@
       {
         "id": "researcher",
         "name": "Research Analyst",
+        "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Research Analyst", "emoji": "🔍" },
         "workspace": "/home/node/.openclaw/agents/researcher",
         "skills": ["summarize", "blogwatcher", "weather", "session-logs", "mcporter"],
@@ -17,6 +18,7 @@
       {
         "id": "writer",
         "name": "Content Creator",
+        "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Content Creator", "emoji": "✍️" },
         "workspace": "/home/node/.openclaw/agents/writer",
         "skills": ["summarize", "nano-banana-pro", "openai-image-gen", "gifgrep", "obsidian", "session-logs"],
@@ -27,6 +29,7 @@
       {
         "id": "coder",
         "name": "Coding Assistant",
+        "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Coding Assistant", "emoji": "💻" },
         "workspace": "/home/node/.openclaw/agents/coder",
         "skills": ["github", "coding-agent", "tmux", "session-logs", "mcporter"],
@@ -37,6 +40,7 @@
       {
         "id": "analyst",
         "name": "Data Analyst",
+        "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Data Analyst", "emoji": "📊" },
         "workspace": "/home/node/.openclaw/agents/analyst",
         "skills": ["summarize", "nano-pdf", "gog", "session-logs"],
@@ -47,6 +51,7 @@
       {
         "id": "assistant",
         "name": "Personal Assistant",
+        "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Personal Assistant", "emoji": "📋" },
         "workspace": "/home/node/.openclaw/agents/assistant",
         "skills": ["gog", "trello", "notion", "himalaya", "weather", "session-logs"],

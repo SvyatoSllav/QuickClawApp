@@ -1,5 +1,11 @@
-import React from 'react';
-import { View, FlatList, Pressable, Modal } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, FlatList, Pressable, Dimensions, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, X } from 'lucide-react-native';
@@ -7,6 +13,11 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Session } from '../../types/session';
 import { colors } from '../../config/colors';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const MAX_DRAWER_HEIGHT = SCREEN_HEIGHT * 0.7;
+const ANIM_DURATION = 280;
+const EASING = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 interface Props {
   visible: boolean;
@@ -34,6 +45,28 @@ export default function SessionDrawer({ visible, onClose }: Props) {
   const createSession = useSessionStore((s) => s.createSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const activeSessionKey = useChatStore((s) => s.activeSessionKey);
+
+  const translateY = useSharedValue(MAX_DRAWER_HEIGHT);
+  const backdropOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withTiming(visible ? 0 : MAX_DRAWER_HEIGHT, {
+      duration: ANIM_DURATION,
+      easing: EASING,
+    });
+    backdropOpacity.value = withTiming(visible ? 1 : 0, {
+      duration: ANIM_DURATION,
+      easing: EASING,
+    });
+  }, [visible]);
+
+  const drawerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
 
   const sorted = [...sessions].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 
@@ -87,41 +120,64 @@ export default function SessionDrawer({ visible, onClose }: Props) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View className="flex-1 bg-black/50" onTouchEnd={onClose}>
-        <View
-          className="mt-auto bg-background rounded-t-2xl max-h-[70%]"
-          onTouchEnd={(e) => e.stopPropagation()}
-        >
-          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-            <Text className="text-base font-semibold text-foreground">Sessions</Text>
-            <View className="flex-row items-center gap-2">
-              <Button variant="outline" size="icon" onPress={handleCreate}>
-                <Plus size={18} color={colors.foreground} />
-              </Button>
-              <Pressable onPress={onClose} hitSlop={8} className="p-1">
-                <X size={20} color={colors.mutedForeground} />
-              </Pressable>
-            </View>
-          </View>
+    <View
+      style={StyleSheet.absoluteFill}
+      pointerEvents={visible ? 'auto' : 'none'}
+    >
+      {/* Backdrop — fades independently */}
+      <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+        <Pressable
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+          onPress={onClose}
+        />
+      </Animated.View>
 
-          {isLoading ? (
-            <View className="py-8 items-center">
-              <Text className="text-sm text-muted-foreground">Loading...</Text>
-            </View>
-          ) : sorted.length === 0 ? (
-            <View className="py-8 items-center">
-              <Text className="text-sm text-muted-foreground">No sessions yet</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={sorted}
-              keyExtractor={(item) => item.key}
-              renderItem={renderItem}
-            />
-          )}
+      {/* Drawer panel — slides up from bottom */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            maxHeight: MAX_DRAWER_HEIGHT,
+            backgroundColor: '#0a0b0d',
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            borderTopWidth: 1,
+            borderTopColor: '#1e1e22',
+          },
+          drawerStyle,
+        ]}
+      >
+        <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
+          <Text className="text-base font-semibold text-foreground">Sessions</Text>
+          <View className="flex-row items-center gap-2">
+            <Button variant="outline" size="icon" onPress={handleCreate}>
+              <Plus size={18} color={colors.foreground} />
+            </Button>
+            <Pressable onPress={onClose} hitSlop={8} className="p-1">
+              <X size={20} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
         </View>
-      </View>
-    </Modal>
+
+        {isLoading ? (
+          <View className="py-8 items-center">
+            <Text className="text-sm text-muted-foreground">Loading...</Text>
+          </View>
+        ) : sorted.length === 0 ? (
+          <View className="py-8 items-center">
+            <Text className="text-sm text-muted-foreground">No sessions yet</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={sorted}
+            keyExtractor={(item) => item.key}
+            renderItem={renderItem}
+          />
+        )}
+      </Animated.View>
+    </View>
   );
 }

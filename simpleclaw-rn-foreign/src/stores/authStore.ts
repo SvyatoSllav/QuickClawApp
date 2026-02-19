@@ -57,13 +57,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // Restore test session in dev mode
     if (__DEV__ && token === 'test-token') {
-      set({
-        authToken: token,
-        isAuthenticated: true,
-        user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
-        loading: false,
-        initComplete: true,
-      });
+      // Set all external stores BEFORE initComplete to avoid race conditions
+      // (initComplete triggers re-render; all state must be ready by then)
       await useOnboardingStore.getState().completeOnboarding();
       useSubscriptionStore.setState({ isSubscribed: true });
       useDeployStore.setState({
@@ -72,6 +67,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isReady: true,
         ipAddress: '194.87.226.98',
         gatewayToken: 'mBDiG-b2PczPIWCywnEp8L0IJ7q-zcPHsBAoAiZq3i0',
+      });
+      set({
+        authToken: token,
+        isAuthenticated: true,
+        user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
+        loading: false,
+        initComplete: true,
       });
       useNavigationStore.getState().setScreen('chat');
       return;

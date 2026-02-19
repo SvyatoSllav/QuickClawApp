@@ -535,6 +535,38 @@ class ServerManager:
         self.upload_file(SEARXNG_ADAPTER_JS, f'{path}/searxng-adapter.js')
         self.upload_file(LIGHTPANDA_CDP_ADAPTER_JS, f'{path}/lightpanda-cdp-adapter.js')
 
+    @staticmethod
+    def _ensure_openrouter_prefix(model: str) -> str:
+        """Ensure model string has openrouter/ prefix for routing through OpenRouter."""
+        if model and not model.startswith('openrouter/'):
+            return f'openrouter/{model}'
+        return model
+
+    def _apply_model_aliases(self):
+        """Set model aliases so user can switch models via /model command.
+
+        Must be called AFTER `models set` because that command overwrites
+        agents.defaults.models with only the primary model.
+        """
+        cli = 'docker exec openclaw node /app/openclaw.mjs'
+        aliases = {
+            "openrouter/anthropic/claude-opus-4.5": {"alias": "opus"},
+            "openrouter/anthropic/claude-sonnet-4": {"alias": "sonnet"},
+            "openrouter/anthropic/claude-sonnet-4-5-20250929": {"alias": "sonnet45"},
+            "openrouter/anthropic/claude-haiku-4.5": {"alias": "haiku"},
+            "openrouter/openai/gpt-4o": {"alias": "gpt4o"},
+            "openrouter/google/gemini-2.5-flash": {"alias": "flash"},
+            "openrouter/google/gemini-3-flash-preview": {"alias": "gemini3"},
+            "openrouter/deepseek/deepseek-reasoner": {"alias": "deepseek"},
+            "openrouter/minimax/minimax-m2.5": {"alias": "minimax"},
+        }
+        aliases_json = json.dumps(aliases)
+        out, err, code = self.exec_command(
+            f"{cli} config set agents.defaults.models '{aliases_json}'"
+        )
+        if code != 0:
+            logger.warning(f'Model aliases failed: {err[:200]}')
+
     def configure_token_optimization(self, model_slug='claude-sonnet-4'):
         """Configure OpenClaw for optimal token usage to reduce costs.
 
@@ -623,20 +655,7 @@ class ServerManager:
             self.exec_command(f'{cli} models fallbacks add {fallback}')
 
         # Set model aliases for easy /model switching
-        aliases = {
-            "openrouter/anthropic/claude-opus-4.5": {"alias": "opus"},
-            "openrouter/anthropic/claude-sonnet-4": {"alias": "sonnet"},
-            "openrouter/anthropic/claude-haiku-4.5": {"alias": "haiku"},
-            "openrouter/google/gemini-2.5-flash": {"alias": "flash"},
-            "openrouter/deepseek/deepseek-reasoner": {"alias": "deepseek"},
-            "openrouter/google/gemini-3-flash-preview": {"alias": "gemini3"},
-        }
-        aliases_json = json.dumps(aliases)
-        out, err, code = self.exec_command(
-            f"{cli} config set agents.defaults.models '{aliases_json}'"
-        )
-        if code != 0:
-            logger.warning(f'Model aliases failed: {err[:200]}')
+        self._apply_model_aliases()
 
         logger.info(f'Token optimization configured on {self.server.ip_address}')
 
@@ -932,25 +951,27 @@ limits:
         }
         auth_json = json.dumps(auth_profiles)
 
-        # Write auth-profiles.json — use host temp file + docker cp to avoid escaping issues
+        # Write auth-profiles.json to ALL agent directories (main + sub-agents)
         self.upload_file(auth_json, '/tmp/_openclaw_auth.json')
-        self.exec_command(
-            'docker exec -u root openclaw mkdir -p /home/node/.openclaw/agents/main/agent'
-        )
-        self.exec_command(
-            'docker cp /tmp/_openclaw_auth.json openclaw:/home/node/.openclaw/agents/main/agent/auth-profiles.json'
-        )
+        agent_dirs = ['main'] + self.AGENT_IDS
+        for agent_id in agent_dirs:
+            agent_path = f'/home/node/.openclaw/agents/{agent_id}/agent'
+            self.exec_command(f'docker exec -u root openclaw mkdir -p {agent_path}')
+            self.exec_command(
+                f'docker cp /tmp/_openclaw_auth.json openclaw:{agent_path}/auth-profiles.json'
+            )
         self.exec_command('rm -f /tmp/_openclaw_auth.json')
 
         self._fix_permissions()
 
-        # Set provider + model
-        self.exec_command(
-            'docker exec openclaw node /app/openclaw.mjs config set provider openrouter'
-        )
+        # Ensure model has openrouter/ prefix (provider is inferred from model prefix)
+        openrouter_model = self._ensure_openrouter_prefix(openrouter_model)
         self.exec_command(
             f'docker exec openclaw node /app/openclaw.mjs models set {openrouter_model}'
         )
+
+        # Re-apply model aliases (models set overwrites agents.defaults.models)
+        self._apply_model_aliases()
 
         # Set dmPolicy to pairing — users must approve via pairing code
         self.exec_command(
@@ -971,16 +992,17 @@ limits:
         if 'pairing' not in out.strip():
             failures.append(f'dmPolicy={out.strip()!r} (expected "pairing")')
 
-        # 2. Model must contain openrouter/ — check logs and config.yaml
+        # 2. Model must contain openrouter/ — check logs; force-fix if wrong
         out, _, _ = self.exec_command(
             'docker logs openclaw --tail 30 2>&1 | grep "agent model:" | tail -1'
         )
         if 'openrouter/' not in out:
-            out2, _, _ = self.exec_command(
-                'docker exec openclaw grep "^model:" /app/config.yaml 2>/dev/null'
+            # Force re-set the model with openrouter/ prefix
+            openrouter_model = self._ensure_openrouter_prefix(openrouter_model)
+            self.exec_command(
+                f'docker exec openclaw node /app/openclaw.mjs models set {openrouter_model}'
             )
-            if 'openrouter/' not in out2:
-                failures.append(f'model not set to openrouter (logs={out.strip()!r}, config={out2.strip()!r})')
+            failures.append(f'model not set to openrouter (logs={out.strip()!r}), re-applied')
 
         # 3. Auth profiles file must exist and contain the key
         out, _, code = self.exec_command(
@@ -1494,6 +1516,21 @@ limits:
         self.upload_file(merged_json, '/tmp/_oc_agents.json')
         self.exec_command(f'cp /tmp/_oc_agents.json {vol_path}')
         self.exec_command('rm -f /tmp/_oc_agents.json')
+
+        # Copy auth-profiles.json and models.json from main agent to custom agents
+        # (main agent's auth is the source of truth for API keys/model routing)
+        main_agent_dir = '/home/node/.openclaw/agents/main/agent'
+        for agent_id in self.AGENT_IDS:
+            agent_auth_dir = f'/home/node/.openclaw/agents/{agent_id}/agent'
+            self.exec_command(
+                f'docker exec -u root openclaw mkdir -p {agent_auth_dir}'
+            )
+            for fname in ['auth-profiles.json', 'models.json']:
+                self.exec_command(
+                    f'docker exec -u root openclaw sh -c '
+                    f'"[ -f {main_agent_dir}/{fname} ] && '
+                    f'cp {main_agent_dir}/{fname} {agent_auth_dir}/{fname} || true"'
+                )
 
         # Fix permissions
         self.exec_command(

@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { Agent } from '../types/agent';
-import { ModelId, AVAILABLE_MODELS } from '../types/chat';
 import { useChatStore } from './chatStore';
 import { useSessionStore } from './sessionStore';
+import { getItem, setItem } from '../services/secureStorage';
+
+const ACTIVE_AGENT_KEY = 'active_agent_id';
 
 interface AgentState {
   agents: Agent[];
@@ -24,35 +26,46 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   fetchAgents: () => {
     set({ isLoading: true });
     const { sendRequest } = useChatStore.getState();
+
     sendRequest('agents.list', {}, (data) => {
       if (data.ok && data.result?.agents) {
-        const agents: Agent[] = data.result.agents.map((a: any) => ({
+        const agentsList: Agent[] = data.result.agents.map((a: any) => ({
           id: a.id,
           name: a.name,
           identity: a.identity,
         }));
 
-        const defaultAgent = data.result.agents.find((a: any) => a.default);
-        const mainAgent = agents.find((a) => a.id === 'main');
-        const defaultId = defaultAgent?.id ?? mainAgent?.id ?? agents[0]?.id ?? null;
+        const serverDefaultId = data.result.defaultId ?? agentsList[0]?.id ?? null;
 
-        set({ agents, defaultAgentId: defaultId, activeAgentId: defaultId, isLoading: false });
+        // Enrich agents with skills from config.get (agents.list doesn't include them)
+        sendRequest('config.get', {}, (cfgData) => {
+          if (cfgData.ok && cfgData.result?.config?.agents?.list) {
+            const configAgents = cfgData.result.config.agents.list as any[];
+            for (const agent of agentsList) {
+              const cfgAgent = configAgents.find((c: any) => c.id === agent.id);
+              if (cfgAgent) {
+                agent.skills = cfgAgent.skills;
+                agent.description = cfgAgent.description;
+              }
+            }
+          }
 
-        if (defaultId) {
-          const chat = useChatStore.getState();
-          const sessionKey = `agent:${defaultId}:main`;
-          chat.setActiveSessionKey(sessionKey);
-          chat.loadHistory(sessionKey);
-          useSessionStore.getState().fetchSessions();
+          // Read saved preference from local storage, fall back to server default
+          getItem(ACTIVE_AGENT_KEY).then((savedId) => {
+            const validSaved = savedId && agentsList.some((a) => a.id === savedId) ? savedId : null;
+            const activeId = validSaved ?? serverDefaultId;
 
-          // Sync model from server
-          chat.sendRequest('session.config.get', { sessionKey }, (cfgData) => {
-            const model = cfgData.result?.model ?? cfgData.result?.config?.model;
-            if (model && AVAILABLE_MODELS.some((m) => m.id === model)) {
-              useChatStore.setState({ selectedModel: model as ModelId });
+            set({ agents: agentsList, defaultAgentId: serverDefaultId, activeAgentId: activeId, isLoading: false });
+
+            if (activeId) {
+              const chat = useChatStore.getState();
+              const sessionKey = `agent:${activeId}:main`;
+              chat.setActiveSessionKey(sessionKey);
+              chat.loadHistory(sessionKey);
+              useSessionStore.getState().fetchSessions();
             }
           });
-        }
+        });
       } else {
         set({ isLoading: false });
       }
@@ -66,6 +79,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     chat.clearMessages();
     chat.loadHistory(`agent:${id}:main`);
     useSessionStore.getState().fetchSessions();
+
+    // Persist locally (config.set kills the WebSocket connection)
+    setItem(ACTIVE_AGENT_KEY, id);
   },
 
   getActiveAgent: () => {

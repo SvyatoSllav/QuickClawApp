@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ModelId, ChatMessage, ChatAttachment } from '../types/chat';
+import { ModelId, ChatMessage, ChatAttachment, AVAILABLE_MODELS } from '../types/chat';
 import apiClient from '../api/client';
 
 type ResponseHandler = (data: { ok: boolean; result?: any; error?: any }) => void;
@@ -29,10 +29,37 @@ interface ChatState {
   setActiveSessionKey: (key: string) => void;
   sendRequest: (method: string, params: Record<string, any>, onResponse?: ResponseHandler) => string | null;
   loadHistory: (sessionKey: string) => void;
+  syncModelFromServer: (serverModel: string) => void;
 }
 
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let requestCounter = 0;
+
+/** Resolve a server model string to a known ModelId */
+function resolveServerModel(serverModel: string): ModelId | null {
+  const normalized = serverModel.toLowerCase().replace(/[-._]/g, '');
+
+  // Exact match
+  const exact = AVAILABLE_MODELS.find((m) => m.id === serverModel);
+  if (exact) return exact.id;
+
+  // Normalized substring match
+  const sub = AVAILABLE_MODELS.find(
+    (m) => normalized.includes(m.id.toLowerCase().replace(/[-._]/g, ''))
+      || m.id.toLowerCase().replace(/[-._]/g, '').includes(normalized),
+  );
+  if (sub) return sub.id;
+
+  // Provider keyword match
+  for (const keyword of ['claude', 'gpt', 'gemini', 'minimax'] as const) {
+    if (normalized.includes(keyword)) {
+      const match = AVAILABLE_MODELS.find((m) => m.icon === (keyword === 'gpt' ? 'gpt' : keyword === 'claude' ? 'claude' : keyword === 'gemini' ? 'gemini' : 'minimax'));
+      if (match) return match.id;
+    }
+  }
+
+  return null;
+}
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
@@ -214,7 +241,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (payload.sessionKey && payload.sessionKey !== activeKey) return;
 
           if (payload.state === 'delta' && payload.message?.content) {
-            get().updateLastAssistantMessage(payload.message.content);
+            get().updateLastAssistantMessage(normalizeContent(payload.message.content));
           } else if (payload.state === 'final') {
             // Message complete — nothing extra needed
           }
@@ -272,12 +299,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const msgs = [...s.messages];
       for (let i = msgs.length - 1; i >= 0; i--) {
         if (msgs[i].role === 'assistant') {
-          msgs[i] = { ...msgs[i], content: msgs[i].content + content };
+          msgs[i] = { ...msgs[i], content };
           break;
         }
       }
       return { messages: msgs };
     }),
+
+  syncModelFromServer: (serverModel) => {
+    const resolved = resolveServerModel(serverModel);
+    if (resolved) set({ selectedModel: resolved });
+  },
 
   clearMessages: () => set({ messages: [] }),
 }));

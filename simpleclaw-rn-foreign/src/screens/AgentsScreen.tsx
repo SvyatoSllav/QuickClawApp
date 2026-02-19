@@ -8,7 +8,7 @@ import { useNavigationStore } from '../stores/navigationStore';
 import { useAgentStore } from '../stores/agentStore';
 import { colors } from '../config/colors';
 
-const AGENT_DESCRIPTIONS: Record<string, string> = {
+const FALLBACK_DESCRIPTIONS: Record<string, string> = {
   researcher: 'Web research, news monitoring, competitive intelligence, and multi-source information synthesis.',
   writer: 'Articles, social media, email campaigns, video scripts, and image generation for visual content.',
   coder: 'Code generation, debugging, architecture design, Git workflows, and background coding agents.',
@@ -52,7 +52,8 @@ export default function AgentsScreen() {
             const isActive = activeAgentId === agent.id;
             const emoji = agent.identity?.emoji ?? '';
             const name = agent.identity?.name ?? agent.name ?? agent.id;
-            const description = AGENT_DESCRIPTIONS[agent.id] ?? '';
+            const description = agent.description || FALLBACK_DESCRIPTIONS[agent.id] || '';
+            const skills = agent.skills ?? [];
 
             return (
               <Pressable key={agent.id} onPress={() => handleSelect(agent.id)}>
@@ -74,6 +75,15 @@ export default function AgentsScreen() {
                         {description}
                       </Text>
                     ) : null}
+                    {skills.length > 0 && (
+                      <View className="flex-row flex-wrap gap-1.5 ml-8 mt-2">
+                        {skills.map((skill) => (
+                          <View key={skill} className="bg-muted rounded-full px-2.5 py-0.5">
+                            <Text className="text-[10px] text-muted-foreground">{skill}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </CardContent>
                 </Card>
               </Pressable>
