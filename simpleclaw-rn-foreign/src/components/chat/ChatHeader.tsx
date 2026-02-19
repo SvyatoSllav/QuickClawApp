@@ -7,6 +7,7 @@ import { Menu, ChevronDown } from 'lucide-react-native';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useSessionStore } from '../../stores/sessionStore';
+import { useAgentStore } from '../../stores/agentStore';
 import { AVAILABLE_MODELS, ModelId } from '../../types/chat';
 import { getModelIcon, MODEL_COLORS } from '../icons/ModelIcons';
 import { colors } from '../../config/colors';
@@ -26,6 +27,7 @@ export default function ChatHeader() {
   const setModel = useChatStore((s) => s.setModel);
   const activeSessionKey = useChatStore((s) => s.activeSessionKey);
   const sessions = useSessionStore((s) => s.sessions);
+  const activeAgent = useAgentStore((s) => s.getActiveAgent());
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSessions, setShowSessions] = useState(false);
 
@@ -50,6 +52,9 @@ export default function ChatHeader() {
           onPress={() => setShowSessions(true)}
           className="flex-1 mx-3 flex-row items-center justify-center gap-1"
         >
+          {activeAgent?.identity?.emoji ? (
+            <Text className="text-sm">{activeAgent.identity.emoji}</Text>
+          ) : null}
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
             {sessionTitle}
           </Text>

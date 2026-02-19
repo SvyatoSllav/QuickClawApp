@@ -14,6 +14,7 @@ import ProfileScreen from '../src/screens/ProfileScreen';
 import UseCasesScreen from '../src/screens/UseCasesScreen';
 import MarketplaceScreen from '../src/screens/MarketplaceScreen';
 import SystemPromptsScreen from '../src/screens/SystemPromptsScreen';
+import AgentsScreen from '../src/screens/AgentsScreen';
 import Sidebar from '../src/components/sidebar/Sidebar';
 import { colors } from '../src/config/colors';
 
@@ -67,6 +68,8 @@ export default function MainScreen() {
         return <MarketplaceScreen />;
       case 'systemPrompts':
         return <SystemPromptsScreen />;
+      case 'agents':
+        return <AgentsScreen />;
     }
   };
 

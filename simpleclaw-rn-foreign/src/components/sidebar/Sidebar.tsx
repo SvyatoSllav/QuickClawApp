@@ -7,8 +7,9 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Text } from '@/components/ui/text';
-import { User, Lightbulb, Plug, ShoppingBag, FileText, X } from 'lucide-react-native';
+import { User, Users, Lightbulb, Plug, ShoppingBag, FileText, X } from 'lucide-react-native';
 import { useNavigationStore, AppScreen } from '../../stores/navigationStore';
+import { useAgentStore } from '../../stores/agentStore';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.82;
@@ -22,6 +23,7 @@ interface MenuItem {
 }
 
 const MENU_ITEMS: MenuItem[] = [
+  { label: 'Agents', icon: Users, screen: 'agents' },
   { label: 'Profile', icon: User, screen: 'profile' },
   { label: 'Use Cases', icon: Lightbulb, screen: 'useCases' },
   { label: 'Integrations', icon: Plug, screen: 'profile' },
@@ -33,6 +35,7 @@ export default function Sidebar() {
   const isSidebarOpen = useNavigationStore((s) => s.isSidebarOpen);
   const closeSidebar = useNavigationStore((s) => s.closeSidebar);
   const setScreen = useNavigationStore((s) => s.setScreen);
+  const activeAgent = useAgentStore((s) => s.getActiveAgent());
 
   const translateX = useSharedValue(-SIDEBAR_WIDTH);
   const backdropOpacity = useSharedValue(0);
@@ -87,7 +90,14 @@ export default function Sidebar() {
       >
         {/* Header with close button */}
         <View className="flex-row items-center justify-between px-5 pt-4 pb-3">
-          <Text className="text-lg font-bold text-foreground">Menu</Text>
+          <View className="flex-row items-center gap-2">
+            {activeAgent?.identity?.emoji ? (
+              <Text className="text-lg">{activeAgent.identity.emoji}</Text>
+            ) : null}
+            <Text className="text-lg font-bold text-foreground">
+              {activeAgent?.identity?.name ?? activeAgent?.name ?? 'Menu'}
+            </Text>
+          </View>
           <Pressable onPress={closeSidebar} hitSlop={12}>
             <X size={22} color="#a1a1aa" />
           </Pressable>

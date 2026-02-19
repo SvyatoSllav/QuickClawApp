@@ -17,7 +17,6 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    if (__DEV__) return;
     if (isReady && ipAddress) {
       useChatStore.getState().connect(ipAddress, gatewayToken ?? '');
     }
@@ -37,6 +36,12 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
+  const handleContentSizeChange = () => {
+    if (messages.length > 0) {
+      flatListRef.current?.scrollToEnd({ animated: false });
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
@@ -55,6 +60,7 @@ export default function ChatScreen() {
             renderItem={({ item }) => <MessageBubble message={item} />}
             contentContainerClassName="px-4 pt-4 pb-2"
             className="flex-1"
+            onContentSizeChange={handleContentSizeChange}
           />
           <ChatInput />
         </>

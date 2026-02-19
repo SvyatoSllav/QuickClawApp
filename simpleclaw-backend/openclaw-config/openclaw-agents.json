@@ -1,0 +1,60 @@
+{
+  "agents": {
+    "defaults": {
+      "bootstrapMaxChars": 20000
+    },
+    "list": [
+      {
+        "id": "researcher",
+        "name": "Research Analyst",
+        "default": true,
+        "identity": { "name": "Research Analyst", "emoji": "🔍" },
+        "workspace": "/home/node/.openclaw/agents/researcher",
+        "skills": ["summarize", "blogwatcher", "weather", "session-logs", "mcporter"],
+        "tools": {
+          "allow": ["web_search", "web_fetch", "browser", "read", "write", "edit", "grep", "find", "ls", "exec", "memory_search", "memory_get"]
+        }
+      },
+      {
+        "id": "writer",
+        "name": "Content Creator",
+        "identity": { "name": "Content Creator", "emoji": "✍️" },
+        "workspace": "/home/node/.openclaw/agents/writer",
+        "skills": ["summarize", "nano-banana-pro", "openai-image-gen", "gifgrep", "obsidian", "session-logs"],
+        "tools": {
+          "allow": ["web_search", "web_fetch", "read", "write", "edit", "grep", "find", "ls", "exec", "memory_search", "memory_get"]
+        }
+      },
+      {
+        "id": "coder",
+        "name": "Coding Assistant",
+        "identity": { "name": "Coding Assistant", "emoji": "💻" },
+        "workspace": "/home/node/.openclaw/agents/coder",
+        "skills": ["github", "coding-agent", "tmux", "session-logs", "mcporter"],
+        "tools": {
+          "allow": ["read", "write", "edit", "apply_patch", "grep", "find", "ls", "exec", "web_search", "web_fetch", "browser"]
+        }
+      },
+      {
+        "id": "analyst",
+        "name": "Data Analyst",
+        "identity": { "name": "Data Analyst", "emoji": "📊" },
+        "workspace": "/home/node/.openclaw/agents/analyst",
+        "skills": ["summarize", "nano-pdf", "gog", "session-logs"],
+        "tools": {
+          "allow": ["read", "write", "edit", "grep", "find", "ls", "exec", "web_search", "web_fetch", "memory_search", "memory_get"]
+        }
+      },
+      {
+        "id": "assistant",
+        "name": "Personal Assistant",
+        "identity": { "name": "Personal Assistant", "emoji": "📋" },
+        "workspace": "/home/node/.openclaw/agents/assistant",
+        "skills": ["gog", "trello", "notion", "himalaya", "weather", "session-logs"],
+        "tools": {
+          "allow": ["cron", "message", "read", "write", "edit", "grep", "find", "ls", "exec", "web_search", "web_fetch", "memory_search", "memory_get"]
+        }
+      }
+    ]
+  }
+}

@@ -171,14 +171,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 minProtocol: 3,
                 maxProtocol: 3,
                 client: {
-                  id: 'simpleclaw-mobile',
-                  displayName: 'AwesomeClaw Mobile',
+                  id: 'gateway-client',
+                  displayName: 'AwesomeClaw',
                   version: '1.0.0',
                   platform: 'mobile',
-                  mode: 'operator',
+                  mode: 'backend',
                 },
-                role: 'operator',
-                scopes: ['operator.read', 'operator.write'],
                 caps: [],
                 auth: { token: gatewayToken },
               },
@@ -188,10 +186,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         // Handle connect response
-        if (data.type === 'res' && data.id === 'connect-init' && data.ok) {
+        if (data.type === 'res' && data.id === 'connect-init' && (data.ok || data.payload)) {
           set({ connectionState: 'connected' });
-          // Load history for active session on connect
-          get().loadHistory(get().activeSessionKey);
+          // Fetch agents on connect — this sets session key and loads history
+          const { useAgentStore } = require('./agentStore');
+          useAgentStore.getState().fetchAgents();
           return;
         }
 
@@ -200,7 +199,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const handler = get()._responseHandlers.get(data.id);
           if (handler) {
             get()._responseHandlers.delete(data.id);
-            handler(data);
+            // OpenClaw uses 'payload' instead of 'result'
+            handler({ ok: !!data.ok, result: data.payload, error: data.error });
             return;
           }
         }

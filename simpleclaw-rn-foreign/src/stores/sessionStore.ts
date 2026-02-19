@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Session } from '../types/session';
 import { useChatStore } from './chatStore';
+import { useAgentStore } from './agentStore';
 
 interface SessionState {
   sessions: Session[];
@@ -22,14 +23,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { sendRequest } = useChatStore.getState();
     sendRequest('sessions.list', {}, (data) => {
       if (data.ok && data.result?.sessions) {
-        const sessions: Session[] = data.result.sessions.map((s: any) => ({
-          key: s.key,
-          displayName: s.displayName,
-          derivedTitle: s.derivedTitle,
-          updatedAt: s.updatedAt ?? null,
-          kind: s.kind ?? 'direct',
-          totalTokens: s.totalTokens,
-        }));
+        const activeAgentId = useAgentStore.getState().activeAgentId;
+        const prefix = activeAgentId ? `agent:${activeAgentId}:` : '';
+
+        const sessions: Session[] = data.result.sessions
+          .filter((s: any) => !prefix || s.key.startsWith(prefix))
+          .map((s: any) => ({
+            key: s.key,
+            displayName: s.displayName,
+            derivedTitle: s.derivedTitle,
+            updatedAt: s.updatedAt ?? null,
+            kind: s.kind ?? 'direct',
+            totalTokens: s.totalTokens,
+          }));
         set({ sessions, isLoading: false });
       } else {
         set({ isLoading: false });
@@ -47,7 +53,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   createSession: (displayName) => {
-    const key = `chat-${Date.now()}`;
+    const activeAgentId = useAgentStore.getState().activeAgentId;
+    const key = activeAgentId
+      ? `agent:${activeAgentId}:chat-${Date.now()}`
+      : `chat-${Date.now()}`;
     const chat = useChatStore.getState();
 
     chat.setActiveSessionKey(key);
@@ -68,18 +77,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   deleteSession: (key) => {
-    if (key === 'main') return;
+    if (key.endsWith(':main')) return;
 
     const chat = useChatStore.getState();
     chat.sendRequest('sessions.delete', { key }, (data) => {
       if (data.ok) {
         set((s) => ({ sessions: s.sessions.filter((sess) => sess.key !== key) }));
 
-        // Switch to main if the deleted session was active
+        // Switch to agent's main session if the deleted session was active
         if (chat.activeSessionKey === key) {
-          chat.setActiveSessionKey('main');
+          const activeAgentId = useAgentStore.getState().activeAgentId;
+          const mainKey = activeAgentId ? `agent:${activeAgentId}:main` : 'main';
+          chat.setActiveSessionKey(mainKey);
           chat.clearMessages();
-          chat.loadHistory('main');
+          chat.loadHistory(mainKey);
         }
       }
     });
