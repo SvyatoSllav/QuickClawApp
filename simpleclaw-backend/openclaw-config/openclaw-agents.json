@@ -7,7 +7,6 @@
       {
         "id": "researcher",
         "name": "Research Analyst",
-        "default": true,
         "identity": { "name": "Research Analyst", "emoji": "🔍" },
         "workspace": "/home/node/.openclaw/agents/researcher",
         "skills": ["summarize", "blogwatcher", "weather", "session-logs", "mcporter"],

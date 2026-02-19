@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Agent } from '../types/agent';
+import { ModelId, AVAILABLE_MODELS } from '../types/chat';
 import { useChatStore } from './chatStore';
 import { useSessionStore } from './sessionStore';
 
@@ -32,15 +33,25 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         }));
 
         const defaultAgent = data.result.agents.find((a: any) => a.default);
-        const defaultId = defaultAgent?.id ?? agents[0]?.id ?? null;
+        const mainAgent = agents.find((a) => a.id === 'main');
+        const defaultId = defaultAgent?.id ?? mainAgent?.id ?? agents[0]?.id ?? null;
 
         set({ agents, defaultAgentId: defaultId, activeAgentId: defaultId, isLoading: false });
 
         if (defaultId) {
           const chat = useChatStore.getState();
-          chat.setActiveSessionKey(`agent:${defaultId}:main`);
-          chat.loadHistory(`agent:${defaultId}:main`);
+          const sessionKey = `agent:${defaultId}:main`;
+          chat.setActiveSessionKey(sessionKey);
+          chat.loadHistory(sessionKey);
           useSessionStore.getState().fetchSessions();
+
+          // Sync model from server
+          chat.sendRequest('session.config.get', { sessionKey }, (cfgData) => {
+            const model = cfgData.result?.model ?? cfgData.result?.config?.model;
+            if (model && AVAILABLE_MODELS.some((m) => m.id === model)) {
+              useChatStore.setState({ selectedModel: model as ModelId });
+            }
+          });
         }
       } else {
         set({ isLoading: false });

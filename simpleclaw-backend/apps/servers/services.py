@@ -1530,6 +1530,10 @@ limits:
         'clawdmatrix-coding', 'clawdmatrix-finance', 'clawdmatrix-legal',
         'clawdmatrix-sysops', 'clawdmatrix-creative', 'clawdmatrix-occult',
         'clawdmatrix-gaming',
+        # Agent-specific skills (used in per-agent skills allowlists)
+        'blogwatcher', 'gifgrep', 'github', 'gog', 'himalaya',
+        'mcporter', 'nano-banana-pro', 'notion', 'obsidian', 'tmux', 'trello',
+        'skill-creator',
     }
 
     # VPS-useless skills to permanently delete (not even kept in skills-disabled)
