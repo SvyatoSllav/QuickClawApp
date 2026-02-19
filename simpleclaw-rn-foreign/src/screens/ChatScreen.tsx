@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { useDeployStore } from '../stores/deployStore';
 import { useChatStore } from '../stores/chatStore';
+import { useSessionStore } from '../stores/sessionStore';
 import ChatHeader from '../components/chat/ChatHeader';
 import ChatInput from '../components/chat/ChatInput';
 import MessageBubble from '../components/chat/MessageBubble';
@@ -10,6 +11,7 @@ import ConnectingOverlay from '../components/chat/ConnectingOverlay';
 export default function ChatScreen() {
   const isReady = useDeployStore((s) => s.isReady);
   const ipAddress = useDeployStore((s) => s.ipAddress);
+  const gatewayToken = useDeployStore((s) => s.gatewayToken);
   const messages = useChatStore((s) => s.messages);
   const connectionState = useChatStore((s) => s.connectionState);
   const flatListRef = useRef<FlatList>(null);
@@ -17,10 +19,17 @@ export default function ChatScreen() {
   useEffect(() => {
     if (__DEV__) return;
     if (isReady && ipAddress) {
-      useChatStore.getState().connect(ipAddress, '');
+      useChatStore.getState().connect(ipAddress, gatewayToken ?? '');
     }
     return () => useChatStore.getState().disconnect();
-  }, [isReady, ipAddress]);
+  }, [isReady, ipAddress, gatewayToken]);
+
+  // Fetch session list when WebSocket connects
+  useEffect(() => {
+    if (connectionState === 'connected') {
+      useSessionStore.getState().fetchSessions();
+    }
+  }, [connectionState]);
 
   useEffect(() => {
     if (messages.length > 0) {

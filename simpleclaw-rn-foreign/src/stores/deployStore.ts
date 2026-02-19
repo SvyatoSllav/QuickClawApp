@@ -50,6 +50,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         openclawRunning: serverStatus.openclawRunning,
         status: serverStatus.status ?? '',
         ipAddress: serverStatus.ipAddress ?? null,
+        gatewayToken: serverStatus.gatewayToken ?? null,
         isReady,
       });
 
