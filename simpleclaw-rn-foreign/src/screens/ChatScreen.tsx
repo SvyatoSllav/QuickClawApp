@@ -25,6 +25,18 @@ export default function ChatScreen() {
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fabOpacity = useSharedValue(0);
 
+  // Filter out blank assistant messages except the last one (loading indicator)
+  const visibleMessages = React.useMemo(() => {
+    const lastMsg = messages[messages.length - 1];
+    const isLastLoading = lastMsg && lastMsg.role === 'assistant' && !lastMsg.content;
+    return messages.filter((msg, idx) => {
+      if (msg.role === 'assistant' && !msg.content) {
+        return isLastLoading && idx === messages.length - 1;
+      }
+      return true;
+    });
+  }, [messages]);
+
   useEffect(() => {
     if (isReady && ipAddress) {
       useChatStore.getState().connect(ipAddress, gatewayToken ?? '');
@@ -39,10 +51,10 @@ export default function ChatScreen() {
   }, [connectionState]);
 
   useEffect(() => {
-    if (messages.length > 0 && isAtBottom) {
+    if (visibleMessages.length > 0 && isAtBottom) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
-  }, [messages.length]);
+  }, [visibleMessages.length]);
 
   const prevLoading = useRef(isLoadingHistory);
   useEffect(() => {
@@ -53,7 +65,7 @@ export default function ChatScreen() {
   }, [isLoadingHistory]);
 
   const handleContentSizeChange = () => {
-    if (messages.length > 0 && isAtBottom) {
+    if (visibleMessages.length > 0 && isAtBottom) {
       flatListRef.current?.scrollToEnd({ animated: false });
     }
   };
@@ -75,7 +87,7 @@ export default function ChatScreen() {
     pointerEvents: fabOpacity.value === 0 ? 'none' as const : 'auto' as const,
   }));
 
-  const showEmptyState = isReady && messages.length === 0;
+  const showEmptyState = isReady && visibleMessages.length === 0;
 
   return (
     <KeyboardAvoidingView
@@ -93,13 +105,13 @@ export default function ChatScreen() {
               <View style={localStyles.emptyIcon}>
                 <Text style={{ fontSize: 40 }}>{'\uD83E\uDD80'}</Text>
               </View>
-              <Text style={localStyles.emptyTitle}>{'\u041D\u0430\u0447\u043D\u0438\u0442\u0435 \u0440\u0430\u0437\u0433\u043E\u0432\u043E\u0440'}</Text>
-              <Text style={localStyles.emptySubtitle}>{'\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0430\u0433\u0435\u043D\u0442\u0430 \u0438\u043B\u0438 \u043D\u0430\u043F\u0438\u0448\u0438\u0442\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435'}</Text>
+              <Text style={localStyles.emptyTitle}>Start a conversation</Text>
+              <Text style={localStyles.emptySubtitle}>Select an agent or type a message</Text>
             </View>
           ) : (
             <FlatList
               ref={flatListRef}
-              data={messages}
+              data={visibleMessages}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => <MessageBubble message={item} />}
               contentContainerClassName="px-4 pt-4 pb-2"

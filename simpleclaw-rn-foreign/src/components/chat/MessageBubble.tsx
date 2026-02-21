@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text as RNText, StyleSheet } from 'react-native';
 import { Text } from '@/components/ui/text';
 import Markdown from 'react-native-markdown-display';
 import { ChatMessage } from '../../types/chat';
@@ -77,7 +77,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
 
   return (
     <View
-      className={`max-w-[80%] mb-3 ${isUser ? 'self-end' : 'self-start'}`}
+      className={`mb-3 ${isUser ? 'max-w-[80%] self-end' : 'w-full self-start'}`}
     >
       <View
         style={[
@@ -92,9 +92,9 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
             <PulseDot size={6} />
           </View>
         ) : isUser ? (
-          <Text style={localStyles.userText}>
+          <RNText style={localStyles.userText}>
             {message.content}
-          </Text>
+          </RNText>
         ) : (
           <Markdown style={mdStyles}>{message.content}</Markdown>
         )}

@@ -18,6 +18,7 @@ export default function ChatInput() {
   const addAttachment = useChatStore((s) => s.addAttachment);
   const removeAttachment = useChatStore((s) => s.removeAttachment);
   const [inputHeight, setInputHeight] = useState(48);
+  const [isFocused, setIsFocused] = useState(false);
   const lastHeight = useRef(48);
 
   const canSend =
@@ -69,7 +70,7 @@ export default function ChatInput() {
         </View>
       )}
 
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputContainer, isFocused && styles.inputContainerFocused]}>
         <Pressable
           onPress={handlePickImage}
           disabled={connectionState !== 'connected'}
@@ -85,10 +86,12 @@ export default function ChatInput() {
           placeholderTextColor={colors.mutedForeground}
           multiline
           maxLength={4000}
-          className={`flex-1 h-auto min-h-12 max-h-40 py-3 px-4 bg-transparent border-0 ${
+          className={`flex-1 h-auto min-h-12 max-h-40 py-3 px-4 bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-transparent ${
             isMultiline ? 'rounded-2xl' : 'rounded-full'
           }`}
           style={{ color: colors.foreground }}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           editable={connectionState === 'connected'}
           onSubmitEditing={canSend ? sendMessage : undefined}
           onContentSizeChange={(e: any) => {
@@ -165,6 +168,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     gap: 2,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  inputContainerFocused: {
+    borderColor: '#F5A623',
   },
   sendButton: {
     width: 40,

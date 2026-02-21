@@ -6,11 +6,14 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PortalHost } from '@rn-primitives/portal';
-import { StyleSheet as NWStyleSheet } from 'react-native-css-interop';
 import '../src/i18n';
 import '../global.css';
 
-NWStyleSheet.setFlag('darkMode', 'class');
+// Ensure NativeWind sees darkMode as 'class' before CSS loads (race condition workaround)
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  document.documentElement.style.setProperty('--css-interop-darkMode', 'class dark');
+}
+
 SplashScreen.preventAutoHideAsync();
 
 function useWebFonts() {

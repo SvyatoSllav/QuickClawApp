@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
-import { Menu, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Menu, ChevronDown } from 'lucide-react-native';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useAgentStore } from '../../stores/agentStore';
 import { AVAILABLE_MODELS, ModelId } from '../../types/chat';
-import { getModelIcon, MODEL_COLORS } from '../icons/ModelIcons';
+import { getModelIcon } from '../icons/ModelIcons';
 import { colors } from '../../config/colors';
 
 export default function ChatHeader() {
@@ -16,11 +16,23 @@ export default function ChatHeader() {
   const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
   const openSessionDrawer = useNavigationStore((s) => s.openSessionDrawer);
   const selectedModel = useChatStore((s) => s.selectedModel);
+  const activeSessionKey = useChatStore((s) => s.activeSessionKey);
   const setModel = useChatStore((s) => s.setModel);
+  const sessions = useSessionStore((s) => s.sessions);
+  const agents = useAgentStore((s) => s.agents);
+  const activeAgentId = useAgentStore((s) => s.activeAgentId);
   const [showDropdown, setShowDropdown] = useState(false);
 
   const currentModel = AVAILABLE_MODELS.find((m) => m.id === selectedModel);
   const CurrentModelIcon = currentModel ? getModelIcon(currentModel.icon) : null;
+
+  // Derive session title with agent name fallback
+  const activeSession = sessions.find((s) => s.key === activeSessionKey);
+  const activeAgent = agents.find((a) => a.id === activeAgentId);
+  const sessionTitle = activeSession?.displayName
+    || activeSession?.derivedTitle
+    || activeAgent?.name
+    || 'New chat';
 
   const handleSelect = async (id: ModelId) => {
     await setModel(id);
@@ -35,23 +47,18 @@ export default function ChatHeader() {
           <Menu size={22} color={colors.foreground} />
         </Pressable>
 
-        {/* Title */}
-        <Pressable onPress={openSessionDrawer} style={styles.titleArea}>
-          <Text style={styles.title}>{'\u0421\u0435\u0441\u0441\u0438\u0438'}</Text>
+        {/* Session name + chevron (centered, clickable) */}
+        <Pressable onPress={openSessionDrawer} style={styles.sessionPill}>
+          <Text style={styles.sessionText} numberOfLines={1}>{sessionTitle}</Text>
+          <ChevronDown size={16} color={colors.mutedForeground} />
         </Pressable>
 
-        {/* Model selector pill */}
+        {/* Model icon button */}
         <Pressable
           onPress={() => setShowDropdown(!showDropdown)}
-          style={styles.modelPill}
+          style={styles.modelButton}
         >
-          {CurrentModelIcon && <CurrentModelIcon size={14} />}
-          <Text style={styles.modelPillText}>{currentModel?.label ?? 'Model'}</Text>
-          {showDropdown ? (
-            <ChevronUp size={14} color={colors.foreground} />
-          ) : (
-            <ChevronDown size={14} color={colors.foreground} />
-          )}
+          {CurrentModelIcon && <CurrentModelIcon size={18} />}
         </Pressable>
       </View>
 
@@ -100,28 +107,27 @@ const styles = StyleSheet.create({
   hamburger: {
     padding: 4,
   },
-  titleArea: {
+  sessionPill: {
     flex: 1,
-    marginLeft: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
-  },
-  modelPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    justifyContent: 'center',
+    gap: 4,
+    marginHorizontal: 12,
   },
-  modelPillText: {
-    fontSize: 13,
+  sessionText: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A1A1A',
+    flexShrink: 1,
+  },
+  modelButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdown: {
     position: 'absolute',

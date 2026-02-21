@@ -40,7 +40,7 @@ export default function FilesScreen() {
         <Pressable onPress={toggleSidebar} hitSlop={8} style={{ padding: 4 }}>
           <Menu size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={localStyles.headerTitle}>{'\u0424\u0430\u0439\u043B\u044B'}</Text>
+        <Text style={localStyles.headerTitle}>Files</Text>
         <View style={{ flex: 1 }} />
         {/* Model pill */}
         <Pressable
@@ -54,8 +54,8 @@ export default function FilesScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 }}>
-        <Text style={localStyles.pageTitle}>{'\u0424\u0430\u0439\u043B\u044B'}</Text>
-        <Text style={localStyles.pageSubtitle}>{'\u0424\u0430\u0439\u043B\u044B \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435'}</Text>
+        <Text style={localStyles.pageTitle}>Files</Text>
+        <Text style={localStyles.pageSubtitle}>Files on server</Text>
 
         <View style={{ gap: 10, marginTop: 12 }}>
           {files.map((file) => (

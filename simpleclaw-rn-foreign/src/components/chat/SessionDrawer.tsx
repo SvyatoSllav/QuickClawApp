@@ -141,7 +141,7 @@ export default function SessionDrawer({ visible, onClose }: Props) {
         ]}
       >
         <View style={localStyles.drawerHeader}>
-          <Text style={localStyles.drawerTitle}>{'\u0421\u0435\u0441\u0441\u0438\u0438'}</Text>
+          <Text style={localStyles.drawerTitle}>Sessions</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Pressable onPress={handleCreate} style={localStyles.addButton}>
               <Plus size={18} color={colors.primary} />
@@ -154,11 +154,11 @@ export default function SessionDrawer({ visible, onClose }: Props) {
 
         {isLoading ? (
           <View style={localStyles.emptyState}>
-            <Text style={localStyles.emptyText}>{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</Text>
+            <Text style={localStyles.emptyText}>Loading...</Text>
           </View>
         ) : sorted.length === 0 ? (
           <View style={localStyles.emptyState}>
-            <Text style={localStyles.emptyText}>{'\u041D\u0435\u0442 \u0441\u0435\u0441\u0441\u0438\u0439'}</Text>
+            <Text style={localStyles.emptyText}>No sessions</Text>
           </View>
         ) : (
           <FlatList

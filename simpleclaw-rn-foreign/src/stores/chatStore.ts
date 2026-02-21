@@ -111,7 +111,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     get().sendRequest('chat.history', { sessionKey }, (data) => {
       if (data.ok && data.result?.messages) {
         const messages: ChatMessage[] = data.result.messages
-          .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+          .filter((m: any) => (m.role === 'user' || m.role === 'assistant') && normalizeContent(m.content))
           .map((m: any, i: number) => ({
             id: `hist-${i}-${Date.now()}`,
             role: m.role as 'user' | 'assistant',
@@ -199,7 +199,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 maxProtocol: 3,
                 client: {
                   id: 'gateway-client',
-                  displayName: 'AwesomeClaw',
+                  displayName: 'EasyClaw',
                   version: '1.0.0',
                   platform: 'mobile',
                   mode: 'backend',
