@@ -31,6 +31,20 @@ class Server(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='creating')
     openclaw_running = models.BooleanField(default=False)
 
+    DEPLOY_STAGE_CHOICES = [
+        ('', 'Нет'),
+        ('pool_assigned', 'Сервер назначен'),
+        ('configuring_keys', 'Настройка ключей'),
+        ('deploying_openclaw', 'Развёртывание OpenClaw'),
+        ('installing_agents', 'Установка агентов'),
+        ('configuring_search', 'Настройка поиска'),
+        ('ready', 'Готов'),
+    ]
+    deployment_stage = models.CharField(
+        max_length=30, choices=DEPLOY_STAGE_CHOICES,
+        default='', blank=True,
+    )
+
     # OpenClaw path on server
     openclaw_path = models.CharField(max_length=255, default='/root/openclaw')
 

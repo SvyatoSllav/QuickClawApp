@@ -11,10 +11,9 @@ import AuthScreen from '../src/screens/AuthScreen';
 import PlanScreen from '../src/screens/PlanScreen';
 import ChatScreen from '../src/screens/ChatScreen';
 import ProfileScreen from '../src/screens/ProfileScreen';
-import UseCasesScreen from '../src/screens/UseCasesScreen';
-import MarketplaceScreen from '../src/screens/MarketplaceScreen';
-import SystemPromptsScreen from '../src/screens/SystemPromptsScreen';
 import AgentsScreen from '../src/screens/AgentsScreen';
+import SkillsScreen from '../src/screens/SkillsScreen';
+import FilesScreen from '../src/screens/FilesScreen';
 import Sidebar from '../src/components/sidebar/Sidebar';
 import SessionDrawer from '../src/components/chat/SessionDrawer';
 import { colors } from '../src/config/colors';
@@ -65,14 +64,12 @@ export default function MainScreen() {
         return <ChatScreen />;
       case 'profile':
         return <ProfileScreen />;
-      case 'useCases':
-        return <UseCasesScreen />;
-      case 'marketplace':
-        return <MarketplaceScreen />;
-      case 'systemPrompts':
-        return <SystemPromptsScreen />;
       case 'agents':
         return <AgentsScreen />;
+      case 'skills':
+        return <SkillsScreen />;
+      case 'files':
+        return <FilesScreen />;
     }
   };
 

@@ -7,7 +7,6 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Text } from '@/components/ui/text';
-import { Button } from '@/components/ui/button';
 import { Plus, Trash2, X } from 'lucide-react-native';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
@@ -89,19 +88,23 @@ export default function SessionDrawer({ visible, onClose }: Props) {
     return (
       <Pressable
         onPress={() => handleSelect(item.key)}
-        className={`flex-row items-center px-4 py-3 border-b border-border ${
-          isActive ? 'bg-accent' : ''
-        }`}
+        style={[
+          localStyles.sessionItem,
+          isActive && localStyles.sessionItemActive,
+        ]}
       >
-        <View className="flex-1 mr-3">
+        <View style={{ flex: 1, marginRight: 12 }}>
           <Text
-            className={`text-sm ${isActive ? 'font-bold text-foreground' : 'font-medium text-foreground'}`}
+            style={[
+              localStyles.sessionTitle,
+              isActive && localStyles.sessionTitleActive,
+            ]}
             numberOfLines={1}
           >
             {getSessionTitle(item)}
           </Text>
           {item.updatedAt && (
-            <Text className="text-xs text-muted-foreground mt-0.5">
+            <Text style={localStyles.sessionTime}>
               {formatTime(item.updatedAt)}
             </Text>
           )}
@@ -110,7 +113,7 @@ export default function SessionDrawer({ visible, onClose }: Props) {
           <Pressable
             onPress={() => handleDelete(item.key)}
             hitSlop={8}
-            className="p-1"
+            style={{ padding: 4 }}
           >
             <Trash2 size={16} color={colors.mutedForeground} />
           </Pressable>
@@ -124,51 +127,38 @@ export default function SessionDrawer({ visible, onClose }: Props) {
       style={StyleSheet.absoluteFill}
       pointerEvents={visible ? 'auto' : 'none'}
     >
-      {/* Backdrop — fades independently */}
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <Pressable
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.3)' }]}
           onPress={onClose}
         />
       </Animated.View>
 
-      {/* Drawer panel — slides up from bottom */}
       <Animated.View
         style={[
-          {
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            maxHeight: MAX_DRAWER_HEIGHT,
-            backgroundColor: '#0a0b0d',
-            borderTopLeftRadius: 16,
-            borderTopRightRadius: 16,
-            borderTopWidth: 1,
-            borderTopColor: '#1e1e22',
-          },
+          localStyles.drawer,
           drawerStyle,
         ]}
       >
-        <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-          <Text className="text-base font-semibold text-foreground">Sessions</Text>
-          <View className="flex-row items-center gap-2">
-            <Button variant="outline" size="icon" onPress={handleCreate}>
-              <Plus size={18} color={colors.foreground} />
-            </Button>
-            <Pressable onPress={onClose} hitSlop={8} className="p-1">
+        <View style={localStyles.drawerHeader}>
+          <Text style={localStyles.drawerTitle}>{'\u0421\u0435\u0441\u0441\u0438\u0438'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Pressable onPress={handleCreate} style={localStyles.addButton}>
+              <Plus size={18} color={colors.primary} />
+            </Pressable>
+            <Pressable onPress={onClose} hitSlop={8} style={{ padding: 4 }}>
               <X size={20} color={colors.mutedForeground} />
             </Pressable>
           </View>
         </View>
 
         {isLoading ? (
-          <View className="py-8 items-center">
-            <Text className="text-sm text-muted-foreground">Loading...</Text>
+          <View style={localStyles.emptyState}>
+            <Text style={localStyles.emptyText}>{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</Text>
           </View>
         ) : sorted.length === 0 ? (
-          <View className="py-8 items-center">
-            <Text className="text-sm text-muted-foreground">No sessions yet</Text>
+          <View style={localStyles.emptyState}>
+            <Text style={localStyles.emptyText}>{'\u041D\u0435\u0442 \u0441\u0435\u0441\u0441\u0438\u0439'}</Text>
           </View>
         ) : (
           <FlatList
@@ -181,3 +171,78 @@ export default function SessionDrawer({ visible, onClose }: Props) {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  drawer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: MAX_DRAWER_HEIGHT,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E0D4',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E0D4',
+  },
+  drawerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sessionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0E8DC',
+  },
+  sessionItemActive: {
+    backgroundColor: '#FEF3C7',
+  },
+  sessionTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1A1A1A',
+  },
+  sessionTitleActive: {
+    fontWeight: '700',
+    color: '#F5A623',
+  },
+  sessionTime: {
+    fontSize: 12,
+    color: '#8B8B8B',
+    marginTop: 2,
+  },
+  emptyState: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#8B8B8B',
+  },
+});

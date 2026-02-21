@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { View, FlatList, KeyboardAvoidingView, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, FlatList, KeyboardAvoidingView, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { ArrowDown } from 'lucide-react-native';
 import { useDeployStore } from '../stores/deployStore';
@@ -9,6 +9,8 @@ import ChatHeader from '../components/chat/ChatHeader';
 import ChatInput from '../components/chat/ChatInput';
 import MessageBubble from '../components/chat/MessageBubble';
 import ConnectingOverlay from '../components/chat/ConnectingOverlay';
+import { Text } from '@/components/ui/text';
+import { colors } from '../config/colors';
 
 const SCROLL_THRESHOLD = 120;
 
@@ -30,25 +32,21 @@ export default function ChatScreen() {
     return () => useChatStore.getState().disconnect();
   }, [isReady, ipAddress, gatewayToken]);
 
-  // Fetch session list when WebSocket connects
   useEffect(() => {
     if (connectionState === 'connected') {
       useSessionStore.getState().fetchSessions();
     }
   }, [connectionState]);
 
-  // Auto-scroll on new messages (only if already at bottom)
   useEffect(() => {
     if (messages.length > 0 && isAtBottom) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length]);
 
-  // Scroll to bottom after history loads
   const prevLoading = useRef(isLoadingHistory);
   useEffect(() => {
     if (prevLoading.current && !isLoadingHistory) {
-      // History just finished loading — scroll to bottom
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 150);
     }
     prevLoading.current = isLoadingHistory;
@@ -77,9 +75,11 @@ export default function ChatScreen() {
     pointerEvents: fabOpacity.value === 0 ? 'none' as const : 'auto' as const,
   }));
 
+  const showEmptyState = isReady && messages.length === 0;
+
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-background"
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ChatHeader />
@@ -87,18 +87,28 @@ export default function ChatScreen() {
       {!isReady ? (
         <ConnectingOverlay />
       ) : (
-        <View className="flex-1">
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <MessageBubble message={item} />}
-            contentContainerClassName="px-4 pt-4 pb-2"
-            className="flex-1"
-            onContentSizeChange={handleContentSizeChange}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-          />
+        <View style={{ flex: 1 }}>
+          {showEmptyState ? (
+            <View style={localStyles.emptyState}>
+              <View style={localStyles.emptyIcon}>
+                <Text style={{ fontSize: 40 }}>{'\uD83E\uDD80'}</Text>
+              </View>
+              <Text style={localStyles.emptyTitle}>{'\u041D\u0430\u0447\u043D\u0438\u0442\u0435 \u0440\u0430\u0437\u0433\u043E\u0432\u043E\u0440'}</Text>
+              <Text style={localStyles.emptySubtitle}>{'\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0430\u0433\u0435\u043D\u0442\u0430 \u0438\u043B\u0438 \u043D\u0430\u043F\u0438\u0448\u0438\u0442\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435'}</Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <MessageBubble message={item} />}
+              contentContainerClassName="px-4 pt-4 pb-2"
+              className="flex-1"
+              onContentSizeChange={handleContentSizeChange}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+            />
+          )}
 
           {/* Scroll-to-bottom FAB */}
           <Animated.View
@@ -113,18 +123,9 @@ export default function ChatScreen() {
           >
             <Pressable
               onPress={scrollToBottom}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: '#27272a',
-                borderWidth: 1,
-                borderColor: '#3f3f46',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              style={localStyles.fab}
             >
-              <ArrowDown size={20} color="#a1a1aa" />
+              <ArrowDown size={20} color="#6B7280" />
             </Pressable>
           </Animated.View>
 
@@ -134,3 +135,47 @@ export default function ChatScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const localStyles = StyleSheet.create({
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    color: '#8B8B8B',
+    textAlign: 'center',
+  },
+  fab: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8E0D4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+});

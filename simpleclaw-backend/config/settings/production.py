@@ -115,6 +115,31 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Moscow'
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'process-subscription-renewals': {
+        'task': 'apps.payments.tasks.process_subscription_renewals',
+        'schedule': crontab(hour=3, minute=0),  # Daily at 03:00 MSK
+    },
+    'cleanup-error-servers': {
+        'task': 'apps.servers.tasks.cleanup_error_servers',
+        'schedule': crontab(minute='*/10'),  # Every 10 minutes
+    },
+    'ensure-server-pool': {
+        'task': 'apps.servers.tasks.ensure_server_pool',
+        'schedule': crontab(minute='*/5'),  # Every 5 minutes
+    },
+    'monitor-servers': {
+        'task': 'apps.servers.tasks.monitor_servers',
+        'schedule': crontab(minute='*/10'),  # Every 10 minutes
+    },
+    'reset-openrouter-keys-monthly': {
+        'task': 'apps.servers.tasks.reset_openrouter_keys_monthly',
+        'schedule': crontab(day_of_month=1, hour=2, minute=0),  # 1st of each month at 02:00
+    },
+}
+
 # Google OAuth
 GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET', default='')

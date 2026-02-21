@@ -15,21 +15,21 @@ function formatTime(ts: number) {
 }
 
 const mdStyles = StyleSheet.create({
-  body: { color: '#e4e4e7', fontSize: 15, lineHeight: 22 },
+  body: { color: '#1A1A1A', fontSize: 15, lineHeight: 22 },
   paragraph: { marginTop: 0, marginBottom: 6 },
-  strong: { color: '#f4f4f5', fontWeight: '700' },
-  em: { color: '#e4e4e7', fontStyle: 'italic' },
-  link: { color: '#60a5fa' },
+  strong: { color: '#1A1A1A', fontWeight: '700' },
+  em: { color: '#374151', fontStyle: 'italic' },
+  link: { color: '#2563EB' },
   blockquote: {
     borderLeftWidth: 3,
-    borderLeftColor: '#3f3f46',
+    borderLeftColor: '#E8E0D4',
     paddingLeft: 10,
     marginLeft: 0,
     marginVertical: 6,
   },
   code_inline: {
-    backgroundColor: '#27272a',
-    color: '#a5f3fc',
+    backgroundColor: '#F3F4F6',
+    color: '#DC2626',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
@@ -37,34 +37,38 @@ const mdStyles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   code_block: {
-    backgroundColor: '#18181b',
-    color: '#a5f3fc',
+    backgroundColor: '#F9FAFB',
+    color: '#1A1A1A',
     padding: 10,
     borderRadius: 8,
     fontSize: 13,
     fontFamily: 'monospace',
     marginVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   fence: {
-    backgroundColor: '#18181b',
-    color: '#a5f3fc',
+    backgroundColor: '#F9FAFB',
+    color: '#1A1A1A',
     padding: 10,
     borderRadius: 8,
     fontSize: 13,
     fontFamily: 'monospace',
     marginVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   bullet_list: { marginVertical: 4 },
   ordered_list: { marginVertical: 4 },
   list_item: { marginVertical: 2 },
-  heading1: { color: '#f4f4f5', fontSize: 20, fontWeight: '700', marginVertical: 6 },
-  heading2: { color: '#f4f4f5', fontSize: 18, fontWeight: '700', marginVertical: 5 },
-  heading3: { color: '#f4f4f5', fontSize: 16, fontWeight: '600', marginVertical: 4 },
-  hr: { backgroundColor: '#3f3f46', height: 1, marginVertical: 8 },
-  table: { borderColor: '#3f3f46' },
-  tr: { borderBottomColor: '#3f3f46' },
-  th: { color: '#f4f4f5', fontWeight: '600', padding: 6 },
-  td: { color: '#e4e4e7', padding: 6 },
+  heading1: { color: '#1A1A1A', fontSize: 20, fontWeight: '700', marginVertical: 6 },
+  heading2: { color: '#1A1A1A', fontSize: 18, fontWeight: '700', marginVertical: 5 },
+  heading3: { color: '#1A1A1A', fontSize: 16, fontWeight: '600', marginVertical: 4 },
+  hr: { backgroundColor: '#E8E0D4', height: 1, marginVertical: 8 },
+  table: { borderColor: '#E8E0D4' },
+  tr: { borderBottomColor: '#E8E0D4' },
+  th: { color: '#1A1A1A', fontWeight: '600', padding: 6 },
+  td: { color: '#374151', padding: 6 },
 });
 
 export default function MessageBubble({ message }: MessageBubbleProps) {
@@ -76,11 +80,10 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
       className={`max-w-[80%] mb-3 ${isUser ? 'self-end' : 'self-start'}`}
     >
       <View
-        className={`px-4 py-3 ${
-          isUser
-            ? 'bg-primary rounded-2xl rounded-br-sm'
-            : 'bg-secondary rounded-2xl rounded-bl-sm'
-        }`}
+        style={[
+          localStyles.bubble,
+          isUser ? localStyles.userBubble : localStyles.assistantBubble,
+        ]}
       >
         {isEmpty && !isUser ? (
           <View className="flex-row items-center gap-1 py-1">
@@ -89,7 +92,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
             <PulseDot size={6} />
           </View>
         ) : isUser ? (
-          <Text className="text-base leading-6 text-primary-foreground">
+          <Text style={localStyles.userText}>
             {message.content}
           </Text>
         ) : (
@@ -106,3 +109,27 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  bubble: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  userBubble: {
+    backgroundColor: '#F5A623',
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
+  },
+  assistantBubble: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E8E0D4',
+  },
+  userText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#FFFFFF',
+  },
+});

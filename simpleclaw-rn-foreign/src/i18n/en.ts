@@ -1,6 +1,6 @@
 export const en = {
   // General
-  appName: 'AwesomeClaw',
+  appName: 'EasyClaw',
   support: 'Support',
   back: 'Back',
   continue: 'Continue',
@@ -21,7 +21,7 @@ export const en = {
   signInWithApple: 'Sign in with Apple',
   signInWithGoogle: 'Sign in with Google',
   signingIn: 'Signing in...',
-  signInTitle: 'Welcome to AwesomeClaw',
+  signInTitle: 'Welcome to EasyClaw',
   signInSubtitle: 'Your personal AI agent, always online.',
 
   // Plan
@@ -44,11 +44,13 @@ export const en = {
   agentReady: 'Agent ready',
   typeMessage: 'Type a message...',
   send: 'Send',
+  startConversation: 'Start a conversation',
+  selectAgentOrType: 'Select an agent or type a message',
 
   // Models
   modelGemini: 'Gemini 3 Flash',
-  modelClaude: 'Claude Opus',
-  modelGpt: 'GPT 5.2',
+  modelClaude: 'Claude Sonnet 4',
+  modelGpt: 'GPT-4o',
 
   // Profile
   profile: 'Profile',
@@ -96,7 +98,20 @@ export const en = {
 
   // Sidebar
   menu: 'Menu',
-  useCases: 'Use Cases',
-  marketplace: 'Marketplace',
-  systemPrompts: 'System Prompts',
+  sessions: 'Sessions',
+  agents: 'Agents',
+  skills: 'Skills',
+  files: 'Files',
+  management: 'MANAGEMENT',
+  analytics: 'Analytics',
+  server: 'Server',
+  training: 'Training',
+
+  // Skills screen
+  skillsTitle: 'Skills',
+  skillsDescription: 'Ready-made setups that teach your assistant new tricks. Pick one — and it will guide you through everything.',
+
+  // Files screen
+  filesTitle: 'Files',
+  filesOnServer: 'Files on server',
 } as const;

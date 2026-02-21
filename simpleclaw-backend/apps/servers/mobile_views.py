@@ -33,8 +33,12 @@ class MobileChatConfigView(APIView):
                 'reason': 'Server not configured for chat',
             })
 
+        # TODO: Switch to HTTPS — currently HTTP exposes gateway_token in plaintext.
+        # Options: nginx reverse proxy with Let's Encrypt on each server, or
+        # proxy through this backend with TLS termination.
         return Response({
             'enabled': True,
             'chat_url': f'http://{server.ip_address}:18789/v1/chat/completions',
             'gateway_token': server.gateway_token,
+            'deployment_stage': server.deployment_stage,
         })

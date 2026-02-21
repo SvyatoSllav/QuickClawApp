@@ -164,11 +164,26 @@ function log(msg) { console.log('[' + new Date().toISOString().substr(11,8) + ']
 
 var consecutiveTimeouts = 0;
 var restartInProgress = false;
+var lastRestartTime = 0;
+var restartCount = 0;
+var RESTART_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between restarts
+var MAX_RESTARTS = 5; // circuit breaker: disable after N restarts
 
 function restartLP() {
   if (restartInProgress) return;
+  var now = Date.now();
+  if (now - lastRestartTime < RESTART_COOLDOWN_MS) {
+    log('Restart cooldown active, skipping (' + Math.round((RESTART_COOLDOWN_MS - (now - lastRestartTime)) / 1000) + 's remaining)');
+    return;
+  }
+  if (restartCount >= MAX_RESTARTS) {
+    log('Circuit breaker: max restarts (' + MAX_RESTARTS + ') reached, browser disabled');
+    return;
+  }
   restartInProgress = true;
-  log('Auto-restarting lightpanda container...');
+  lastRestartTime = now;
+  restartCount++;
+  log('Auto-restarting lightpanda container (restart ' + restartCount + '/' + MAX_RESTARTS + ')...');
   var req = http.request({
     socketPath: '/var/run/docker.sock',
     path: '/containers/lightpanda/restart?t=2',
@@ -1284,7 +1299,16 @@ limits:
             if code != 0:
                 logger.warning(f'SearXNG/Lightpanda config failed: {cmd[-60:]} err={err[:200]}')
 
-        logger.info(f'SearXNG + browser configured on {self.server.ip_address}')
+        # Health check: verify SearXNG adapter responds
+        import time
+        time.sleep(3)
+        out, _, code = self.exec_command(
+            'docker exec openclaw curl -sf http://searxng-adapter:3000/res/v1/web/search?q=test\\&count=1 2>/dev/null'
+        )
+        if code != 0:
+            logger.warning(f'SearXNG health check failed on {self.server.ip_address}')
+        else:
+            logger.info(f'SearXNG + browser configured on {self.server.ip_address}')
 
     def configure_lightpanda_browser(self):
         """Configure Lightpanda browser. Delegates to configure_searxng_provider()."""
@@ -1383,7 +1407,7 @@ limits:
         if 'brave' not in out.strip().lower():
             failures.append(f'search provider not set to brave')
 
-        return (len(failures) == 0, failures)
+        return (not failures, failures)
 
     def install_searxng(self):
         """Install SearXNG + Lightpanda on an existing server (retrofit).
@@ -1536,6 +1560,19 @@ limits:
         self.exec_command(
             'docker exec -u root openclaw chown -R node:node /home/node/.openclaw/agents'
         )
+
+        # Verify agent directories exist
+        missing_agents = []
+        for agent_id in self.AGENT_IDS:
+            out, _, code = self.exec_command(
+                f'docker exec openclaw ls /home/node/.openclaw/agents/{agent_id}/SOUL.md 2>/dev/null'
+            )
+            if code != 0:
+                missing_agents.append(agent_id)
+        if missing_agents:
+            logger.warning(f'Agent verification failed on {self.server.ip_address}: missing {missing_agents}')
+        else:
+            logger.info(f'All {len(self.AGENT_IDS)} agents verified on {self.server.ip_address}')
 
         logger.info(f'Agents installed on {self.server.ip_address}')
 
@@ -1802,7 +1839,7 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
         if out.strip():
             failures.append(f'Old clawdmatrix entries still in /app/skills/: {out.strip()}')
 
-        return (len(failures) == 0, failures)
+        return (not failures, failures)
 
     def update_clawdmatrix_skills(self, domain_map=None, skills=None):
         """Update ClawdMatrix skills by re-deploying SKILL.md files."""
@@ -1836,22 +1873,29 @@ def assign_server_to_user_sync(user_id):
         logger.info(f'User {user.email} already has server {existing.ip_address}')
         return
 
-    available_server = Server.objects.filter(
-        status='active',
-        profile__isnull=True,
-    ).first()
+    from django.db import transaction
 
-    if not available_server:
-        logger.warning(f'No servers in pool for {user.email}')
-        send_telegram_message(
-            ADMIN_TELEGRAM_ID,
-            f'⚠️ No pool servers for {user.email}! Please add a server manually.'
-        )
-        return
+    with transaction.atomic():
+        available_server = Server.objects.select_for_update().filter(
+            status='active',
+            profile__isnull=True,
+        ).first()
 
-    available_server.profile = profile
-    available_server.save()
+        if not available_server:
+            logger.warning(f'No servers in pool for {user.email}')
+            send_telegram_message(
+                ADMIN_TELEGRAM_ID,
+                f'⚠️ No pool servers for {user.email}! Provisioning new server...'
+            )
+            from .tasks import provision_user_service
+            provision_user_service.delay(user_id)
+            return
 
+        available_server.profile = profile
+        available_server.save()
+
+    available_server.deployment_stage = 'configuring_keys'
+    available_server.save(update_fields=['deployment_stage'])
     logger.info(f'Assigned server {available_server.ip_address} to {user.email}')
 
     or_key, or_key_id = create_openrouter_key(
@@ -1871,39 +1915,39 @@ def assign_server_to_user_sync(user_id):
     )
 
     if profile.telegram_bot_token:
-        # Get the owner's Telegram ID to restrict bot access
         telegram_owner_id = None
         try:
             telegram_owner_id = user.telegram_bot_user.telegram_id
         except Exception:
             pass
 
+        was_warmed = available_server.openclaw_running
         manager = ServerManager(available_server)
         try:
+            available_server.deployment_stage = 'deploying_openclaw'
+            available_server.save(update_fields=['deployment_stage'])
+
+            deploy_kwargs = dict(
+                openrouter_key=profile.openrouter_api_key,
+                telegram_token=profile.telegram_bot_token,
+                model_slug=profile.selected_model,
+                telegram_owner_id=telegram_owner_id,
+            )
             # Use quick deploy on warmed servers (~30s), full deploy as fallback (~5-10min)
-            if available_server.openclaw_running:
-                result = manager.quick_deploy_user(
-                    openrouter_key=profile.openrouter_api_key,
-                    telegram_token=profile.telegram_bot_token,
-                    model_slug=profile.selected_model,
-                    telegram_owner_id=telegram_owner_id,
-                )
+            if was_warmed:
+                result = manager.quick_deploy_user(**deploy_kwargs)
             else:
-                result = manager.deploy_openclaw(
-                    openrouter_key=profile.openrouter_api_key,
-                    telegram_token=profile.telegram_bot_token,
-                    model_slug=profile.selected_model,
-                    telegram_owner_id=telegram_owner_id,
-                )
+                result = manager.deploy_openclaw(**deploy_kwargs)
+
             if result:
                 available_server.openclaw_running = True
-                available_server.save()
-                deploy_type = 'quick' if available_server.openclaw_running else 'full'
+                available_server.deployment_stage = 'ready'
+                available_server.save(update_fields=['openclaw_running', 'deployment_stage'])
+                deploy_type = 'quick' if was_warmed else 'full'
                 send_telegram_message(
                     ADMIN_TELEGRAM_ID,
                     f'✅ OpenClaw deployed ({deploy_type})!\nIP: {available_server.ip_address}\nUser: {user.email}'
                 )
-                # Notify Telegram bot user that their bot is ready
                 try:
                     tg_bot_user = user.telegram_bot_user
                     bot_username = profile.telegram_bot_username or ''
@@ -1914,7 +1958,7 @@ def assign_server_to_user_sync(user_id):
                         f'Напишите <b>@{bot_username}</b>',
                     )
                 except Exception:
-                    pass  # User may not be a Telegram bot user
+                    pass
         except Exception as e:
             send_telegram_message(
                 ADMIN_TELEGRAM_ID,

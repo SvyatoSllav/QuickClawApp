@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, Alert } from 'react-native';
+import { View, ScrollView, Alert, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { cancelSubscription } from '../api/subscriptionApi';
 import { formatDate } from '../utils/formatDate';
 import IntegrationsCard from '../components/integrations/IntegrationsCard';
 import TelegramSetupSheet from '../components/integrations/TelegramSetupSheet';
+import { colors } from '../config/colors';
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
@@ -45,20 +46,18 @@ export default function ProfileScreen() {
   const usagePercent = usage.limit > 0 ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
 
   return (
-    <View className="flex-1 bg-background">
-      <View className="flex-row items-center px-4 py-3 border-b border-border">
+    <View style={localStyles.container}>
+      <View style={localStyles.header}>
         <Button variant="ghost" size="sm" onPress={goBack}>
-          <Text className="text-sm font-medium">{t('back')}</Text>
+          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.foreground }}>{t('back')}</Text>
         </Button>
-        <Text className="font-bold text-lg ml-2">{t('profile')}</Text>
+        <Text style={localStyles.headerTitle}>{t('profile')}</Text>
       </View>
 
-      <ScrollView contentContainerClassName="px-6 pt-6 pb-12 gap-4">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 48, gap: 16 }}>
         <Card>
           <CardHeader>
-            <Text variant="muted" className="text-xs font-medium uppercase" style={{ letterSpacing: 1.5 }}>
-              ACCOUNT
-            </Text>
+            <Text style={localStyles.sectionLabel}>ACCOUNT</Text>
             <CardTitle className="text-xl">
               {user?.firstName} {user?.lastName}
             </CardTitle>
@@ -69,14 +68,12 @@ export default function ProfileScreen() {
         {subscription?.isActive && (
           <Card>
             <CardHeader>
-              <Text variant="muted" className="text-xs font-medium uppercase" style={{ letterSpacing: 1.5 }}>
-                SUBSCRIPTION
-              </Text>
+              <Text style={localStyles.sectionLabel}>SUBSCRIPTION</Text>
             </CardHeader>
             <CardContent className="gap-4">
               <View className="flex-row justify-between">
                 <Text variant="muted">{t('planName')}</Text>
-                <Text className="text-primary font-bold text-sm uppercase">ACTIVE</Text>
+                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14, textTransform: 'uppercase' }}>ACTIVE</Text>
               </View>
               {subscription.currentPeriodEnd && (
                 <View className="flex-row justify-between">
@@ -139,3 +136,31 @@ export default function ProfileScreen() {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFF8F0',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E0D4',
+  },
+  headerTitle: {
+    fontWeight: '700',
+    fontSize: 18,
+    marginLeft: 8,
+    color: '#1A1A1A',
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8B8B8B',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+});

@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/text';
 import { useDeployStore } from '../../stores/deployStore';
 import SpinnerIcon from '../ui/SpinnerIcon';
 import PulseDot from '../ui/PulseDot';
+import { colors } from '../../config/colors';
 
 export default function ConnectingOverlay() {
   const { t } = useTranslation();
@@ -19,16 +20,16 @@ export default function ConnectingOverlay() {
   }, [startPolling, stopPolling]);
 
   return (
-    <View className="flex-1 items-center justify-center px-8">
+    <View style={localStyles.container}>
       <SpinnerIcon size={48} />
-      <Text variant="h4" className="mt-6 mb-2 uppercase" style={{ letterSpacing: 1.5 }}>
+      <Text style={localStyles.title}>
         {t('connecting')}
       </Text>
-      <Text variant="muted" className="text-center text-base mb-8">
+      <Text style={localStyles.subtitle}>
         {t('connectingDesc')}
       </Text>
 
-      <View className="w-full gap-4">
+      <View style={localStyles.stepsContainer}>
         <StepRow label={t('serverAssigning')} done={assigned} active={!assigned} index="01" />
         <StepRow label={t('configuringAgent')} done={openclawRunning} active={assigned && !openclawRunning} index="02" />
         <StepRow label={t('agentReady')} done={false} active={openclawRunning} index="03" />
@@ -39,24 +40,96 @@ export default function ConnectingOverlay() {
 
 function StepRow({ label, done, active, index }: { label: string; done: boolean; active: boolean; index: string }) {
   return (
-    <View className="flex-row items-center gap-3 border-t border-border pt-3">
-      <Text variant="muted" className="text-xs font-bold w-6" style={{ letterSpacing: 2 }}>
-        {index}
-      </Text>
+    <View style={stepStyles.row}>
+      <Text style={stepStyles.index}>{index}</Text>
       {done ? (
-        <Text className="text-primary text-sm font-bold">DONE</Text>
+        <Text style={stepStyles.doneLabel}>DONE</Text>
       ) : active ? (
         <PulseDot />
       ) : (
-        <View className="w-2 h-2 rounded-full bg-muted" />
+        <View style={stepStyles.inactiveDot} />
       )}
       <Text
-        className={`text-base font-medium flex-1 ${
-          done ? 'text-primary' : active ? 'text-foreground' : 'text-muted-foreground'
-        }`}
+        style={[
+          stepStyles.label,
+          done && stepStyles.labelDone,
+          active && stepStyles.labelActive,
+          !done && !active && stepStyles.labelInactive,
+        ]}
       >
         {label}
       </Text>
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginTop: 24,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#8B8B8B',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  stepsContainer: {
+    width: '100%',
+    gap: 16,
+  },
+});
+
+const stepStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E0D4',
+    paddingTop: 12,
+  },
+  index: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8B8B8B',
+    width: 24,
+    letterSpacing: 2,
+  },
+  doneLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  inactiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E8E0D4',
+  },
+  label: {
+    fontSize: 15,
+    fontWeight: '500',
+    flex: 1,
+  },
+  labelDone: {
+    color: colors.primary,
+  },
+  labelActive: {
+    color: '#1A1A1A',
+  },
+  labelInactive: {
+    color: '#8B8B8B',
+  },
+});

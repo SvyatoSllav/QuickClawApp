@@ -1,6 +1,5 @@
 import uuid
 import logging
-import subprocess
 from decimal import Decimal
 from django.conf import settings
 from django.utils import timezone
@@ -216,18 +215,10 @@ def handle_payment_succeeded(yookassa_payment_id, payment_data):
             enable_openrouter_key(profile.openrouter_key_id)
             logger.info(f'Re-enabled OpenRouter key for {user.email}')
     else:
-        # First payment - deploy in a separate process so it survives
-        # gunicorn worker recycling (daemon threads get killed)
-        import sys
-        venv_python = sys.executable
-        subprocess.Popen(
-            [venv_python, 'manage.py', 'deploy_server', str(user.id)],
-            cwd='/home/simpleclaw-backend',
-            stdout=open('/var/log/simpleclaw-deploy.log', 'a'),
-            stderr=subprocess.STDOUT,
-            start_new_session=True,  # detach from parent process
-        )
-        logger.info(f'Spawned deploy_server process for user {user.id}')
+        # First payment — assign server via Celery task (provides retry + monitoring)
+        from apps.servers.tasks import assign_server_to_user
+        assign_server_to_user.delay(user.id)
+        logger.info(f'Queued assign_server_to_user task for user {user.id}')
 
     # Notify Telegram bot user about payment received
     try:

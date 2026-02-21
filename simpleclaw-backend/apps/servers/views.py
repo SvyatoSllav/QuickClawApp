@@ -1,8 +1,7 @@
 import re
-import sys
 import shlex
-import subprocess
 import logging
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
@@ -25,6 +24,7 @@ class ServerStatusView(APIView):
             'status': server.status,
             'openclaw_running': server.openclaw_running,
             'gateway_token': server.gateway_token,
+            'deployment_stage': server.deployment_stage,
             'last_health_check': server.last_health_check,
         })
 
@@ -44,20 +44,14 @@ class RedeployView(APIView):
         if not server.openclaw_running:
             return Response({'error': 'Деплой в процессе, подождите'}, status=409)
 
-        subprocess.Popen(
-            [sys.executable, 'manage.py', 'deploy_server', str(request.user.id)],
-            cwd='/home/simpleclaw-backend',
-            stdout=open('/var/log/simpleclaw-deploy.log', 'a'),
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+        from .tasks import redeploy_openclaw
+        redeploy_openclaw.delay(request.user.id)
 
         return Response({'status': 'redeploying'})
 
 
 class ServerPoolStatusView(APIView):
     """Public endpoint to show available servers count"""
-    from rest_framework.permissions import AllowAny
     permission_classes = [AllowAny]
 
     def get(self, request):

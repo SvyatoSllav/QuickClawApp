@@ -7,6 +7,7 @@ import OnboardingPage from '../components/onboarding/OnboardingPage';
 import PageIndicator from '../components/onboarding/PageIndicator';
 import { useOnboardingStore } from '../stores/onboardingStore';
 import { useNavigationStore } from '../stores/navigationStore';
+import { colors } from '../config/colors';
 
 const { width } = Dimensions.get('window');
 
@@ -39,7 +40,7 @@ export default function OnboardingScreen() {
   );
 
   return (
-    <View className="flex-1 bg-background">
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <FlatList
         ref={flatListRef}
         data={PAGES}
@@ -64,8 +65,12 @@ export default function OnboardingScreen() {
       <View className="px-6 pb-8 gap-4">
         <PageIndicator total={PAGES.length} current={currentPage} />
 
-        <Button onPress={handleGetStarted} className="w-full">
-          <Text className="font-semibold">{t('getStarted', 'Get Started')}</Text>
+        <Button
+          onPress={handleGetStarted}
+          className="w-full"
+          style={{ backgroundColor: colors.primary }}
+        >
+          <Text style={{ fontWeight: '600', color: '#FFFFFF' }}>{t('getStarted', 'Get Started')}</Text>
         </Button>
       </View>
     </View>

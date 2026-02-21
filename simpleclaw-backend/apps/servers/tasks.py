@@ -7,8 +7,8 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Admin Telegram ID for error reports
-ADMIN_TELEGRAM_ID = 997273934
+# Admin Telegram ID for error reports — falls back to hardcoded if setting missing
+ADMIN_TELEGRAM_ID = getattr(settings, 'ADMIN_TELEGRAM_CHAT_ID', None) or 997273934
 
 
 def send_telegram_message(chat_id, message, bot_token=None):
@@ -64,27 +64,19 @@ def cleanup_error_servers():
     """
     from .models import Server
     from .timeweb import delete_server
+    from django.db.models import Q
     from django.utils import timezone
     from datetime import timedelta
-    
-    # Clean error servers
-    error_servers = list(Server.objects.filter(status='error', profile__isnull=True))  # ONLY pool servers
-    
-    # Also clean stuck provisioning/creating servers older than 30 min
+
     stuck_threshold = timezone.now() - timedelta(minutes=30)
-    stuck_servers = list(Server.objects.filter(
-        status__in=['provisioning', 'creating'],
-        updated_at__lt=stuck_threshold,
-        profile__isnull=True,  # Only pool servers
+
+    # Pool servers that are in error OR stuck in provisioning/creating for 30+ min
+    servers_to_clean = list(Server.objects.filter(
+        profile__isnull=True,
+    ).filter(
+        Q(status='error') |
+        Q(status__in=['provisioning', 'creating'], updated_at__lt=stuck_threshold)
     ))
-    
-    # Combine and deduplicate
-    seen_ids = set()
-    servers_to_clean = []
-    for s in error_servers + stuck_servers:
-        if s.id not in seen_ids:
-            seen_ids.add(s.id)
-            servers_to_clean.append(s)
     
     if not servers_to_clean:
         return
@@ -97,8 +89,7 @@ def cleanup_error_servers():
     for server in servers_to_clean:
         tw_id = server.timeweb_server_id
         ip = server.ip_address or 'NO IP'
-        error_msg = server.last_error or 'Unknown error'
-        
+
         logger.info(f'Deleting error server ID:{server.id} TW:{tw_id} IP:{ip}')
         
         # Delete from TimeWeb
@@ -121,6 +112,22 @@ def cleanup_error_servers():
         if errors:
             report += f'\n\n⚠️ Warnings:\n' + '\n'.join(errors)
         notify_admin.delay(report)
+
+    # Notify about user-assigned servers stuck in error for >24h
+    user_error_threshold = timezone.now() - timedelta(hours=24)
+    user_error_servers = Server.objects.filter(
+        status='error',
+        profile__isnull=False,
+        updated_at__lt=user_error_threshold,
+    )
+    if user_error_servers.exists():
+        details = ', '.join(
+            f'{s.ip_address}({s.profile.user.email})'
+            for s in user_error_servers[:10]
+        )
+        notify_admin.delay(
+            f'⚠️ {user_error_servers.count()} user server(s) in error >24h: {details}'
+        )
 
 
 # ============== SERVER POOL MANAGEMENT ==============
@@ -615,19 +622,22 @@ def assign_server_to_user(user_id):
         logger.info(f'User {user.email} already has server {existing.ip_address}')
         return
 
-    available_server = Server.objects.filter(
-        status='active',
-        profile__isnull=True,
-    ).first()
+    from django.db import transaction
 
-    if not available_server:
-        logger.warning(f'No servers in pool for {user.email}')
-        notify_admin.delay(f'⚠️ No pool servers for {user.email}! Creating new...')
-        provision_user_service.delay(user_id)
-        return
+    with transaction.atomic():
+        available_server = Server.objects.select_for_update().filter(
+            status='active',
+            profile__isnull=True,
+        ).first()
 
-    available_server.profile = profile
-    available_server.save()
+        if not available_server:
+            logger.warning(f'No servers in pool for {user.email}')
+            notify_admin.delay(f'⚠️ No pool servers for {user.email}! Creating new...')
+            provision_user_service.delay(user_id)
+            return
+
+        available_server.profile = profile
+        available_server.save()
 
     logger.info(f'Assigned server {available_server.ip_address} to {user.email}')
 
@@ -655,25 +665,20 @@ def assign_server_to_user(user_id):
         except Exception:
             pass
 
+        deploy_kwargs = dict(
+            openrouter_key=profile.openrouter_api_key,
+            telegram_token=profile.telegram_bot_token,
+            model_slug=profile.selected_model,
+            telegram_owner_id=telegram_owner_id,
+        )
         manager = ServerManager(available_server)
         try:
-            # Use quick deploy on warmed servers (~30s), full deploy as fallback
             if available_server.openclaw_running:
-                manager.quick_deploy_user(
-                    openrouter_key=profile.openrouter_api_key,
-                    telegram_token=profile.telegram_bot_token,
-                    model_slug=profile.selected_model,
-                    telegram_owner_id=telegram_owner_id,
-                )
+                manager.quick_deploy_user(**deploy_kwargs)
             else:
-                manager.deploy_openclaw(
-                    openrouter_key=profile.openrouter_api_key,
-                    telegram_token=profile.telegram_bot_token,
-                    model_slug=profile.selected_model,
-                    telegram_owner_id=telegram_owner_id,
-                )
+                manager.deploy_openclaw(**deploy_kwargs)
             available_server.openclaw_running = True
-            available_server.save()
+            available_server.save(update_fields=['openclaw_running'])
         except Exception as e:
             notify_error.delay('OpenClaw Deploy Failed', f'User: {user.email}\nError: {e}')
 
