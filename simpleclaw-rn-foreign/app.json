@@ -38,12 +38,7 @@
       "expo-font",
       "expo-video",
       "expo-apple-authentication",
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.1568931022-iil9topt7v2n8p6m97crp4tc410800mf"
-        }
-      ]
+      "@react-native-google-signin/google-signin"
     ]
   }
 }
