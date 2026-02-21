@@ -26,6 +26,7 @@ export const en = {
 
   // Plan
   planTitle: 'Choose your plan',
+  planSubtitle: 'Unlock full access to EasyClaw',
   planName: 'OpenClaw Pro',
   planPrice: '$49',
   planPeriod: '/month',

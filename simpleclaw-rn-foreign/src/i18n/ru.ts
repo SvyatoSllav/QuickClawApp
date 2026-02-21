@@ -26,6 +26,7 @@ export const ru = {
 
   // Plan
   planTitle: '\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u043B\u0430\u043D',
+  planSubtitle: '\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043F\u043E\u043B\u043D\u044B\u0439 \u0434\u043E\u0441\u0442\u0443\u043F \u043A EasyClaw',
   planName: 'OpenClaw Pro',
   planPrice: '$49',
   planPeriod: '/\u043C\u0435\u0441\u044F\u0446',

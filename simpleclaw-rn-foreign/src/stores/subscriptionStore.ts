@@ -1,14 +1,18 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
-import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import Purchases, { LOG_LEVEL, PurchasesPackage } from 'react-native-purchases';
 import { AppConfig } from '../config/appConfig';
 
 interface SubscriptionState {
   isSubscribed: boolean;
   loading: boolean;
   error: string | null;
+  packages: PurchasesPackage[];
+  selectedPackage: PurchasesPackage | null;
   initRevenueCat: (userId: string) => Promise<void>;
-  purchasePackage: () => Promise<boolean>;
+  loadOfferings: () => Promise<void>;
+  selectPackage: (pkg: PurchasesPackage) => void;
+  purchaseSelected: () => Promise<boolean>;
   presentPaywall: () => Promise<boolean>;
   presentCustomerCenter: () => Promise<void>;
   restorePurchases: () => Promise<boolean>;
@@ -16,10 +20,12 @@ interface SubscriptionState {
   logoutRevenueCat: () => Promise<void>;
 }
 
-export const useSubscriptionStore = create<SubscriptionState>((set) => ({
+export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   isSubscribed: false,
   loading: false,
   error: null,
+  packages: [],
+  selectedPackage: null,
 
   initRevenueCat: async (userId) => {
     try {
@@ -40,16 +46,34 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
     }
   },
 
-  purchasePackage: async () => {
+  loadOfferings: async () => {
     set({ loading: true, error: null });
     try {
       const offerings = await Purchases.getOfferings();
-      const pkg = offerings.current?.availablePackages[0];
-      if (!pkg) {
-        set({ loading: false, error: 'No packages available' });
-        return false;
-      }
+      const packages = offerings.current?.availablePackages ?? [];
+      set({
+        packages,
+        selectedPackage: packages[0] ?? null,
+        loading: false,
+      });
+    } catch (e) {
+      set({ loading: false, error: String(e) });
+    }
+  },
 
+  selectPackage: (pkg) => {
+    set({ selectedPackage: pkg });
+  },
+
+  purchaseSelected: async () => {
+    const pkg = get().selectedPackage;
+    if (!pkg) {
+      set({ error: 'No package selected' });
+      return false;
+    }
+
+    set({ loading: true, error: null });
+    try {
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
@@ -71,11 +95,10 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
     set({ loading: true, error: null });
     try {
       const RevenueCatUI = (await import('react-native-purchases-ui')).default;
-      const result = await RevenueCatUI.presentPaywallIfNeeded({
+      await RevenueCatUI.presentPaywallIfNeeded({
         requiredEntitlementIdentifier: AppConfig.revenueCatEntitlementId,
       });
 
-      // Check entitlement after paywall closes
       const customerInfo = await Purchases.getCustomerInfo();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
@@ -138,6 +161,6 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
     } catch {
       // ignore
     }
-    set({ isSubscribed: false });
+    set({ isSubscribed: false, packages: [], selectedPackage: null });
   },
 }));
