@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { View, FlatList, KeyboardAvoidingView, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { ArrowDown } from 'lucide-react-native';
@@ -44,12 +44,23 @@ export default function ChatScreen() {
     connectionState !== 'connected' || isLoadingHistory
   );
 
+  // Use ref for connection params so the effect only triggers on isReady
+  const connectionRef = useRef({ ipAddress: '', gatewayToken: '' });
   useEffect(() => {
-    if (isReady && ipAddress) {
-      useChatStore.getState().connect(ipAddress, gatewayToken ?? '');
+    connectionRef.current = { ipAddress: ipAddress ?? '', gatewayToken: gatewayToken ?? '' };
+    console.log('[chat] connectionRef updated: ip=' + (ipAddress ?? 'null') + ' token=' + (gatewayToken ? gatewayToken.substring(0, 8) + '...' : 'null'));
+  }, [ipAddress, gatewayToken]);
+
+  useEffect(() => {
+    console.log('[chat] Connection effect: isReady=' + isReady + ' ip=' + connectionRef.current.ipAddress);
+    if (isReady && connectionRef.current.ipAddress) {
+      useChatStore.getState().connect(connectionRef.current.ipAddress, connectionRef.current.gatewayToken);
     }
-    return () => useChatStore.getState().disconnect();
-  }, [isReady, ipAddress, gatewayToken]);
+    return () => {
+      console.log('[chat] Effect cleanup: disconnecting');
+      useChatStore.getState().disconnect();
+    };
+  }, [isReady]);
 
   useEffect(() => {
     if (connectionState === 'connected') {

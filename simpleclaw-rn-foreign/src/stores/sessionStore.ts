@@ -19,10 +19,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   isLoading: false,
 
   fetchSessions: () => {
+    console.log('[sessions] fetchSessions starting...');
     set({ isLoading: true });
     const { sendRequest } = useChatStore.getState();
     const activeAgentId = useAgentStore.getState().activeAgentId;
     sendRequest('sessions.list', activeAgentId ? { agentId: activeAgentId } : {}, (data) => {
+      console.log('[sessions] sessions.list response:', data.ok ? (data.result?.sessions?.length + ' sessions') : 'FAILED', data.error || '');
       if (data.ok && data.result?.sessions) {
         const activeAgentId = useAgentStore.getState().activeAgentId;
         const prefix = activeAgentId ? `agent:${activeAgentId}:` : '';
@@ -37,13 +39,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
             kind: s.kind ?? 'direct',
             totalTokens: s.totalTokens,
           }));
+        console.log('[sessions] Filtered sessions:', sessions.length, 'for prefix:', prefix);
         set({ sessions, isLoading: false });
 
         const serverModel = data.result?.defaults?.model;
         if (serverModel) {
+          console.log('[sessions] Server model:', serverModel);
           useChatStore.getState().syncModelFromServer(serverModel);
         }
       } else {
+        console.error('[sessions] fetchSessions failed:', data.error);
         set({ isLoading: false });
       }
     });

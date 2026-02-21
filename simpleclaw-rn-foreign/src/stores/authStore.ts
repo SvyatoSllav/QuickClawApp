@@ -48,41 +48,51 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initComplete: false,
 
   init: async () => {
+    console.log('[auth] init() starting');
     const token = await getAuthToken();
     if (!token) {
+      console.log('[auth] No saved token, skipping init');
       set({ initComplete: true });
       return;
     }
 
+    console.log('[auth] Token found, loading profile...');
     set({ authToken: token, isAuthenticated: true, loading: true });
 
     try {
       await get().loadProfile();
+      console.log('[auth] Profile loaded. subscriptionStatus:', get().profile?.subscriptionStatus, 'model:', get().profile?.selectedModel);
 
-      // Initialize RevenueCat if we have a user
       const user = get().user;
       if (user) {
         const subStore = useSubscriptionStore.getState();
         await subStore.initRevenueCat(String(user.id));
         await subStore.checkEntitlement();
+        console.log('[auth] RevenueCat check done. isSubscribed:', subStore.isSubscribed);
       }
 
-      // Backend subscription fallback (web where RevenueCat is unavailable)
       const backendStatus = get().profile?.subscriptionStatus;
       if (!useSubscriptionStore.getState().isSubscribed &&
           (backendStatus === 'active' || backendStatus === 'cancelling')) {
+        console.log('[auth] Backend subscription fallback: marking subscribed (status:', backendStatus, ')');
         useSubscriptionStore.setState({ isSubscribed: true });
       }
 
-      // Fetch server status so ChatScreen can connect
       if (useSubscriptionStore.getState().isSubscribed) {
+        console.log('[auth] User subscribed, checking deploy status...');
         await useDeployStore.getState().checkStatus();
+        const ds = useDeployStore.getState();
+        console.log('[auth] Deploy status: isReady:', ds.isReady, 'ip:', ds.ipAddress, 'token:', ds.gatewayToken ? ds.gatewayToken.substring(0, 8) + '...' : 'null');
+      } else {
+        console.log('[auth] User NOT subscribed, skipping deploy check');
       }
-    } catch {
+    } catch (e) {
+      console.error('[auth] init() error, logging out:', e);
       await get().logout();
     }
 
     set({ loading: false, initComplete: true });
+    console.log('[auth] init() complete');
   },
 
   signInApple: async () => {
@@ -131,32 +141,37 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   afterAuthFlow: async () => {
+    console.log('[auth] afterAuthFlow() starting');
     await get().loadProfile();
+    console.log('[auth] Profile loaded. subscriptionStatus:', get().profile?.subscriptionStatus);
 
-    // Mark onboarding complete
     await useOnboardingStore.getState().completeOnboarding();
 
-    // Init RevenueCat (native only; noop on web)
     const user = get().user;
     if (user) {
       const subStore = useSubscriptionStore.getState();
       await subStore.initRevenueCat(String(user.id));
       await subStore.checkEntitlement();
+      console.log('[auth] RevenueCat check done. isSubscribed:', subStore.isSubscribed);
     }
 
-    // Check subscription: RevenueCat (native) OR backend profile (web fallback)
     const rcSubscribed = useSubscriptionStore.getState().isSubscribed;
     const backendStatus = get().profile?.subscriptionStatus;
     const isSubscribed = rcSubscribed || backendStatus === 'active' || backendStatus === 'cancelling';
+    console.log('[auth] Subscription check: rc:', rcSubscribed, 'backend:', backendStatus, 'final:', isSubscribed);
 
     if (isSubscribed) {
       useSubscriptionStore.setState({ isSubscribed: true });
-      // Fetch server status so ChatScreen can connect
+      console.log('[auth] Fetching deploy status...');
       await useDeployStore.getState().checkStatus();
+      const ds = useDeployStore.getState();
+      console.log('[auth] Deploy status: isReady:', ds.isReady, 'ip:', ds.ipAddress, 'token:', ds.gatewayToken ? ds.gatewayToken.substring(0, 8) + '...' : 'null');
     }
 
+    const targetScreen = isSubscribed ? 'chat' : 'plan';
+    console.log('[auth] afterAuthFlow() done. Navigating to:', targetScreen);
     set({ loading: false });
-    useNavigationStore.getState().setScreen(isSubscribed ? 'chat' : 'plan');
+    useNavigationStore.getState().setScreen(targetScreen);
   },
 
   loadProfile: async () => {

@@ -39,7 +39,11 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   selectedPackage: null,
 
   initRevenueCat: async (userId) => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web') {
+      console.log('[subscription] initRevenueCat skipped (web)');
+      return;
+    }
+    console.log('[subscription] initRevenueCat for user:', userId);
     try {
       const apiKey =
         Platform.OS === 'ios'
@@ -61,19 +65,23 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   loadOfferings: async () => {
     if (Platform.OS === 'web') {
+      console.log('[subscription] loadOfferings skipped (web)');
       set({ loading: false, packages: [], selectedPackage: null });
       return;
     }
+    console.log('[subscription] loadOfferings starting...');
     set({ loading: true, error: null });
     try {
       const offerings = await getPurchases().getOfferings();
       const packages = offerings.current?.availablePackages ?? [];
+      console.log('[subscription] loadOfferings: found', packages.length, 'packages');
       set({
         packages,
         selectedPackage: packages[0] ?? null,
         loading: false,
       });
     } catch (e) {
+      console.error('[subscription] loadOfferings error:', e);
       set({ loading: false, error: String(e) });
     }
   },
@@ -160,25 +168,31 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   checkEntitlement: async () => {
-    if (Platform.OS === 'web') return false;
+    if (Platform.OS === 'web') {
+      console.log('[subscription] checkEntitlement skipped (web)');
+      return false;
+    }
     try {
       const customerInfo = await getPurchases().getCustomerInfo();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
-
+      console.log('[subscription] checkEntitlement:', isActive, 'entitlementId:', AppConfig.revenueCatEntitlementId);
       set({ isSubscribed: isActive });
       return isActive;
-    } catch {
+    } catch (e) {
+      console.error('[subscription] checkEntitlement error:', e);
       return false;
     }
   },
 
   webPurchase: async () => {
+    console.log('[subscription] webPurchase starting...');
     set({ loading: true, error: null });
     try {
       const { useAuthStore } = require('./authStore');
       const userId = useAuthStore.getState().user?.id;
+      console.log('[subscription] webPurchase userId:', userId);
       if (!userId) throw new Error('Not authenticated');
 
       await apiClient.post('/payments/webhook/revenuecat/', {
@@ -190,9 +204,11 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       });
 
       await useAuthStore.getState().loadProfile();
+      console.log('[subscription] webPurchase SUCCESS');
       set({ isSubscribed: true, loading: false });
       return true;
     } catch (e) {
+      console.error('[subscription] webPurchase ERROR:', e);
       set({ loading: false, error: String(e) });
       return false;
     }

@@ -24,10 +24,12 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   isLoading: false,
 
   fetchAgents: () => {
+    console.log('[agents] fetchAgents starting...');
     set({ isLoading: true });
     const { sendRequest } = useChatStore.getState();
 
     sendRequest('agents.list', {}, (data) => {
+      console.log('[agents] agents.list response:', data.ok ? (data.result?.agents?.length + ' agents, defaultId: ' + data.result?.defaultId) : 'FAILED', data.error || '');
       if (data.ok && data.result?.agents) {
         const agentsList: Agent[] = data.result.agents.map((a: any) => ({
           id: a.id,
@@ -37,8 +39,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
         const serverDefaultId = data.result.defaultId ?? agentsList[0]?.id ?? null;
 
-        // Enrich agents with skills from config.get (agents.list doesn't include them)
         sendRequest('config.get', {}, (cfgData) => {
+          console.log('[agents] config.get response:', cfgData.ok ? 'ok' : 'FAILED', cfgData.error || '');
           if (cfgData.ok && cfgData.result?.config?.agents?.list) {
             const configAgents = cfgData.result.config.agents.list as any[];
             for (const agent of agentsList) {
@@ -50,16 +52,17 @@ export const useAgentStore = create<AgentState>((set, get) => ({
             }
           }
 
-          // Read saved preference from local storage, fall back to server default
           getItem(ACTIVE_AGENT_KEY).then((savedId) => {
             const validSaved = savedId && agentsList.some((a) => a.id === savedId) ? savedId : null;
             const activeId = validSaved ?? serverDefaultId;
+            console.log('[agents] Active agent:', activeId, '(saved:', savedId, 'default:', serverDefaultId, ')');
 
             set({ agents: agentsList, defaultAgentId: serverDefaultId, activeAgentId: activeId, isLoading: false });
 
             if (activeId) {
               const chat = useChatStore.getState();
               const sessionKey = `agent:${activeId}:main`;
+              console.log('[agents] Setting session key:', sessionKey, '+ loading history + fetching sessions');
               chat.setActiveSessionKey(sessionKey);
               chat.loadHistory(sessionKey);
               useSessionStore.getState().fetchSessions();
@@ -67,6 +70,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           });
         });
       } else {
+        console.error('[agents] fetchAgents failed:', data.error);
         set({ isLoading: false });
       }
     });
