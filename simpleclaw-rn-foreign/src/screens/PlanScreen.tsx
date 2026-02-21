@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, ScrollView, ActivityIndicator, Pressable, Platform, StyleSheet } from 'react-native';
+import { View, ScrollView, ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
@@ -89,7 +89,6 @@ export default function PlanScreen() {
   const selectPackage = useSubscriptionStore((s) => s.selectPackage);
   const loadOfferings = useSubscriptionStore((s) => s.loadOfferings);
   const purchaseSelected = useSubscriptionStore((s) => s.purchaseSelected);
-  const webPurchase = useSubscriptionStore((s) => s.webPurchase);
   const restorePurchases = useSubscriptionStore((s) => s.restorePurchases);
   const loading = useSubscriptionStore((s) => s.loading);
   const error = useSubscriptionStore((s) => s.error);
@@ -101,9 +100,7 @@ export default function PlanScreen() {
   }, []);
 
   const handleSubscribe = async () => {
-    const success = Platform.OS === 'web'
-      ? await webPurchase()
-      : await purchaseSelected();
+    const success = await purchaseSelected();
     if (success) {
       await useDeployStore.getState().checkStatus();
       setScreen('chat');
