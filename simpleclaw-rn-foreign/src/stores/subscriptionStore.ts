@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
 import { AppConfig } from '../config/appConfig';
+import apiClient from '../api/client';
 
 // Lazy-load RevenueCat only on native (crashes Metro on web)
 function getPurchases() {
@@ -26,6 +27,7 @@ interface SubscriptionState {
   presentCustomerCenter: () => Promise<void>;
   restorePurchases: () => Promise<boolean>;
   checkEntitlement: () => Promise<boolean>;
+  webPurchase: () => Promise<boolean>;
   logoutRevenueCat: () => Promise<void>;
 }
 
@@ -168,6 +170,30 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       set({ isSubscribed: isActive });
       return isActive;
     } catch {
+      return false;
+    }
+  },
+
+  webPurchase: async () => {
+    set({ loading: true, error: null });
+    try {
+      const { useAuthStore } = require('./authStore');
+      const userId = useAuthStore.getState().user?.id;
+      if (!userId) throw new Error('Not authenticated');
+
+      await apiClient.post('/payments/webhook/revenuecat/', {
+        event: {
+          type: 'INITIAL_PURCHASE',
+          app_user_id: String(userId),
+          expiration_at_ms: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        },
+      });
+
+      await useAuthStore.getState().loadProfile();
+      set({ isSubscribed: true, loading: false });
+      return true;
+    } catch (e) {
+      set({ loading: false, error: String(e) });
       return false;
     }
   },

@@ -89,6 +89,7 @@ export default function PlanScreen() {
   const selectPackage = useSubscriptionStore((s) => s.selectPackage);
   const loadOfferings = useSubscriptionStore((s) => s.loadOfferings);
   const purchaseSelected = useSubscriptionStore((s) => s.purchaseSelected);
+  const webPurchase = useSubscriptionStore((s) => s.webPurchase);
   const restorePurchases = useSubscriptionStore((s) => s.restorePurchases);
   const loading = useSubscriptionStore((s) => s.loading);
   const error = useSubscriptionStore((s) => s.error);
@@ -99,11 +100,10 @@ export default function PlanScreen() {
     loadOfferings();
   }, []);
 
-  const isWeb = Platform.OS === 'web';
-
   const handleSubscribe = async () => {
-    if (isWeb) return;
-    const success = await purchaseSelected();
+    const success = Platform.OS === 'web'
+      ? await webPurchase()
+      : await purchaseSelected();
     if (success) {
       await useDeployStore.getState().checkStatus();
       setScreen('chat');
@@ -183,32 +183,24 @@ export default function PlanScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        {isWeb ? (
-          <Text style={{ textAlign: 'center', color: '#8B8B8B', fontSize: 14 }}>
-            {t('webPurchaseNotice', 'Purchases are available in the iOS and Android app')}
-          </Text>
-        ) : (
-          <>
-            <Button
-              onPress={handleSubscribe}
-              disabled={loading || (!selectedPackage && packages.length > 0)}
-              className="w-full"
-              style={{ backgroundColor: colors.primary }}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>{t('continue')}</Text>
-              )}
-            </Button>
+        <Button
+          onPress={handleSubscribe}
+          disabled={loading || (!selectedPackage && packages.length > 0)}
+          className="w-full"
+          style={{ backgroundColor: colors.primary }}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>{t('continue')}</Text>
+          )}
+        </Button>
 
-            <Button variant="ghost" onPress={handleRestore} disabled={loading}>
-              <Text className="text-xs font-medium uppercase" style={{ letterSpacing: 2, color: colors.foreground }}>
-                {t('restorePurchases')}
-              </Text>
-            </Button>
-          </>
-        )}
+        <Button variant="ghost" onPress={handleRestore} disabled={loading}>
+          <Text className="text-xs font-medium uppercase" style={{ letterSpacing: 2, color: colors.foreground }}>
+            {t('restorePurchases')}
+          </Text>
+        </Button>
       </View>
     </View>
   );
