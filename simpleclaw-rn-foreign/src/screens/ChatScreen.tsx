@@ -9,6 +9,7 @@ import ChatHeader from '../components/chat/ChatHeader';
 import ChatInput from '../components/chat/ChatInput';
 import MessageBubble from '../components/chat/MessageBubble';
 import ConnectingOverlay from '../components/chat/ConnectingOverlay';
+import SpinnerIcon from '../components/ui/SpinnerIcon';
 import { Text } from '@/components/ui/text';
 import { colors } from '../config/colors';
 
@@ -24,6 +25,7 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fabOpacity = useSharedValue(0);
+  const prevMessageCount = useRef(0);
 
   // Filter out blank assistant messages except the last one (loading indicator)
   const visibleMessages = React.useMemo(() => {
@@ -36,6 +38,11 @@ export default function ChatScreen() {
       return true;
     });
   }, [messages]);
+
+  // Loading state: server ready but WS not connected yet, or history still fetching
+  const isInitialLoading = isReady && messages.length === 0 && (
+    connectionState !== 'connected' || isLoadingHistory
+  );
 
   useEffect(() => {
     if (isReady && ipAddress) {
@@ -50,16 +57,25 @@ export default function ChatScreen() {
     }
   }, [connectionState]);
 
+  // Auto-scroll when new messages arrive
   useEffect(() => {
-    if (visibleMessages.length > 0 && isAtBottom) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    if (visibleMessages.length > 0) {
+      const wasEmpty = prevMessageCount.current === 0;
+      if (wasEmpty || isAtBottom) {
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: !wasEmpty }), 100);
+      }
+      prevMessageCount.current = visibleMessages.length;
     }
   }, [visibleMessages.length]);
 
+  // Scroll to bottom when history finishes loading
   const prevLoading = useRef(isLoadingHistory);
   useEffect(() => {
     if (prevLoading.current && !isLoadingHistory) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 150);
+      flatListRef.current?.scrollToEnd({ animated: false });
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 300);
+      setIsAtBottom(true);
     }
     prevLoading.current = isLoadingHistory;
   }, [isLoadingHistory]);
@@ -87,7 +103,7 @@ export default function ChatScreen() {
     pointerEvents: fabOpacity.value === 0 ? 'none' as const : 'auto' as const,
   }));
 
-  const showEmptyState = isReady && visibleMessages.length === 0;
+  const showEmptyState = isReady && !isInitialLoading && visibleMessages.length === 0;
 
   return (
     <KeyboardAvoidingView
@@ -98,6 +114,10 @@ export default function ChatScreen() {
 
       {!isReady ? (
         <ConnectingOverlay />
+      ) : isInitialLoading ? (
+        <View style={localStyles.emptyState}>
+          <SpinnerIcon size={36} />
+        </View>
       ) : (
         <View style={{ flex: 1 }}>
           {showEmptyState ? (

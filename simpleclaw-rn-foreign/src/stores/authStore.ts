@@ -186,6 +186,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       profile,
       subscription,
     });
+
+    // Sync model from profile so ChatHeader shows correct model immediately
+    if (profile?.selectedModel) {
+      useChatStore.getState().syncModelFromServer(profile.selectedModel);
+    }
   },
 
   logout: async () => {
