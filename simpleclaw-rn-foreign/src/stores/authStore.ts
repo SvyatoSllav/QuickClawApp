@@ -66,6 +66,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await subStore.initRevenueCat(String(user.id));
         await subStore.checkEntitlement();
       }
+
+      // Backend subscription fallback (web where RevenueCat is unavailable)
+      const backendStatus = get().profile?.subscriptionStatus;
+      if (!useSubscriptionStore.getState().isSubscribed &&
+          (backendStatus === 'active' || backendStatus === 'cancelling')) {
+        useSubscriptionStore.setState({ isSubscribed: true });
+      }
+
+      // Fetch server status so ChatScreen can connect
+      if (useSubscriptionStore.getState().isSubscribed) {
+        await useDeployStore.getState().checkStatus();
+      }
     } catch {
       await get().logout();
     }
@@ -124,7 +136,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Mark onboarding complete
     await useOnboardingStore.getState().completeOnboarding();
 
-    // Init RevenueCat
+    // Init RevenueCat (native only; noop on web)
     const user = get().user;
     if (user) {
       const subStore = useSubscriptionStore.getState();
@@ -132,7 +144,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await subStore.checkEntitlement();
     }
 
-    const isSubscribed = useSubscriptionStore.getState().isSubscribed;
+    // Check subscription: RevenueCat (native) OR backend profile (web fallback)
+    const rcSubscribed = useSubscriptionStore.getState().isSubscribed;
+    const backendStatus = get().profile?.subscriptionStatus;
+    const isSubscribed = rcSubscribed || backendStatus === 'active' || backendStatus === 'cancelling';
+
+    if (isSubscribed) {
+      useSubscriptionStore.setState({ isSubscribed: true });
+      // Fetch server status so ChatScreen can connect
+      await useDeployStore.getState().checkStatus();
+    }
 
     set({ loading: false });
     useNavigationStore.getState().setScreen(isSubscribed ? 'chat' : 'plan');
