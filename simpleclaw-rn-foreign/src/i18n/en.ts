@@ -65,6 +65,7 @@ export const en = {
   cancelConfirm: 'Are you sure you want to cancel your subscription?',
   subscriptionCancelled: 'Subscription cancelled. It will remain active until the end of the current period.',
   noSubscription: 'No active subscription',
+  upgradePlan: 'Upgrade Plan',
   logout: 'Log out',
 
   // Integrations

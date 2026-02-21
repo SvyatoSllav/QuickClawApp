@@ -93,6 +93,7 @@ export default function PlanScreen() {
   const loading = useSubscriptionStore((s) => s.loading);
   const error = useSubscriptionStore((s) => s.error);
   const setScreen = useNavigationStore((s) => s.setScreen);
+  const goBack = useNavigationStore((s) => s.goBack);
 
   useEffect(() => {
     loadOfferings();
@@ -114,6 +115,13 @@ export default function PlanScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Button variant="ghost" size="sm" onPress={goBack}>
+          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.foreground }}>{t('back')}</Text>
+        </Button>
+        <Text style={styles.headerTitle}>{t('planTitle')}</Text>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent} style={{ flex: 1 }}>
         <Text style={styles.sectionLabel}>ACCESS</Text>
 
@@ -198,9 +206,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: {
+    fontWeight: '700',
+    fontSize: 18,
+    marginLeft: 8,
+    color: colors.foreground,
+  },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 64,
+    paddingTop: 24,
     paddingBottom: 32,
   },
   sectionLabel: {

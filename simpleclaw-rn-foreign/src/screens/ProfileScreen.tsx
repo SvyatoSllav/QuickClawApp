@@ -23,6 +23,7 @@ export default function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
   const loadProfile = useAuthStore((s) => s.loadProfile);
   const goBack = useNavigationStore((s) => s.goBack);
+  const setScreen = useNavigationStore((s) => s.setScreen);
   const usage = useUsageStore();
   const presentCustomerCenter = useSubscriptionStore((s) => s.presentCustomerCenter);
   const [showTelegramSheet, setShowTelegramSheet] = useState(false);
@@ -125,8 +126,18 @@ export default function ProfileScreen() {
 
         {!subscription?.isActive && (
           <Card>
-            <CardContent>
+            <CardHeader>
+              <Text style={localStyles.sectionLabel}>SUBSCRIPTION</Text>
+            </CardHeader>
+            <CardContent className="gap-4">
               <Text variant="muted">{t('noSubscription')}</Text>
+              <Button
+                onPress={() => setScreen('plan')}
+                className="w-full"
+                style={{ backgroundColor: colors.primary }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>{t('upgradePlan', 'Upgrade Plan')}</Text>
+              </Button>
             </CardContent>
           </Card>
         )}
