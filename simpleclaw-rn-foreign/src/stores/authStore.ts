@@ -32,7 +32,6 @@ interface AuthState {
   signInApple: () => Promise<void>;
   signInGoogle: () => Promise<void>;
   afterAuthFlow: () => Promise<void>;
-  skipAuth: () => Promise<void>;
   loadProfile: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -52,30 +51,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const token = await getAuthToken();
     if (!token) {
       set({ initComplete: true });
-      return;
-    }
-
-    // Restore test session in dev mode
-    if (__DEV__ && token === 'test-token') {
-      // Set all external stores BEFORE initComplete to avoid race conditions
-      // (initComplete triggers re-render; all state must be ready by then)
-      await useOnboardingStore.getState().completeOnboarding();
-      useSubscriptionStore.setState({ isSubscribed: true });
-      useDeployStore.setState({
-        assigned: true,
-        openclawRunning: true,
-        isReady: true,
-        ipAddress: '194.87.226.98',
-        gatewayToken: 'mBDiG-b2PczPIWCywnEp8L0IJ7q-zcPHsBAoAiZq3i0',
-      });
-      set({
-        authToken: token,
-        isAuthenticated: true,
-        user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
-        loading: false,
-        initComplete: true,
-      });
-      useNavigationStore.getState().setScreen('chat');
       return;
     }
 
@@ -123,18 +98,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signInGoogle: async () => {
     set({ loading: true, error: null });
 
-    // Dev mock — auto-auth with test account
-    if (__DEV__) {
-      await setAuthToken('test-token');
-      set({
-        authToken: 'test-token',
-        user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
-        isAuthenticated: true,
-      });
-      await get().afterAuthFlow();
-      return;
-    }
-
     try {
       const result = await googleSignIn();
       const authResponse =
@@ -155,34 +118,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  skipAuth: async () => {
-    set({ loading: true, error: null });
-    await setAuthToken('test-token');
-    set({
-      authToken: 'test-token',
-      user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
-      isAuthenticated: true,
-    });
-    await get().afterAuthFlow();
-  },
-
   afterAuthFlow: async () => {
-    // Dev mock — connect to real OpenClaw server for testing
-    if (__DEV__) {
-      await useOnboardingStore.getState().completeOnboarding();
-      useSubscriptionStore.setState({ isSubscribed: true });
-      useDeployStore.setState({
-        assigned: true,
-        openclawRunning: true,
-        isReady: true,
-        ipAddress: '194.87.226.98',
-        gatewayToken: 'mBDiG-b2PczPIWCywnEp8L0IJ7q-zcPHsBAoAiZq3i0',
-      });
-      set({ loading: false });
-      useNavigationStore.getState().setScreen('chat');
-      return;
-    }
-
     await get().loadProfile();
 
     // Mark onboarding complete
