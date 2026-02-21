@@ -898,7 +898,14 @@ limits:
             self.configure_token_optimization(model_slug)
             self.install_session_watchdog()
 
+            # Prune unused built-in skills
+            self.prune_builtin_skills()
+
+            # Install multi-agent workspace files and config (with OpenRouter auth)
+            self.install_agents(openrouter_key=openrouter_key)
+
             # Apply user-specific config (auth-profiles, telegram) with retry
+            # This runs AFTER install_agents so it has the final say on auth/model
             config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model, telegram_owner_id)
 
             if not config_ok:
@@ -913,12 +920,6 @@ limits:
                 self.server.last_error = 'Quick deploy config verification failed'
                 self.server.save()
                 return False
-
-            # Prune unused built-in skills
-            self.prune_builtin_skills()
-
-            # Install multi-agent workspace files and config
-            self.install_agents()
 
             # Start browser with headless profile (CLI still works at this point)
             self.exec_command(
@@ -1217,10 +1218,11 @@ limits:
             # Prune unused built-in skills
             self.prune_builtin_skills()
 
-            # Install multi-agent workspace files and config
-            self.install_agents()
+            # Install multi-agent workspace files and config (with OpenRouter auth)
+            self.install_agents(openrouter_key=openrouter_key)
 
             # Apply config with restart + verify (includes restart cycle)
+            # Runs AFTER install_agents so it has the final say on auth/model
             config_ok = self._apply_config_with_retry(openrouter_key, openrouter_model, telegram_owner_id)
 
             if not config_ok:
@@ -1467,12 +1469,19 @@ limits:
     AGENT_IDS = ['researcher', 'writer', 'coder', 'analyst', 'assistant']
     AGENT_FILES = ['SOUL.md', 'IDENTITY.md', 'TOOLS.md']
 
-    def install_agents(self):
+    def install_agents(self, openrouter_key=None):
         """Deploy multi-agent workspace files and config to the OpenClaw container.
 
         Copies SOUL.md, IDENTITY.md, TOOLS.md for each agent into
         /home/node/.openclaw/agents/{id}/ and applies the agents config
         via openclaw.json merge.
+
+        All agent models are forced to use OpenRouter provider. The model
+        from openclaw-agents.json is used as default, but the openrouter/
+        prefix is always enforced.
+
+        If openrouter_key is provided, writes auth-profiles with
+        default=openrouter to main + all sub-agents, ensuring no drift.
         """
         import os
 
@@ -1533,6 +1542,14 @@ limits:
 
         # Merge agents config
         agents_config = json_mod.loads(agents_json)
+
+        # CRITICAL: Enforce openrouter/ prefix on ALL agent models.
+        # The agents JSON may have models without the prefix — force it.
+        for agent in agents_config.get('agents', {}).get('list', []):
+            model = agent.get('model', '')
+            if model and not model.startswith('openrouter/'):
+                agent['model'] = f'openrouter/{model}'
+
         config['agents'] = agents_config['agents']
 
         # Write merged config back
@@ -1541,20 +1558,41 @@ limits:
         self.exec_command(f'cp /tmp/_oc_agents.json {vol_path}')
         self.exec_command('rm -f /tmp/_oc_agents.json')
 
-        # Copy auth-profiles.json and models.json from main agent to custom agents
-        # (main agent's auth is the source of truth for API keys/model routing)
+        # Ensure main agent dir exists (warm_deploy_standby doesn't create it)
         main_agent_dir = '/home/node/.openclaw/agents/main/agent'
-        for agent_id in self.AGENT_IDS:
-            agent_auth_dir = f'/home/node/.openclaw/agents/{agent_id}/agent'
-            self.exec_command(
-                f'docker exec -u root openclaw mkdir -p {agent_auth_dir}'
-            )
-            for fname in ['auth-profiles.json', 'models.json']:
+        self.exec_command(f'docker exec -u root openclaw mkdir -p {main_agent_dir}')
+
+        # Write auth-profiles with default=openrouter to ALL agents
+        if openrouter_key:
+            auth_profiles = json_mod.dumps({
+                "profiles": {
+                    "openrouter": {
+                        "provider": "openrouter",
+                        "apiKey": openrouter_key
+                    }
+                },
+                "default": "openrouter"
+            })
+            self.upload_file(auth_profiles, '/tmp/_openclaw_auth.json')
+            for agent_id in ['main'] + self.AGENT_IDS:
+                agent_auth_dir = f'/home/node/.openclaw/agents/{agent_id}/agent'
+                self.exec_command(f'docker exec -u root openclaw mkdir -p {agent_auth_dir}')
                 self.exec_command(
-                    f'docker exec -u root openclaw sh -c '
-                    f'"[ -f {main_agent_dir}/{fname} ] && '
-                    f'cp {main_agent_dir}/{fname} {agent_auth_dir}/{fname} || true"'
+                    f'docker cp /tmp/_openclaw_auth.json openclaw:{agent_auth_dir}/auth-profiles.json'
                 )
+            self.exec_command('rm -f /tmp/_openclaw_auth.json')
+            logger.info(f'Auth-profiles (default=openrouter) written to all agents on {self.server.ip_address}')
+        else:
+            # No key provided — copy from main agent to sub-agents if main exists
+            for agent_id in self.AGENT_IDS:
+                agent_auth_dir = f'/home/node/.openclaw/agents/{agent_id}/agent'
+                self.exec_command(f'docker exec -u root openclaw mkdir -p {agent_auth_dir}')
+                for fname in ['auth-profiles.json', 'models.json']:
+                    self.exec_command(
+                        f'docker exec -u root openclaw sh -c '
+                        f'"[ -f {main_agent_dir}/{fname} ] && '
+                        f'cp {main_agent_dir}/{fname} {agent_auth_dir}/{fname} || true"'
+                    )
 
         # Fix permissions
         self.exec_command(
