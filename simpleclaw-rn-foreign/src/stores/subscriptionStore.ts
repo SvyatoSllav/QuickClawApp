@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
+import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import { AppConfig } from '../config/appConfig';
 
 interface SubscriptionState {
@@ -7,8 +8,9 @@ interface SubscriptionState {
   loading: boolean;
   error: string | null;
   initRevenueCat: (userId: string) => Promise<void>;
-  loadOfferings: () => Promise<void>;
   purchasePackage: () => Promise<boolean>;
+  presentPaywall: () => Promise<boolean>;
+  presentCustomerCenter: () => Promise<void>;
   restorePurchases: () => Promise<boolean>;
   checkEntitlement: () => Promise<boolean>;
   logoutRevenueCat: () => Promise<void>;
@@ -21,7 +23,6 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
 
   initRevenueCat: async (userId) => {
     try {
-      const Purchases = await import('react-native-purchases');
       const apiKey =
         Platform.OS === 'ios'
           ? AppConfig.revenueCatApiKeyIos
@@ -29,35 +30,27 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
 
       if (!apiKey) return;
 
-      Purchases.default.configure({ apiKey, appUserID: userId });
+      if (__DEV__) {
+        Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+      }
+
+      Purchases.configure({ apiKey, appUserID: userId });
     } catch (e) {
       console.warn('RevenueCat init failed:', e);
-    }
-  },
-
-  loadOfferings: async () => {
-    set({ loading: true, error: null });
-    try {
-      const Purchases = await import('react-native-purchases');
-      await Purchases.default.getOfferings();
-      set({ loading: false });
-    } catch (e) {
-      set({ loading: false, error: String(e) });
     }
   },
 
   purchasePackage: async () => {
     set({ loading: true, error: null });
     try {
-      const Purchases = await import('react-native-purchases');
-      const offerings = await Purchases.default.getOfferings();
+      const offerings = await Purchases.getOfferings();
       const pkg = offerings.current?.availablePackages[0];
       if (!pkg) {
         set({ loading: false, error: 'No packages available' });
         return false;
       }
 
-      const { customerInfo } = await Purchases.default.purchasePackage(pkg);
+      const { customerInfo } = await Purchases.purchasePackage(pkg);
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -74,11 +67,45 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
     }
   },
 
+  presentPaywall: async () => {
+    set({ loading: true, error: null });
+    try {
+      const RevenueCatUI = (await import('react-native-purchases-ui')).default;
+      const result = await RevenueCatUI.presentPaywallIfNeeded({
+        requiredEntitlementIdentifier: AppConfig.revenueCatEntitlementId,
+      });
+
+      // Check entitlement after paywall closes
+      const customerInfo = await Purchases.getCustomerInfo();
+      const isActive =
+        customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
+        undefined;
+
+      set({ isSubscribed: isActive, loading: false });
+      return isActive;
+    } catch (e: any) {
+      if (e.userCancelled) {
+        set({ loading: false });
+        return false;
+      }
+      set({ loading: false, error: String(e) });
+      return false;
+    }
+  },
+
+  presentCustomerCenter: async () => {
+    try {
+      const RevenueCatUI = (await import('react-native-purchases-ui')).default;
+      await RevenueCatUI.presentCustomerCenter();
+    } catch (e) {
+      console.warn('Customer Center failed:', e);
+    }
+  },
+
   restorePurchases: async () => {
     set({ loading: true, error: null });
     try {
-      const Purchases = await import('react-native-purchases');
-      const customerInfo = await Purchases.default.restorePurchases();
+      const customerInfo = await Purchases.restorePurchases();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -93,8 +120,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
 
   checkEntitlement: async () => {
     try {
-      const Purchases = await import('react-native-purchases');
-      const customerInfo = await Purchases.default.getCustomerInfo();
+      const customerInfo = await Purchases.getCustomerInfo();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -108,8 +134,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
 
   logoutRevenueCat: async () => {
     try {
-      const Purchases = await import('react-native-purchases');
-      await Purchases.default.logOut();
+      await Purchases.logOut();
     } catch {
       // ignore
     }
