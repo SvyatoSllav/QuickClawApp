@@ -1,7 +1,17 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
-import Purchases, { LOG_LEVEL, PurchasesPackage } from 'react-native-purchases';
 import { AppConfig } from '../config/appConfig';
+import apiClient from '../api/client';
+
+// Lazy-load RevenueCat only on native (crashes Metro on web)
+function getPurchases() {
+  return require('react-native-purchases').default;
+}
+function getLOG_LEVEL() {
+  return require('react-native-purchases').LOG_LEVEL;
+}
+
+type PurchasesPackage = any;
 
 interface SubscriptionState {
   isSubscribed: boolean;
@@ -17,6 +27,7 @@ interface SubscriptionState {
   presentCustomerCenter: () => Promise<void>;
   restorePurchases: () => Promise<boolean>;
   checkEntitlement: () => Promise<boolean>;
+  webPurchase: () => Promise<boolean>;
   logoutRevenueCat: () => Promise<void>;
 }
 
@@ -28,6 +39,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   selectedPackage: null,
 
   initRevenueCat: async (userId) => {
+    if (Platform.OS === 'web') return;
     try {
       const apiKey =
         Platform.OS === 'ios'
@@ -36,8 +48,9 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
       if (!apiKey) return;
 
+      const Purchases = getPurchases();
       if (__DEV__) {
-        Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+        Purchases.setLogLevel(getLOG_LEVEL().VERBOSE);
       }
 
       Purchases.configure({ apiKey, appUserID: userId });
@@ -47,9 +60,13 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   loadOfferings: async () => {
+    if (Platform.OS === 'web') {
+      set({ loading: false, packages: [], selectedPackage: null });
+      return;
+    }
     set({ loading: true, error: null });
     try {
-      const offerings = await Purchases.getOfferings();
+      const offerings = await getPurchases().getOfferings();
       const packages = offerings.current?.availablePackages ?? [];
       set({
         packages,
@@ -74,7 +91,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     set({ loading: true, error: null });
     try {
-      const { customerInfo } = await Purchases.purchasePackage(pkg);
+      const { customerInfo } = await getPurchases().purchasePackage(pkg);
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -99,7 +116,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
         requiredEntitlementIdentifier: AppConfig.revenueCatEntitlementId,
       });
 
-      const customerInfo = await Purchases.getCustomerInfo();
+      const customerInfo = await getPurchases().getCustomerInfo();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -126,9 +143,10 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   restorePurchases: async () => {
+    if (Platform.OS === 'web') return false;
     set({ loading: true, error: null });
     try {
-      const customerInfo = await Purchases.restorePurchases();
+      const customerInfo = await getPurchases().restorePurchases();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -142,8 +160,9 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   checkEntitlement: async () => {
+    if (Platform.OS === 'web') return false;
     try {
-      const customerInfo = await Purchases.getCustomerInfo();
+      const customerInfo = await getPurchases().getCustomerInfo();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -155,11 +174,37 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     }
   },
 
-  logoutRevenueCat: async () => {
+  webPurchase: async () => {
+    set({ loading: true, error: null });
     try {
-      await Purchases.logOut();
-    } catch {
-      // ignore
+      const { useAuthStore } = require('./authStore');
+      const userId = useAuthStore.getState().user?.id;
+      if (!userId) throw new Error('Not authenticated');
+
+      await apiClient.post('/payments/webhook/revenuecat/', {
+        event: {
+          type: 'INITIAL_PURCHASE',
+          app_user_id: String(userId),
+          expiration_at_ms: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        },
+      });
+
+      await useAuthStore.getState().loadProfile();
+      set({ isSubscribed: true, loading: false });
+      return true;
+    } catch (e) {
+      set({ loading: false, error: String(e) });
+      return false;
+    }
+  },
+
+  logoutRevenueCat: async () => {
+    if (Platform.OS !== 'web') {
+      try {
+        await getPurchases().logOut();
+      } catch {
+        // ignore
+      }
     }
     set({ isSubscribed: false, packages: [], selectedPackage: null });
   },
