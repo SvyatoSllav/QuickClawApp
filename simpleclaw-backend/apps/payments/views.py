@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone as dt_tz
 import logging
 from django.conf import settings
 from django.utils import timezone
@@ -171,8 +172,8 @@ class RevenueCatWebhookView(APIView):
                 expiration = data.get('event', {}).get('expiration_at_ms')
                 period_end = None
                 if expiration:
-                    period_end = timezone.datetime.fromtimestamp(
-                        expiration / 1000, tz=timezone.utc
+                    period_end = datetime.fromtimestamp(
+                        expiration / 1000, tz=dt_tz.utc
                     )
 
                 subscription, created = Subscription.objects.get_or_create(
@@ -182,7 +183,7 @@ class RevenueCatWebhookView(APIView):
                         'auto_renew': True,
                         'status': 'active',
                         'current_period_start': now,
-                        'current_period_end': period_end or now + timezone.timedelta(days=30),
+                        'current_period_end': period_end or now + timedelta(days=30),
                     }
                 )
 
@@ -191,7 +192,7 @@ class RevenueCatWebhookView(APIView):
                     subscription.auto_renew = True
                     subscription.status = 'active'
                     subscription.current_period_start = now
-                    subscription.current_period_end = period_end or now + timezone.timedelta(days=30)
+                    subscription.current_period_end = period_end or now + timedelta(days=30)
                     subscription.cancelled_at = None
                     subscription.save()
 
