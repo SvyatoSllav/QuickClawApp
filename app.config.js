@@ -31,6 +31,11 @@ module.exports = {
       favicon: "./assets/favicon.png",
       bundler: "metro",
     },
+    extra: {
+      eas: {
+        projectId: "5d712d93-9e58-46af-9b23-6d0203c93bde",
+      },
+    },
     plugins: [
       "expo-router",
       "expo-secure-store",
