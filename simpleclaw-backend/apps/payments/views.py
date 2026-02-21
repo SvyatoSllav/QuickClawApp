@@ -1,4 +1,5 @@
 import logging
+from django.conf import settings
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -139,6 +140,12 @@ class RevenueCatWebhookView(APIView):
         import sys
         import subprocess
         from django.contrib.auth.models import User
+
+        # Validate RevenueCat webhook authorization
+        auth_header = request.headers.get('Authorization', '')
+        expected_key = settings.REVENUECAT_WEBHOOK_AUTH_KEY
+        if expected_key and auth_header != f'Bearer {expected_key}':
+            return Response({'error': 'Unauthorized'}, status=401)
 
         try:
             data = request.data
