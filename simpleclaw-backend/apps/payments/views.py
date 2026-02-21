@@ -141,10 +141,12 @@ class RevenueCatWebhookView(APIView):
         import subprocess
         from django.contrib.auth.models import User
 
-        # Validate RevenueCat webhook authorization
+        # Validate: RevenueCat webhook key OR authenticated user
         auth_header = request.headers.get('Authorization', '')
         expected_key = settings.REVENUECAT_WEBHOOK_AUTH_KEY
-        if expected_key and auth_header != f'Bearer {expected_key}':
+        is_rc_auth = expected_key and auth_header == f'Bearer {expected_key}'
+        is_user_auth = request.user and request.user.is_authenticated
+        if not is_rc_auth and not is_user_auth:
             return Response({'error': 'Unauthorized'}, status=401)
 
         try:
