@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ModelId, ChatMessage, ChatAttachment, AVAILABLE_MODELS } from '../types/chat';
 import apiClient from '../api/client';
+import { setServerModel } from '../api/profileApi';
 
 type ResponseHandler = (data: { ok: boolean; result?: any; error?: any }) => void;
 
@@ -35,12 +36,23 @@ interface ChatState {
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let requestCounter = 0;
 
+/** Strip openrouter/<provider>/ prefix: "openrouter/minimax/minimax-m2.5" → "minimax-m2.5" */
+function stripOpenRouterPrefix(raw: string): string {
+  const parts = raw.split('/');
+  // openrouter/<provider>/<model> → take last part
+  if (parts.length >= 3 && parts[0] === 'openrouter') return parts.slice(2).join('/');
+  // openrouter/<model> → take last part
+  if (parts.length === 2 && parts[0] === 'openrouter') return parts[1];
+  return raw;
+}
+
 /** Resolve a server model string to a known ModelId */
 function resolveServerModel(serverModel: string): ModelId | null {
-  const normalized = serverModel.toLowerCase().replace(/[-._]/g, '');
+  const stripped = stripOpenRouterPrefix(serverModel);
+  const normalized = stripped.toLowerCase().replace(/[-._]/g, '');
 
-  // Exact match
-  const exact = AVAILABLE_MODELS.find((m) => m.id === serverModel);
+  // Exact match against stripped value
+  const exact = AVAILABLE_MODELS.find((m) => m.id === stripped);
   if (exact) return exact.id;
 
   // Normalized substring match
@@ -53,7 +65,7 @@ function resolveServerModel(serverModel: string): ModelId | null {
   // Provider keyword match
   for (const keyword of ['claude', 'gpt', 'gemini', 'minimax'] as const) {
     if (normalized.includes(keyword)) {
-      const match = AVAILABLE_MODELS.find((m) => m.icon === (keyword === 'gpt' ? 'gpt' : keyword === 'claude' ? 'claude' : keyword === 'gemini' ? 'gemini' : 'minimax'));
+      const match = AVAILABLE_MODELS.find((m) => m.icon === keyword);
       if (match) return match.id;
     }
   }
@@ -75,7 +87,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setModel: async (model) => {
     set({ selectedModel: model });
     try {
-      await apiClient.patch('/profile/', { selected_model: model });
+      await Promise.all([
+        apiClient.patch('/profile/', { selected_model: model }),
+        setServerModel(model),
+      ]);
     } catch {
       // silent — local state is enough
     }
@@ -134,7 +149,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: () => {
     const { inputText, ws, connectionState, activeSessionKey, attachments } = get();
     const text = inputText.trim();
-    if ((!text && attachments.length === 0) || connectionState !== 'connected' || !ws) return;
+    console.log('[ws] sendMessage called: text="' + text.substring(0, 50) + '" state=' + connectionState + ' session=' + activeSessionKey + ' attachments=' + attachments.length);
+    if ((!text && attachments.length === 0) || connectionState !== 'connected' || !ws) {
+      console.log('[ws] sendMessage SKIPPED: noText=' + (!text && attachments.length === 0) + ' notConnected=' + (connectionState !== 'connected') + ' noWs=' + !ws);
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -165,6 +184,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     }
 
+    console.log('[ws] sendMessage → chat.send id=' + requestId + ' session=' + activeSessionKey);
     ws.send(
       JSON.stringify({
         type: 'req',
@@ -206,7 +226,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         // Handle challenge — send connect request
         if (data.type === 'event' && data.event === 'connect.challenge') {
-          console.log('[ws] Challenge received, sending auth with client.id=gateway-client mode=backend');
+          console.log('[ws] Challenge received, sending auth as openclaw-control-ui mode=ui');
           ws.send(
             JSON.stringify({
               type: 'req',
@@ -216,13 +236,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 minProtocol: 3,
                 maxProtocol: 3,
                 client: {
-                  id: 'gateway-client',
+                  id: 'openclaw-control-ui',
                   displayName: 'EasyClaw',
                   version: '1.0.0',
                   platform: 'mobile',
-                  mode: 'backend',
+                  mode: 'ui',
                 },
                 caps: [],
+                scopes: ['operator.read', 'operator.write'],
                 auth: { token: gatewayToken },
               },
             }),

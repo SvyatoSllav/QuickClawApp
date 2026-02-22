@@ -550,6 +550,36 @@ class ServerManager:
         self.upload_file(SEARXNG_ADAPTER_JS, f'{path}/searxng-adapter.js')
         self.upload_file(LIGHTPANDA_CDP_ADAPTER_JS, f'{path}/lightpanda-cdp-adapter.js')
 
+    def set_model(self, model_slug: str) -> tuple[bool, str]:
+        """Change the active model on a running OpenClaw container.
+
+        Args:
+            model_slug: Frontend model ID like 'claude-sonnet-4' or 'minimax-m2.5'.
+
+        Returns:
+            (success, message) tuple.
+        """
+        from django.conf import settings as django_settings
+        model_mapping = getattr(django_settings, 'MODEL_MAPPING', {})
+        base_model = model_mapping.get(model_slug, model_slug)
+        openrouter_model = self._ensure_openrouter_prefix(base_model)
+
+        cli = 'docker exec openclaw node /app/openclaw.mjs'
+        out, err, exit_code = self.exec_command(
+            f'{cli} models set {openrouter_model}',
+            timeout=30,
+        )
+
+        if exit_code != 0:
+            logger.warning('set_model failed for %s: %s', openrouter_model, err or out)
+            return False, (err or out).strip()
+
+        # Re-apply aliases so /model command still works after models set
+        self._apply_model_aliases()
+
+        logger.info('Model changed to %s on %s', openrouter_model, self.server.ip_address)
+        return True, openrouter_model
+
     @staticmethod
     def _ensure_openrouter_prefix(model: str) -> str:
         """Ensure model string has openrouter/ prefix for routing through OpenRouter."""
@@ -749,6 +779,9 @@ gateway:
   auth:
     type: token
     token: {gateway_token}
+  controlUi:
+    allowInsecureAuth: true
+    allowedOrigins: ["*"]
 
 limits:
   max_tokens_per_message: 4096
@@ -857,6 +890,9 @@ gateway:
   auth:
     type: token
     token: {gateway_token}
+  controlUi:
+    allowInsecureAuth: true
+    allowedOrigins: ["*"]
 
 channels:
   telegram:
@@ -1150,6 +1186,9 @@ gateway:
   auth:
     type: token
     token: {gateway_token}
+  controlUi:
+    allowInsecureAuth: true
+    allowedOrigins: ["*"]
 
 channels:
   telegram:
@@ -1540,7 +1579,7 @@ limits:
         else:
             config = {}
 
-        # Merge agents config
+        # Merge agents config (deep-merge to preserve agents.defaults.models)
         agents_config = json_mod.loads(agents_json)
 
         # CRITICAL: Enforce openrouter/ prefix on ALL agent models.
@@ -1550,7 +1589,15 @@ limits:
             if model and not model.startswith('openrouter/'):
                 agent['model'] = f'openrouter/{model}'
 
-        config['agents'] = agents_config['agents']
+        if 'agents' not in config:
+            config['agents'] = {}
+        existing_defaults = config.get('agents', {}).get('defaults', {})
+        config['agents']['list'] = agents_config['agents']['list']
+        # Merge defaults: keep existing (e.g. models from `models set`) + add new
+        config['agents']['defaults'] = {
+            **existing_defaults,
+            **agents_config['agents'].get('defaults', {}),
+        }
 
         # Write merged config back
         merged_json = json_mod.dumps(config, indent=2, ensure_ascii=False)

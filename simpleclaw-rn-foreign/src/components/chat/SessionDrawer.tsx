@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, FlatList, Pressable, Dimensions, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, FlatList, Pressable, Dimensions, StyleSheet, TextInput } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,7 +7,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Text } from '@/components/ui/text';
-import { Plus, Trash2, X } from 'lucide-react-native';
+import { Plus, Trash2, X, Pencil } from 'lucide-react-native';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Session } from '../../types/session';
@@ -43,7 +43,12 @@ export default function SessionDrawer({ visible, onClose }: Props) {
   const switchSession = useSessionStore((s) => s.switchSession);
   const createSession = useSessionStore((s) => s.createSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
+  const renameSession = useSessionStore((s) => s.renameSession);
   const activeSessionKey = useChatStore((s) => s.activeSessionKey);
+
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const editInputRef = useRef<TextInput>(null);
 
   const translateY = useSharedValue(MAX_DRAWER_HEIGHT);
   const backdropOpacity = useSharedValue(0);
@@ -83,40 +88,84 @@ export default function SessionDrawer({ visible, onClose }: Props) {
     deleteSession(key);
   };
 
+  const handleLongPress = (item: Session) => {
+    setEditingKey(item.key);
+    setEditText(getSessionTitle(item));
+    setTimeout(() => editInputRef.current?.focus(), 100);
+  };
+
+  const handleRenameSubmit = () => {
+    if (editingKey && editText.trim()) {
+      renameSession(editingKey, editText.trim());
+    }
+    setEditingKey(null);
+    setEditText('');
+  };
+
   const renderItem = ({ item }: { item: Session }) => {
     const isActive = item.key === activeSessionKey;
+    const isEditing = editingKey === item.key;
     return (
       <Pressable
-        onPress={() => handleSelect(item.key)}
+        onPress={() => isEditing ? undefined : handleSelect(item.key)}
+        onLongPress={() => handleLongPress(item)}
+        delayLongPress={400}
         style={[
           localStyles.sessionItem,
           isActive && localStyles.sessionItemActive,
         ]}
       >
         <View style={{ flex: 1, marginRight: 12 }}>
-          <Text
-            style={[
-              localStyles.sessionTitle,
-              isActive && localStyles.sessionTitleActive,
-            ]}
-            numberOfLines={1}
-          >
-            {getSessionTitle(item)}
-          </Text>
-          {item.updatedAt && (
+          {isEditing ? (
+            <TextInput
+              ref={editInputRef}
+              value={editText}
+              onChangeText={setEditText}
+              onSubmitEditing={handleRenameSubmit}
+              onBlur={handleRenameSubmit}
+              style={[
+                localStyles.sessionTitle,
+                isActive && localStyles.sessionTitleActive,
+                localStyles.sessionEditInput,
+              ]}
+              autoFocus
+              selectTextOnFocus
+              returnKeyType="done"
+            />
+          ) : (
+            <Text
+              style={[
+                localStyles.sessionTitle,
+                isActive && localStyles.sessionTitleActive,
+              ]}
+              numberOfLines={1}
+            >
+              {getSessionTitle(item)}
+            </Text>
+          )}
+          {item.updatedAt && !isEditing && (
             <Text style={localStyles.sessionTime}>
               {formatTime(item.updatedAt)}
             </Text>
           )}
         </View>
-        {item.key !== 'main' && (
-          <Pressable
-            onPress={() => handleDelete(item.key)}
-            hitSlop={8}
-            style={{ padding: 4 }}
-          >
-            <Trash2 size={16} color={colors.mutedForeground} />
-          </Pressable>
+        {item.key !== 'main' && !isEditing && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Pressable
+              onPress={() => handleLongPress(item)}
+              hitSlop={8}
+              style={{ padding: 4 }}
+            >
+              <Pencil size={14} color={colors.mutedForeground} />
+            </Pressable>
+            <Pressable
+              onPress={() => handleDelete(item.key)}
+              hitSlop={8}
+              style={{ padding: 4 }}
+            >
+              <Trash2 size={16} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
         )}
       </Pressable>
     );
@@ -231,6 +280,13 @@ const localStyles = StyleSheet.create({
   sessionTitleActive: {
     fontWeight: '700',
     color: '#F5A623',
+  },
+  sessionEditInput: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primary,
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+    margin: 0,
   },
   sessionTime: {
     fontSize: 12,

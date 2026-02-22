@@ -1,12 +1,56 @@
+import hashlib
+import json
 import re
 import shlex
 import logging
+import requests as http_requests
+from django.conf import settings
+from django.core.cache import cache
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 
 logger = logging.getLogger(__name__)
+
+SKILLSMP_CACHE_TTL = 30 * 60  # 30 minutes
+
+
+class SkillsSearchView(APIView):
+    """GET /api/skills/search/ — proxy SkillsMP search with Redis caching"""
+
+    def get(self, request):
+        q = request.query_params.get('q', '')
+        page = request.query_params.get('page', '1')
+        limit = request.query_params.get('limit', '20')
+        sort_by = request.query_params.get('sortBy', 'stars')
+
+        cache_key = 'skillsmp:' + hashlib.md5(
+            f'{q}:{page}:{limit}:{sort_by}'.encode()
+        ).hexdigest()
+
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(json.loads(cached))
+
+        base_url = getattr(settings, 'SKILLSMP_BASE_URL', 'https://skillsmp.com/api/v1')
+        api_key = getattr(settings, 'SKILLSMP_API_KEY', '')
+
+        try:
+            resp = http_requests.get(
+                f'{base_url}/skills/search',
+                params={'q': q, 'page': page, 'limit': limit, 'sortBy': sort_by},
+                headers={'Authorization': f'Bearer {api_key}', 'Accept': 'application/json'},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            cache.set(cache_key, json.dumps(data), SKILLSMP_CACHE_TTL)
+            return Response(data)
+        except http_requests.RequestException as e:
+            logger.warning('SkillsMP search failed: %s', e)
+            return Response({'skills': [], 'total': 0, 'error': 'Marketplace unavailable'}, status=502)
 
 
 class ServerStatusView(APIView):
@@ -74,6 +118,41 @@ class ServerPoolStatusView(APIView):
 
 class PairingThrottle(UserRateThrottle):
     rate = '10/min'
+
+
+class SetModelView(APIView):
+    """POST /api/server/set-model/ — change active model on running OpenClaw"""
+    throttle_classes = [PairingThrottle]
+
+    def post(self, request):
+        model = request.data.get('model', '').strip()
+        if not model or not re.match(r'^[a-zA-Z0-9._-]+$', model):
+            return Response({'error': 'Invalid model'}, status=400)
+
+        profile = request.user.profile
+        server = getattr(profile, 'server', None)
+
+        if not server or not server.openclaw_running:
+            return Response({'error': 'Server not ready'}, status=404)
+
+        from .services import ServerManager
+        manager = ServerManager(server)
+        try:
+            manager.connect()
+            success, message = manager.set_model(model)
+            if not success:
+                return Response({'error': message}, status=400)
+
+            # Also update profile's selected_model
+            profile.selected_model = model
+            profile.save(update_fields=['selected_model'])
+
+            return Response({'success': True, 'model': message})
+        except Exception as e:
+            logger.exception('set_model error for user %s', request.user.id)
+            return Response({'error': 'Internal error'}, status=500)
+        finally:
+            manager.disconnect()
 
 
 class ApprovePairingView(APIView):

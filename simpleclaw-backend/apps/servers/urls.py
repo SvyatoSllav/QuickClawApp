@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ServerStatusView, RedeployView, ServerPoolStatusView, ApprovePairingView
+from .views import ServerStatusView, RedeployView, ServerPoolStatusView, ApprovePairingView, SetModelView, SkillsSearchView
 
 # api/
 urlpatterns = [
@@ -7,4 +7,6 @@ urlpatterns = [
     path('server/redeploy/', RedeployView.as_view(), name='server-redeploy'),
     path('server/pool/', ServerPoolStatusView.as_view(), name='server-pool'),
     path('server/pairing/approve/', ApprovePairingView.as_view(), name='server-pairing-approve'),
+    path('server/set-model/', SetModelView.as_view(), name='server-set-model'),
+    path('skills/search/', SkillsSearchView.as_view(), name='skills-search'),
 ]

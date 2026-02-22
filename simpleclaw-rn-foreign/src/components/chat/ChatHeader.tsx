@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E8E0D4',
-    paddingVertical: 4,
+    paddingVertical: 0,
     width: 200,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -155,6 +155,7 @@ const styles = StyleSheet.create({
   },
   dropdownItemActive: {
     backgroundColor: '#FEF3C7',
+    borderRadius: 8,
   },
   dropdownLabel: {
     fontSize: 14,

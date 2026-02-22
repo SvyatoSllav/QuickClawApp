@@ -106,9 +106,22 @@ CSRF_TRUSTED_ORIGINS = [
     'https://install-openclow.ru',
 ]
 
+# Redis cache (used for SkillsMP proxy etc.)
+REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+    }
+}
+
+# SkillsMP API
+SKILLSMP_API_KEY = env('SKILLSMP_API_KEY', default='sk_live_skillsmp_nk85O6aCBjU1C39hvaiEO46okUqpPyECIgWn5TKK99o')
+SKILLSMP_BASE_URL = 'https://skillsmp.com/api/v1'
+
 # Celery
-CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = env('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
