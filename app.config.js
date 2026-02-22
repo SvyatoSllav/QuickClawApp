@@ -1,7 +1,7 @@
 module.exports = {
   expo: {
     name: "EasyClaw",
-    slug: "easyclaw",
+    slug: "easyclaw-app",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
