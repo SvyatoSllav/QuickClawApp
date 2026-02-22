@@ -33,7 +33,7 @@ module.exports = {
     },
     extra: {
       eas: {
-        projectId: "356ef3ec-a058-4d6b-aa64-d5726472c3d0",
+        projectId: "9bbfa377-a122-43a1-ba67-1f365d423d9d",
       },
     },
     plugins: [
