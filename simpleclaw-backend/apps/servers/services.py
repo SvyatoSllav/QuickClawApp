@@ -779,9 +779,6 @@ gateway:
   auth:
     type: token
     token: {gateway_token}
-  controlUi:
-    allowInsecureAuth: true
-    allowedOrigins: ["http://localhost:8081", "http://localhost:19006", "http://localhost:3000"]
 
 limits:
   max_tokens_per_message: 4096
@@ -890,9 +887,6 @@ gateway:
   auth:
     type: token
     token: {gateway_token}
-  controlUi:
-    allowInsecureAuth: true
-    allowedOrigins: ["http://localhost:8081", "http://localhost:19006", "http://localhost:3000"]
 
 channels:
   telegram:
@@ -1186,9 +1180,6 @@ gateway:
   auth:
     type: token
     token: {gateway_token}
-  controlUi:
-    allowInsecureAuth: true
-    allowedOrigins: ["http://localhost:8081", "http://localhost:19006", "http://localhost:3000"]
 
 channels:
   telegram:

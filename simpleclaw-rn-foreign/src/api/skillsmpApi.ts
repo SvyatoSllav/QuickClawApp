@@ -48,20 +48,21 @@ export interface SkillCategory {
   key: string;
   label: string;
   count: number;
+  icon: string;
   subcategories?: { label: string; count: number }[];
 }
 
 export const SKILL_CATEGORIES: SkillCategory[] = [
-  { key: 'tools', label: 'Tools', count: 71840 },
-  { key: 'development', label: 'Development', count: 56892 },
-  { key: 'business', label: 'Business', count: 44784 },
-  { key: 'data-ai', label: 'Data & AI', count: 37420 },
-  { key: 'devops', label: 'DevOps', count: 30103 },
-  { key: 'testing-security', label: 'Testing & Security', count: 28556 },
-  { key: 'documentation', label: 'Documentation', count: 20194 },
-  { key: 'content-media', label: 'Content & Media', count: 19703 },
-  { key: 'research', label: 'Research', count: 10209 },
-  { key: 'databases', label: 'Databases', count: 4511 },
-  { key: 'lifestyle', label: 'Lifestyle', count: 3939 },
-  { key: 'blockchain', label: 'Blockchain', count: 3648 },
+  { key: 'tools', label: 'Tools', count: 71840, icon: 'Wrench' },
+  { key: 'development', label: 'Development', count: 56892, icon: 'Code' },
+  { key: 'business', label: 'Business', count: 44784, icon: 'Briefcase' },
+  { key: 'data-ai', label: 'Data & AI', count: 37420, icon: 'BrainCircuit' },
+  { key: 'devops', label: 'DevOps', count: 30103, icon: 'Container' },
+  { key: 'testing-security', label: 'Testing & Security', count: 28556, icon: 'ShieldCheck' },
+  { key: 'documentation', label: 'Documentation', count: 20194, icon: 'FileText' },
+  { key: 'content-media', label: 'Content & Media', count: 19703, icon: 'Image' },
+  { key: 'research', label: 'Research', count: 10209, icon: 'FlaskConical' },
+  { key: 'databases', label: 'Databases', count: 4511, icon: 'Database' },
+  { key: 'lifestyle', label: 'Lifestyle', count: 3939, icon: 'Heart' },
+  { key: 'blockchain', label: 'Blockchain', count: 3648, icon: 'Link' },
 ];

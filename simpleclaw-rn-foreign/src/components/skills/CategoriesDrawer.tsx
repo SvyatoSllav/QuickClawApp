@@ -7,9 +7,39 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Text } from '@/components/ui/text';
-import { X } from 'lucide-react-native';
+import {
+  X,
+  Wrench,
+  Code,
+  Briefcase,
+  BrainCircuit,
+  Container,
+  ShieldCheck,
+  FileText,
+  Image,
+  FlaskConical,
+  Database,
+  Heart,
+  Link,
+} from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { SKILL_CATEGORIES, SkillCategory } from '../../api/skillsmpApi';
 import { colors } from '../../config/colors';
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Wrench,
+  Code,
+  Briefcase,
+  BrainCircuit,
+  Container,
+  ShieldCheck,
+  FileText,
+  Image,
+  FlaskConical,
+  Database,
+  Heart,
+  Link,
+};
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.82;
@@ -74,6 +104,7 @@ export default function CategoriesDrawer({ visible, onClose, onSelect, activeCat
         <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
           {SKILL_CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.key;
+            const Icon = ICON_MAP[cat.icon];
             return (
               <Pressable
                 key={cat.key}
@@ -86,14 +117,22 @@ export default function CategoriesDrawer({ visible, onClose, onSelect, activeCat
                   isActive && localStyles.categoryItemActive,
                 ]}
               >
-                <Text
-                  style={[
-                    localStyles.categoryLabel,
-                    isActive && localStyles.categoryLabelActive,
-                  ]}
-                >
-                  {cat.label}
-                </Text>
+                <View style={localStyles.categoryLeft}>
+                  {Icon && (
+                    <Icon
+                      size={18}
+                      color={isActive ? colors.primary : '#6B7280'}
+                    />
+                  )}
+                  <Text
+                    style={[
+                      localStyles.categoryLabel,
+                      isActive && localStyles.categoryLabelActive,
+                    ]}
+                  >
+                    {cat.label}
+                  </Text>
+                </View>
                 <Text style={localStyles.categoryCount}>
                   {formatCount(cat.count)}
                 </Text>
@@ -145,6 +184,11 @@ const localStyles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#F0E8DC',
+  },
+  categoryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   categoryItemActive: {
     backgroundColor: '#FEF3C7',
