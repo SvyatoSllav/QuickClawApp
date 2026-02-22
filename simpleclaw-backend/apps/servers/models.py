@@ -68,3 +68,21 @@ class Server(models.Model):
     def __str__(self):
         user_email = self.profile.user.email if self.profile else 'free'
         return f'{self.ip_address or "pending"} — {self.status} ({user_email})'
+
+
+class OAuthPendingFlow(models.Model):
+    """Pending OAuth authorization flow — maps state to user's server."""
+
+    state = models.CharField(max_length=64, unique=True, db_index=True)
+    server = models.ForeignKey(Server, on_delete=models.CASCADE, related_name='oauth_flows')
+    provider = models.CharField(max_length=50)
+    skill_key = models.CharField(max_length=100)
+    scopes = models.TextField(blank=True, help_text='Space-separated scopes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'OAuth Flow'
+        verbose_name_plural = 'OAuth Flows'
+
+    def __str__(self):
+        return f'{self.provider} → {self.skill_key} ({self.server.ip_address})'

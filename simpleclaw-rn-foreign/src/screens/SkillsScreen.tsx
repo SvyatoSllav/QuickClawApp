@@ -6,6 +6,7 @@ import { useNavigationStore } from '../stores/navigationStore';
 import { colors } from '../config/colors';
 import { searchSkills, SkillsmpSkill, SkillCategory } from '../api/skillsmpApi';
 import CategoriesDrawer from '../components/skills/CategoriesDrawer';
+import InstallSkillModal from '../components/skills/InstallSkillModal';
 
 function formatStars(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
@@ -34,6 +35,8 @@ export default function SkillsScreen() {
   const [showCategories, setShowCategories] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeCategoryLabel, setActiveCategoryLabel] = useState<string | null>(null);
+  const [selectedSkill, setSelectedSkill] = useState<SkillsmpSkill | null>(null);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   const doSearch = useCallback(async (searchQuery: string) => {
     setIsLoading(true);
@@ -131,7 +134,14 @@ export default function SkillsScreen() {
         ) : (
           <View style={{ gap: 12, marginTop: 4 }}>
             {skills.map((skill, index) => (
-              <SkillCard key={skill.id || index} skill={skill} />
+              <SkillCard
+                key={skill.id || index}
+                skill={skill}
+                onPress={() => {
+                  setSelectedSkill(skill);
+                  setShowInstallModal(true);
+                }}
+              />
             ))}
           </View>
         )}
@@ -143,15 +153,21 @@ export default function SkillsScreen() {
         onSelect={handleCategorySelect}
         activeCategory={activeCategory}
       />
+
+      <InstallSkillModal
+        visible={showInstallModal}
+        skill={selectedSkill}
+        onClose={() => setShowInstallModal(false)}
+      />
     </View>
   );
 }
 
-function SkillCard({ skill }: { skill: SkillsmpSkill }) {
+function SkillCard({ skill, onPress }: { skill: SkillsmpSkill; onPress?: () => void }) {
   const avatarUri = getAuthorAvatar(skill.author);
 
   return (
-    <View style={s.card}>
+    <Pressable style={s.card} onPress={onPress}>
       {/* Title bar — terminal style */}
       <View style={s.cardTitleBar}>
         <View style={s.cardDots}>
@@ -202,7 +218,7 @@ function SkillCard({ skill }: { skill: SkillsmpSkill }) {
         <Text style={s.cardDate}>{formatDate(skill.updatedAt)}</Text>
         <Heart size={14} color="#D1D5DB" />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -309,17 +325,17 @@ const s = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   cardTitleBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: 'rgba(240,232,220,0.3)',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
     gap: 8,
   },
   cardDots: {
@@ -330,6 +346,7 @@ const s = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+    opacity: 0.6,
   },
   cardFileName: {
     flex: 1,
@@ -353,32 +370,35 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   lineNum: {
-    width: 16,
+    width: 32,
     fontSize: 12,
     fontFamily: 'monospace',
     color: '#D1D5DB',
     marginRight: 8,
+    backgroundColor: 'rgba(240,232,220,0.2)',
+    paddingLeft: 8,
+    paddingRight: 4,
   },
   codeKeyword: {
-    fontSize: 13,
+    fontSize: 18,
     fontFamily: 'monospace',
-    color: '#7C3AED',
+    color: '#8B5CF6',
   },
   codeName: {
-    fontSize: 13,
+    fontSize: 18,
     fontFamily: 'monospace',
     fontWeight: '700',
     color: '#1A1A1A',
   },
   codeFrom: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'monospace',
-    color: '#7C3AED',
+    color: '#3B82F6',
   },
   codeAuthor: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'monospace',
-    color: '#D97706',
+    color: '#16A34A',
   },
   authorAvatar: {
     width: 16,
@@ -387,9 +407,9 @@ const s = StyleSheet.create({
     marginRight: 6,
   },
   cardDesc: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
-    lineHeight: 18,
+    lineHeight: 20,
     marginTop: 8,
   },
   cardFooter: {
@@ -398,8 +418,9 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     paddingVertical: 10,
+    backgroundColor: 'rgba(240,232,220,0.2)',
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: colors.border,
   },
   cardDate: {
     fontSize: 12,

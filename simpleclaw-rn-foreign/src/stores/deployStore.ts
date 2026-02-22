@@ -25,8 +25,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
   _intervalId: null,
 
   startPolling: () => {
-    console.log('[deploy] startPolling() __DEV__:', __DEV__);
-    if (__DEV__) return;
+    console.log('[deploy] startPolling()');
     get().stopPolling();
     get().checkStatus();
     const id = setInterval(() => {

@@ -1,0 +1,312 @@
+{
+  "project": "OpenClaw iOS App — Vector Illustration Set",
+  "generator": "nano-banana",
+  "global_style": {
+    "art_style": "Modern flat vector illustration, minimal line art with solid color fills, clean geometric shapes, no gradients, no shadows, no textures",
+    "rendering": "2D flat vector, SVG-ready, crisp edges, bold simplified forms",
+    "character_style": "Stylized human figures with exaggerated proportions, simplified facial features (dot eyes, minimal nose, simple smile), large heads relative to body, flowing hair shapes as solid silhouettes, dynamic confident poses",
+    "line_work": "Clean uniform outlines where present, mostly filled shapes with no outlines, occasional thin accent lines for detail",
+    "composition": "Each illustration is a standalone spot illustration / vignette, single concept per image, centered composition, no background or very minimal abstract background elements",
+    "mood": "Friendly, modern, tech-savvy, approachable, confident, slightly playful",
+    "aspect_ratio": "1:1 square for each individual illustration",
+    "output_size": "1024x1024px per illustration",
+    "total_illustrations": 36
+  },
+  "color_palette": {
+    "primary_dark": {
+      "hex": "#181818",
+      "usage": "Primary fill color for characters, devices, large shapes, hair, clothing"
+    },
+    "white": {
+      "hex": "#FFFFFF",
+      "usage": "Background, skin tones, secondary fills, negative space, screen content"
+    },
+    "accent_warm_tan": {
+      "hex": "#DC9F85",
+      "usage": "Accent color for highlights, UI elements, icons, badges, interactive elements, key focal objects — used sparingly like the golden yellow in the reference"
+    },
+    "rules": [
+      "Strictly 3 colors only: dark (#181818), white (#FFFFFF), warm tan accent (#DC9F85)",
+      "Accent color used for 15-25% of each illustration to draw attention to key elements",
+      "Dark color used for 40-50% as the dominant fill",
+      "White used for remaining space, skin, and backgrounds",
+      "No additional colors, no grays, no other tones — strictly tricolor"
+    ]
+  },
+  "brand_context": {
+    "app_name": "OpenClaw",
+    "mascot": "Stylized claw / lobster claw — friendly, geometric, minimal",
+    "tagline": "Your personal AI assistant on every channel",
+    "app_type": "iOS AI assistant app that connects to WhatsApp, Telegram, Slack, Discord, iMessage, and more",
+    "key_themes": [
+      "AI-powered personal assistant",
+      "Multi-channel messaging (WhatsApp, Telegram, Slack, Discord, iMessage)",
+      "Privacy-first, runs on your own devices",
+      "Voice interaction and talk mode",
+      "Smart automation and workflows",
+      "Cross-platform (iOS, macOS, Android, Desktop)",
+      "Device pairing and local network",
+      "Camera, calendar, reminders integration"
+    ]
+  },
+  "illustrations": [
+    {
+      "id": 1,
+      "title": "Hero — AI Assistant at Work",
+      "prompt": "A stylized person sitting at a laptop with headphones on, smiling confidently. A small claw icon in a warm tan speech bubble floats above the laptop screen. The person has dark silhouette hair and white skin, wearing a dark top. The laptop is dark with a white screen. Clean minimal flat vector, 3-color palette: dark #181818, white #FFFFFF, warm tan accent #DC9F85. Modern digital illustration style, no background, no gradients, no shadows.",
+      "size": "large_hero",
+      "usage": "App Store feature graphic, landing page header"
+    },
+    {
+      "id": 2,
+      "title": "Multi-Channel Messaging",
+      "prompt": "A stylized person holding a smartphone with multiple chat bubble icons floating around them — representing WhatsApp, Telegram, Slack, and Discord as simplified geometric shapes. All chat bubbles connect to one central claw icon in warm tan. Person has dark hair silhouette, white skin, dark clothing. Flat vector, 3 colors only: dark #181818, white #FFFFFF, warm tan #DC9F85. No background, minimal, clean geometric forms.",
+      "usage": "Feature section — messaging integration"
+    },
+    {
+      "id": 3,
+      "title": "Voice Mode / Talk Mode",
+      "prompt": "A stylized person speaking into the air with sound wave lines emanating from their mouth. A warm tan circular microphone icon or audio waveform floats nearby. The person has an open, expressive pose with one hand slightly raised. Dark silhouette hair, white skin, dark outfit. Flat vector illustration, strictly 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. No gradients, no shadows.",
+      "usage": "Feature section — voice assistant"
+    },
+    {
+      "id": 4,
+      "title": "Privacy Shield / Local-First",
+      "prompt": "A stylized person standing behind or beside a large shield icon. The shield is dark with a warm tan lock or checkmark symbol on it. The person looks confident with arms crossed or one hand on the shield. Conveys trust and security. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. Clean minimal geometric shapes, no background.",
+      "usage": "Feature section — privacy and security"
+    },
+    {
+      "id": 5,
+      "title": "Smart Chat Conversation",
+      "prompt": "A stylized person sitting relaxed, looking at a floating chat interface. Two chat bubbles: a dark one (user message) and a warm tan one (AI reply with a small claw icon). The person is leaning back casually, comfortable and engaged. Flat vector, 3 colors only: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal, modern, no gradients.",
+      "usage": "Feature section — AI chat"
+    },
+    {
+      "id": 6,
+      "title": "Device Pairing",
+      "prompt": "Two devices — a smartphone and a laptop — facing each other with a wireless connection arc or dotted line between them. A warm tan sync/connection icon in the center. Small claw logo on one device screen. Flat vector, 3-color palette: dark #181818, white #FFFFFF, warm tan #DC9F85. Clean geometric, no background.",
+      "usage": "Feature section — device pairing"
+    },
+    {
+      "id": 7,
+      "title": "Notification / Alert",
+      "prompt": "A stylized person looking at their phone with a warm tan notification badge (bell icon or numbered badge) floating above the device. The person has a pleasantly surprised expression. Dark hair, white face, dark clothing. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal, clean, no gradients.",
+      "usage": "Feature section — smart notifications"
+    },
+    {
+      "id": 8,
+      "title": "Calendar & Reminders",
+      "prompt": "A stylized person standing next to a large calendar page or planner. The calendar has a warm tan highlight on today's date or a checkmark. A small clock or reminder bell in warm tan nearby. Flat vector illustration, strictly 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. Modern minimal, no shadows.",
+      "usage": "Feature section — calendar integration"
+    },
+    {
+      "id": 9,
+      "title": "Camera / Photo Access",
+      "prompt": "A stylized person holding up a phone in camera mode, the phone screen showing a viewfinder frame. A warm tan camera icon or photo thumbnail accent. Dynamic pose, slightly angled. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. Clean geometric forms, no background.",
+      "usage": "Feature section — camera integration"
+    },
+    {
+      "id": 10,
+      "title": "Telegram Integration",
+      "prompt": "A stylized person sending a message, with a simplified Telegram paper plane icon in warm tan flying away from their phone. Clean minimal pose, confident gesture. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. No background, no gradients.",
+      "usage": "Channel integration — Telegram"
+    },
+    {
+      "id": 11,
+      "title": "WhatsApp Integration",
+      "prompt": "A stylized person holding a phone with a simplified chat bubble containing a phone icon in warm tan. Green is NOT used — the WhatsApp concept is conveyed through the phone/chat bubble shape only, using the warm tan accent. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85.",
+      "usage": "Channel integration — WhatsApp"
+    },
+    {
+      "id": 12,
+      "title": "Slack Integration",
+      "prompt": "A stylized person at a desk with a laptop, a simplified hashtag (#) channel icon in warm tan floating above. Conveys workplace messaging. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal geometric, no background.",
+      "usage": "Channel integration — Slack"
+    },
+    {
+      "id": 13,
+      "title": "Discord Integration",
+      "prompt": "A stylized person wearing headphones with a simplified game controller or headset icon in warm tan. Conveys community/voice chat. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. No background, clean minimal.",
+      "usage": "Channel integration — Discord"
+    },
+    {
+      "id": 14,
+      "title": "iMessage Integration",
+      "prompt": "A stylized person holding an iPhone-like device with a simplified chat bubble icon in warm tan. Clean Apple-esque simplicity. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal, no background.",
+      "usage": "Channel integration — iMessage"
+    },
+    {
+      "id": 15,
+      "title": "AI Brain / Intelligence",
+      "prompt": "A stylized side profile of a head with a simplified brain or neural network pattern visible inside, highlighted in warm tan. Clean geometric representation of artificial intelligence. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. No gradients.",
+      "usage": "Feature section — AI intelligence"
+    },
+    {
+      "id": 16,
+      "title": "Automation / Workflow",
+      "prompt": "A stylized person relaxing in a chair while floating gear icons and arrow flow diagrams work automatically around them. Gears or key workflow nodes in warm tan. Conveys automation doing work for you. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85.",
+      "usage": "Feature section — smart automation"
+    },
+    {
+      "id": 17,
+      "title": "Search / Discovery",
+      "prompt": "A stylized person holding or looking through a large magnifying glass. The magnifying glass lens has a warm tan tint or accent. Conveys finding information quickly. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal, no background.",
+      "usage": "Feature section — search"
+    },
+    {
+      "id": 18,
+      "title": "Settings / Configuration",
+      "prompt": "A stylized person next to a large gear/cog icon. The gear has warm tan accent details. The person is adjusting or interacting with the gear, conveying customization. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. Clean geometric.",
+      "usage": "Feature section — settings"
+    },
+    {
+      "id": 19,
+      "title": "Onboarding / Welcome",
+      "prompt": "A stylized person waving hello with a friendly open gesture. A warm tan speech bubble with a claw icon or wave emoji nearby. Welcoming, approachable pose. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. No background.",
+      "usage": "Onboarding screens"
+    },
+    {
+      "id": 20,
+      "title": "Subscription / Premium Plan",
+      "prompt": "A stylized person next to a large star or crown icon in warm tan, with a subtle sparkle effect (geometric lines). Conveys premium/upgrade value. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal, no gradients.",
+      "usage": "Pricing / subscription page"
+    },
+    {
+      "id": 21,
+      "title": "Fast Response / Speed",
+      "prompt": "A stylized person with a lightning bolt icon in warm tan, conveying speed and instant response. Dynamic forward-leaning pose with motion lines. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. Clean, minimal.",
+      "usage": "Feature section — fast AI response"
+    },
+    {
+      "id": 22,
+      "title": "Cross-Platform / Multiple Devices",
+      "prompt": "Three devices arranged together — phone, tablet, laptop — all showing the same claw icon on their screens. Warm tan accent on the claw icons. Conveys seamless cross-platform experience. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85.",
+      "usage": "Feature section — cross-platform"
+    },
+    {
+      "id": 23,
+      "title": "Data Analytics / Insights",
+      "prompt": "A stylized person pointing at a floating bar chart or upward trending line graph. The chart bars or trend line highlighted in warm tan. Conveys AI-powered insights. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. No background.",
+      "usage": "Feature section — analytics"
+    },
+    {
+      "id": 24,
+      "title": "Team / Group Chat",
+      "prompt": "Three stylized people standing together with overlapping speech bubbles above them. One speech bubble highlighted in warm tan. Conveys group communication. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal geometric.",
+      "usage": "Feature section — group messaging"
+    },
+    {
+      "id": 25,
+      "title": "Email / Mail Integration",
+      "prompt": "A stylized person next to a large envelope icon. The envelope has a warm tan seal or notification dot. Conveys email management through AI. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. Clean, no background.",
+      "usage": "Feature section — email"
+    },
+    {
+      "id": 26,
+      "title": "Location / Maps",
+      "prompt": "A stylized person with a large map pin / location marker in warm tan floating above or beside them. Conveys location awareness and context. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal.",
+      "usage": "Feature section — location access"
+    },
+    {
+      "id": 27,
+      "title": "Code / Developer",
+      "prompt": "A stylized person at a laptop with code brackets </> floating in a warm tan badge or speech bubble. Conveys developer-friendly and API access. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. No gradients.",
+      "usage": "Feature section — developer / API"
+    },
+    {
+      "id": 28,
+      "title": "Claw Mascot Solo",
+      "prompt": "A friendly stylized claw / lobster claw character as a standalone mascot icon. The claw is rendered in dark #181818 with warm tan #DC9F85 accent details (joints, inner claw). Approachable, geometric, minimal design like a simplified cartoon mascot. White background. Flat vector, 3-color only.",
+      "usage": "Brand mascot, app icon variant, stickers"
+    },
+    {
+      "id": 29,
+      "title": "Night Mode / Dark Theme",
+      "prompt": "A stylized person in bed or relaxing on a couch, looking at their phone which emits a soft glow. A moon or stars icon in warm tan. Conveys comfortable dark mode usage at night. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85.",
+      "usage": "Feature section — dark mode"
+    },
+    {
+      "id": 30,
+      "title": "File Sharing / Documents",
+      "prompt": "A stylized person holding or presenting a document/file icon. The document has a warm tan corner fold or file type badge. A small upload arrow in warm tan. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal, clean.",
+      "usage": "Feature section — file sharing"
+    },
+    {
+      "id": 31,
+      "title": "Success / Achievement",
+      "prompt": "A stylized person with arms raised in celebration next to a trophy or checkmark badge in warm tan. Victorious, positive energy pose. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. No background.",
+      "usage": "Success states, achievement screens"
+    },
+    {
+      "id": 32,
+      "title": "24/7 Always Available",
+      "prompt": "A stylized person next to a large clock showing 24/7 in warm tan text or a warm tan clock face. Conveys always-on availability of the AI assistant. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85. Clean minimal.",
+      "usage": "Feature section — availability"
+    },
+    {
+      "id": 33,
+      "title": "Puzzle / Problem Solving",
+      "prompt": "A stylized person fitting a puzzle piece into a larger puzzle. The key puzzle piece is in warm tan, the rest in dark. Conveys AI solving complex problems. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85.",
+      "usage": "Feature section — problem solving"
+    },
+    {
+      "id": 34,
+      "title": "Launch / Rocket",
+      "prompt": "A stylized person pointing upward at a simplified rocket or arrow launching upward. The rocket or arrow tip in warm tan with minimal motion lines. Conveys growth, launch, getting started. Flat vector, 3-color: dark #181818, white #FFFFFF, warm tan #DC9F85.",
+      "usage": "Onboarding, getting started"
+    },
+    {
+      "id": 35,
+      "title": "Support / Help",
+      "prompt": "A stylized person with a friendly gesture next to a question mark or help circle icon in warm tan. Welcoming, helpful pose with open body language. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. Minimal.",
+      "usage": "Help section, support page"
+    },
+    {
+      "id": 36,
+      "title": "App Store Preview Composite",
+      "prompt": "A composition showing a stylized person interacting with a floating iPhone mockup that displays the OpenClaw interface. Small icons orbit around the phone: chat bubble, claw, microphone, shield — all as simplified geometric shapes. Phone screen is white, icons in warm tan, person and phone frame in dark. Flat vector, 3 colors: dark #181818, white #FFFFFF, warm tan #DC9F85. No gradients, no shadows, clean modern illustration.",
+      "size": "wide_banner",
+      "usage": "App Store screenshots, marketing banner"
+    }
+  ],
+  "negative_prompts": [
+    "no gradients",
+    "no drop shadows",
+    "no textures or patterns",
+    "no realistic rendering",
+    "no 3D effects",
+    "no more than 3 colors",
+    "no gray tones",
+    "no outlines on large shapes",
+    "no detailed facial features",
+    "no background scenes or environments",
+    "no photographic elements",
+    "no hand-drawn or sketch style",
+    "no watercolor or paint effects",
+    "no neon or glowing effects"
+  ],
+  "style_reference": {
+    "reference_image": "Digital Marketing 36 vector illustrations set — Pinterest",
+    "key_attributes_to_match": [
+      "Strictly 3-color palette (adapt: dark instead of black, warm tan instead of golden yellow)",
+      "Flat vector with solid fills, no outlines on major shapes",
+      "Stylized human characters with simplified features and large heads",
+      "Hair rendered as solid dark silhouette shapes with flowing forms",
+      "Each illustration is a self-contained vignette / spot illustration",
+      "Bold confident character poses with dynamic body language",
+      "Technology objects (phones, laptops, screens) as simplified geometric shapes",
+      "Accent color used for small focal elements: icons, badges, UI elements, key objects",
+      "White used for skin, screens, negative space",
+      "Dark used for hair, clothing, devices, large shapes",
+      "Minimal or no background — illustrations float on white",
+      "Modern SaaS / tech illustration aesthetic",
+      "Consistent character proportions across all 36 illustrations"
+    ]
+  },
+  "delivery_format": {
+    "file_format": ["PNG (transparent background)", "SVG (vector)"],
+    "resolution": "1024x1024px minimum per illustration",
+    "naming": "openclaw-illustration-{id}-{title_slug}.png",
+    "organization": "All 36 illustrations in consistent style, usable as a cohesive set"
+  }
+}

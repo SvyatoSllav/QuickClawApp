@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Server
+from .models import Server, OAuthPendingFlow
 
 
 @admin.register(Server)
@@ -22,3 +22,10 @@ class ServerAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at'),
         }),
     )
+
+
+@admin.register(OAuthPendingFlow)
+class OAuthPendingFlowAdmin(admin.ModelAdmin):
+    list_display = ['provider', 'skill_key', 'server', 'created_at']
+    list_filter = ['provider']
+    readonly_fields = ['state', 'created_at']

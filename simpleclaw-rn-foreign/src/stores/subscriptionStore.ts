@@ -191,24 +191,34 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const { useAuthStore } = require('./authStore');
-      const userId = useAuthStore.getState().user?.id;
-      console.log('[subscription] webPurchase userId:', userId);
+      const authState = useAuthStore.getState();
+      const userId = authState.user?.id;
+      const token = authState.authToken;
+      console.log('[subscription] webPurchase userId:', userId, 'hasToken:', !!token);
       if (!userId) throw new Error('Not authenticated');
 
-      await apiClient.post('/payments/webhook/revenuecat/', {
+      const payload = {
         event: {
           type: 'INITIAL_PURCHASE',
           app_user_id: String(userId),
           expiration_at_ms: Date.now() + 30 * 24 * 60 * 60 * 1000,
         },
-      });
+      };
+      const url = '/payments/webhook/revenuecat/';
+      console.log('[subscription] webPurchase POST', url, JSON.stringify(payload));
 
+      const response = await apiClient.post(url, payload);
+      console.log('[subscription] webPurchase response status:', response.status, 'data:', JSON.stringify(response.data));
+
+      console.log('[subscription] webPurchase reloading profile...');
       await useAuthStore.getState().loadProfile();
+      console.log('[subscription] webPurchase profile reloaded. subscriptionStatus:', useAuthStore.getState().profile?.subscriptionStatus);
       console.log('[subscription] webPurchase SUCCESS');
       set({ isSubscribed: true, loading: false });
       return true;
-    } catch (e) {
+    } catch (e: any) {
       console.error('[subscription] webPurchase ERROR:', e);
+      console.error('[subscription] webPurchase ERROR details — message:', e?.message, 'response.status:', e?.response?.status, 'response.data:', JSON.stringify(e?.response?.data));
       set({ loading: false, error: String(e) });
       return false;
     }

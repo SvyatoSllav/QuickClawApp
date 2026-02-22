@@ -1,7 +1,7 @@
-export default {
+module.exports = {
   expo: {
     name: "EasyClaw",
-    slug: "simpleclaw-rn",
+    slug: "easyclaw",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -30,6 +30,11 @@ export default {
     web: {
       favicon: "./assets/favicon.png",
       bundler: "metro",
+    },
+    extra: {
+      eas: {
+        projectId: "356ef3ec-a058-4d6b-aa64-d5726472c3d0",
+      },
     },
     plugins: [
       "expo-router",

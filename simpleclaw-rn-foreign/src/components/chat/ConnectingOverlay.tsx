@@ -99,12 +99,13 @@ const stepStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E8E0D4',
     paddingTop: 12,
+    flexWrap: 'nowrap',
   },
   index: {
     fontSize: 12,
     fontWeight: '700',
     color: '#8B8B8B',
-    width: 24,
+    minWidth: 24,
     letterSpacing: 2,
   },
   doneLabel: {

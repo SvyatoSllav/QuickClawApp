@@ -169,7 +169,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     const targetScreen = isSubscribed ? 'chat' : 'plan';
-    console.log('[auth] afterAuthFlow() done. Navigating to:', targetScreen);
+    console.log('[auth] afterAuthFlow() done. Platform:', Platform.OS, 'Navigating to:', targetScreen, '(rcSubscribed:', rcSubscribed, 'backendStatus:', backendStatus, ')');
     set({ loading: false });
     useNavigationStore.getState().setScreen(targetScreen);
   },

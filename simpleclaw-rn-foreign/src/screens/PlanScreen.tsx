@@ -97,16 +97,26 @@ export default function PlanScreen() {
   const goBack = useNavigationStore((s) => s.goBack);
 
   useEffect(() => {
+    console.log('[PlanScreen] mounted, calling loadOfferings()');
     loadOfferings();
   }, []);
 
+  console.log('[PlanScreen] render — packages:', packages.length, 'selectedPackage:', selectedPackage?.identifier ?? 'null', 'loading:', loading, 'error:', error, 'buttonDisabled:', loading || (!selectedPackage && packages.length > 0));
+
   const handleSubscribe = async () => {
-    const success = Platform.OS === 'web'
+    const isWeb = Platform.OS === 'web';
+    console.log('[PlanScreen] handleSubscribe called — platform:', Platform.OS, 'branch:', isWeb ? 'webPurchase' : 'purchaseSelected');
+    const success = isWeb
       ? await webPurchase()
       : await purchaseSelected();
+    console.log('[PlanScreen] handleSubscribe result:', success);
     if (success) {
+      console.log('[PlanScreen] Purchase succeeded, checking deploy status...');
       await useDeployStore.getState().checkStatus();
+      console.log('[PlanScreen] Navigating to chat');
       setScreen('chat');
+    } else {
+      console.log('[PlanScreen] Purchase failed or cancelled');
     }
   };
 

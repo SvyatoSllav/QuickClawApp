@@ -226,7 +226,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         // Handle challenge — send connect request
         if (data.type === 'event' && data.event === 'connect.challenge') {
-          console.log('[ws] Challenge received, sending auth as openclaw-control-ui mode=ui');
+          console.log('[ws] Challenge received, sending auth as control-ui mode=ui');
           ws.send(
             JSON.stringify({
               type: 'req',

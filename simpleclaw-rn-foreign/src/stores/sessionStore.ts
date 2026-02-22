@@ -48,7 +48,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           useChatStore.getState().syncModelFromServer(serverModel);
         }
       } else {
-        console.error('[sessions] fetchSessions failed:', data.error);
+        console.warn('[sessions] fetchSessions unavailable (scope):', data.error?.message || data.error);
         set({ isLoading: false });
       }
     });
