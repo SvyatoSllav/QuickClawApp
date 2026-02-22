@@ -20,7 +20,7 @@ class SkillsSearchView(APIView):
     """GET /api/skills/search/ — proxy SkillsMP search with Redis caching"""
 
     def get(self, request):
-        q = request.query_params.get('q', '')
+        q = request.query_params.get('q', '') or '*'
         page = request.query_params.get('page', '1')
         limit = request.query_params.get('limit', '20')
         sort_by = request.query_params.get('sortBy', 'stars')
@@ -44,7 +44,16 @@ class SkillsSearchView(APIView):
                 timeout=10,
             )
             resp.raise_for_status()
-            data = resp.json()
+            raw = resp.json()
+
+            # Unwrap SkillsMP envelope: { success, data: { skills, pagination } }
+            inner = raw.get('data', raw) if raw.get('success') else raw
+            data = {
+                'skills': inner.get('skills', []),
+                'total': inner.get('pagination', {}).get('total', 0),
+                'page': inner.get('pagination', {}).get('page', 1),
+                'limit': inner.get('pagination', {}).get('limit', 20),
+            }
 
             cache.set(cache_key, json.dumps(data), SKILLSMP_CACHE_TTL)
             return Response(data)
