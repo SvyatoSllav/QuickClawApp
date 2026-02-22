@@ -10,6 +10,9 @@ export interface SkillsmpSkill {
   tags?: string[];
   icon?: string;
   slug?: string;
+  githubUrl?: string;
+  skillUrl?: string;
+  updatedAt?: number;
 }
 
 export interface SkillsSearchResult {
