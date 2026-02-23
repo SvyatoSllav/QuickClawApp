@@ -3,6 +3,7 @@ import { Agent } from '../types/agent';
 import { useChatStore } from './chatStore';
 import { useSessionStore } from './sessionStore';
 import { getItem, setItem } from '../services/secureStorage';
+import { remoteLog } from '../services/remoteLog';
 
 const ACTIVE_AGENT_KEY = 'active_agent_id';
 
@@ -39,6 +40,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
     agentsP.then((data) => {
       console.log('[agents] agents.list response:', data.ok ? (data.result?.agents?.length + ' agents, defaultId: ' + data.result?.defaultId) : 'FAILED', data.error || '');
+      remoteLog('info', 'agents', 'agents.list result', { ok: data.ok, count: data.result?.agents?.length ?? 0, defaultId: data.result?.defaultId });
       if (!data.ok || !data.result?.agents) {
         console.error('[agents] fetchAgents failed:', data.error);
         set({ isLoading: false });
@@ -57,6 +59,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         const validSaved = savedId && agentsList.some((a) => a.id === savedId) ? savedId : null;
         const activeId = validSaved ?? serverDefaultId;
         console.log('[agents] Active agent:', activeId, '(saved:', savedId, 'default:', serverDefaultId, ')');
+        remoteLog('info', 'agents', 'active agent set', { activeId, savedId, serverDefaultId });
 
         set({ agents: agentsList, defaultAgentId: serverDefaultId, activeAgentId: activeId, isLoading: false });
 

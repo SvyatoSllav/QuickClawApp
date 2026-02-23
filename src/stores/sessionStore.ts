@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Session } from '../types/session';
 import { useChatStore } from './chatStore';
 import { useAgentStore } from './agentStore';
+import { remoteLog } from '../services/remoteLog';
 
 interface SessionState {
   sessions: Session[];
@@ -23,8 +24,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ isLoading: true });
     const { sendRequest } = useChatStore.getState();
     const activeAgentId = useAgentStore.getState().activeAgentId;
+    remoteLog('info', 'sessions', 'fetchSessions', { agentId: activeAgentId });
     sendRequest('sessions.list', activeAgentId ? { agentId: activeAgentId } : {}, (data) => {
       console.log('[sessions] sessions.list response:', data.ok ? (data.result?.sessions?.length + ' sessions') : 'FAILED', data.error || '');
+      remoteLog('info', 'sessions', 'sessions.list result', { ok: data.ok, count: data.result?.sessions?.length ?? 0, error: data.error ? JSON.stringify(data.error).substring(0, 200) : undefined });
       if (data.ok && data.result?.sessions) {
         const activeAgentId = useAgentStore.getState().activeAgentId;
         const prefix = activeAgentId ? `agent:${activeAgentId}:` : '';

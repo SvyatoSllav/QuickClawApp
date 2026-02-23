@@ -167,9 +167,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadHistory: (sessionKey) => {
     console.log('[ws] loadHistory:', sessionKey);
+    remoteLog('info', 'ws', 'loadHistory', { sessionKey });
     set({ isLoadingHistory: true });
     get().sendRequest('chat.history', { sessionKey }, (data) => {
       console.log('[ws] loadHistory response:', data.ok ? `${data.result?.messages?.length ?? 0} messages` : 'FAILED', data.error || '');
+      remoteLog('info', 'ws', 'loadHistory result', { ok: data.ok, count: data.result?.messages?.length ?? 0, session: sessionKey });
       if (data.ok && data.result?.messages) {
         const messages: ChatMessage[] = data.result.messages
           .filter((m: any) => (m.role === 'user' || m.role === 'assistant') && normalizeContent(m.content))
@@ -194,6 +196,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Self-healing: if state says connected but ws is gone, fix it
     if (connectionState === 'connected' && !ws) {
       console.warn('[ws] State corrupted: connected but no ws — resetting to disconnected');
+      remoteLog('error', 'ws', 'state corrupted: connected but no ws');
       set({ connectionState: 'disconnected', ws: null });
       return;
     }
@@ -285,6 +288,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Stale check
       if (get()._connGeneration !== gen) { ws.close(); return; }
       console.log('[ws] WebSocket opened, waiting for challenge...');
+      remoteLog('info', 'ws', 'onopen', { gen });
     };
 
     ws.onmessage = (event) => {
@@ -296,7 +300,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       try {
         const data = JSON.parse(event.data);
-        console.log('[ws] ← recv:', data.type, data.event || data.id || '', data.ok !== undefined ? 'ok=' + data.ok : '');
+        const msgSummary = data.type + ' ' + (data.event || data.id || data.method || '') + (data.ok !== undefined ? ' ok=' + data.ok : '');
+        console.log('[ws] ← recv:', msgSummary);
+        remoteLog('info', 'ws.recv', msgSummary, {
+          gen,
+          ...(data.error ? { error: JSON.stringify(data.error).substring(0, 200) } : {}),
+          ...(data.payload?.state ? { state: data.payload.state } : {}),
+          ...(data.payload?.sessionKey ? { sessionKey: data.payload.sessionKey } : {}),
+        });
 
         // Handle challenge — send connect request
         if (data.type === 'event' && data.event === 'connect.challenge') {
@@ -356,6 +367,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (handler) {
             get()._responseHandlers.delete(data.id);
             console.log('[ws] RPC response for', data.id, 'ok:', !!data.ok, data.error ? 'error:' + JSON.stringify(data.error) : '');
+            remoteLog('info', 'ws.rpc', data.id, { ok: !!data.ok, error: data.error ? JSON.stringify(data.error).substring(0, 300) : undefined });
             handler({ ok: !!data.ok, result: data.payload, error: data.error });
             return;
           }
@@ -371,14 +383,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (payload.state === 'delta' && payload.message?.content) {
             const content = normalizeContent(payload.message.content);
             console.log('[ws] chat delta len=' + content.length + ' preview="' + content.substring(0, 50) + '"');
+            remoteLog('info', 'ws.chat', 'delta', { len: content.length, session: payload.sessionKey });
             get().updateLastAssistantMessage(content);
           } else if (payload.state === 'final') {
             const finalContent = payload.message?.content ? normalizeContent(payload.message.content) : null;
             console.log('[ws] Chat message final for session:', payload.sessionKey, 'finalLen=' + (finalContent?.length ?? 'none'));
+            remoteLog('info', 'ws.chat', 'final', { len: finalContent?.length ?? 0, session: payload.sessionKey });
             // If final has content and it's longer than what we have, use it
             if (finalContent && finalContent.length > 0) {
               get().updateLastAssistantMessage(finalContent);
             }
+          } else {
+            remoteLog('info', 'ws.chat', 'other', { state: payload.state, session: payload.sessionKey });
           }
         }
 
@@ -388,6 +404,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           remoteLog('error', 'ws', 'chat.send failed', { error: data.error || data });
         }
         if (data.type === 'res' && data.ok && data.id?.startsWith('req-')) {
+          remoteLog('info', 'ws', 'chat.send OK, creating assistant placeholder', { reqId: data.id });
           const assistantMsg: ChatMessage = {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
@@ -396,8 +413,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           };
           set((s) => ({ messages: [...s.messages, assistantMsg] }));
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('[ws] Message parse error:', e, 'raw:', String(event.data).substring(0, 200));
+        remoteLog('error', 'ws', 'parse error', { error: e?.message, raw: String(event.data).substring(0, 200) });
       }
     };
 
