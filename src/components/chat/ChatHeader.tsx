@@ -69,7 +69,7 @@ export default function ChatHeader() {
       {showDropdown && (
         <>
           <Pressable
-            style={StyleSheet.absoluteFill}
+            style={styles.overlay}
             onPress={() => setShowDropdown(false)}
           />
           <View style={styles.dropdown}>
@@ -169,5 +169,13 @@ const styles = StyleSheet.create({
   dropdownLabelActive: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: -1000,
+    zIndex: 99,
   },
 });

@@ -15,7 +15,7 @@ function formatTime(ts: number) {
 }
 
 const mdStyles = StyleSheet.create({
-  body: { color: '#1A1A1A', fontSize: 15, lineHeight: 22 },
+  body: { color: '#1A1A1A', fontSize: 15, lineHeight: 22, userSelect: 'text' } as any,
   paragraph: { marginTop: 0, marginBottom: 6 },
   strong: { color: '#1A1A1A', fontWeight: '700' },
   em: { color: '#374151', fontStyle: 'italic' },
@@ -92,11 +92,11 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
             <PulseDot size={6} />
           </View>
         ) : isUser ? (
-          <RNText style={localStyles.userText}>
+          <RNText selectable style={localStyles.userText}>
             {message.content}
           </RNText>
         ) : (
-          <Markdown style={mdStyles}>{message.content}</Markdown>
+          <Markdown style={mdStyles} mergeStyle>{message.content}</Markdown>
         )}
       </View>
       <Text

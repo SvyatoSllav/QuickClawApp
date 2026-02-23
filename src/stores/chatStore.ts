@@ -211,12 +211,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     const requestId = `req-${Date.now()}`;
-    const selectedModel = get().selectedModel;
-    const modelForServer = MODEL_TO_OPENROUTER[selectedModel] || selectedModel;
     const params: Record<string, any> = {
       sessionKey: activeSessionKey,
       message: text,
-      model: modelForServer,
       idempotencyKey: requestId,
     };
 
@@ -229,7 +226,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     }
 
-    console.log('[ws] sendMessage → chat.send id=' + requestId + ' session=' + activeSessionKey + ' model=' + modelForServer);
+    console.log('[ws] sendMessage → chat.send id=' + requestId + ' session=' + activeSessionKey);
     try {
       ws.send(
         JSON.stringify({
@@ -357,13 +354,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (payload.sessionKey && payload.sessionKey !== activeKey) return;
 
           if (payload.state === 'delta' && payload.message?.content) {
-            get().updateLastAssistantMessage(normalizeContent(payload.message.content));
+            const content = normalizeContent(payload.message.content);
+            console.log('[ws] chat delta len=' + content.length + ' preview="' + content.substring(0, 50) + '"');
+            get().updateLastAssistantMessage(content);
           } else if (payload.state === 'final') {
-            console.log('[ws] Chat message final for session:', payload.sessionKey);
+            const finalContent = payload.message?.content ? normalizeContent(payload.message.content) : null;
+            console.log('[ws] Chat message final for session:', payload.sessionKey, 'finalLen=' + (finalContent?.length ?? 'none'));
+            // If final has content and it's longer than what we have, use it
+            if (finalContent && finalContent.length > 0) {
+              get().updateLastAssistantMessage(finalContent);
+            }
           }
         }
 
-        // Handle chat.send response — create placeholder assistant message
+        // Handle chat.send response
+        if (data.type === 'res' && data.id?.startsWith('req-') && !data.ok) {
+          console.error('[ws] chat.send FAILED:', JSON.stringify(data.error || data));
+        }
         if (data.type === 'res' && data.ok && data.id?.startsWith('req-')) {
           const assistantMsg: ChatMessage = {
             id: `assistant-${Date.now()}`,
@@ -467,12 +474,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
 /** Normalize Pi-format content (string or array of parts) to plain string */
 function normalizeContent(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
+  let text = '';
+  if (typeof content === 'string') {
+    text = content;
+  } else if (Array.isArray(content)) {
+    text = content
       .filter((part: any) => part.type === 'text' && part.text)
       .map((part: any) => part.text)
       .join('');
   }
-  return '';
+  return stripMessageMetadata(text);
+}
+
+/** Strip OpenClaw metadata prefix from user messages:
+ *  "Conversation info (untrusted metadata):\n```json\n{...}\n```\n\n[timestamp] actual text"
+ */
+function stripMessageMetadata(text: string): string {
+  if (!text) return text;
+  // Remove "Conversation info ..." block + timestamp prefix
+  const cleaned = text.replace(/^Conversation info \(untrusted metadata\):\n```json\n[\s\S]*?```\n\n/, '');
+  // Remove leading timestamp like "[Mon 2026-02-23 09:14 UTC] "
+  return cleaned.replace(/^\[[\w\s:,-]+\]\s*/, '');
 }
