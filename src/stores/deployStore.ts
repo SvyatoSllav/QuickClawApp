@@ -8,6 +8,7 @@ interface DeployState {
   status: string;
   ipAddress: string | null;
   gatewayToken: string | null;
+  wsUrl: string | null;
   isReady: boolean;
   _intervalId: ReturnType<typeof setInterval> | null;
   startPolling: () => void;
@@ -21,6 +22,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
   status: '',
   ipAddress: null,
   gatewayToken: null,
+  wsUrl: null,
   isReady: false,
   _intervalId: null,
 
@@ -62,6 +64,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         status: serverStatus.status ?? '',
         ipAddress: serverStatus.ipAddress ?? null,
         gatewayToken: serverStatus.gatewayToken ?? null,
+        wsUrl: serverStatus.wsUrl ?? null,
         isReady,
       });
 

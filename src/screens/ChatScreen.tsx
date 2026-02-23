@@ -19,6 +19,7 @@ export default function ChatScreen() {
   const isReady = useDeployStore((s) => s.isReady);
   const ipAddress = useDeployStore((s) => s.ipAddress);
   const gatewayToken = useDeployStore((s) => s.gatewayToken);
+  const wsUrl = useDeployStore((s) => s.wsUrl);
   const messages = useChatStore((s) => s.messages);
   const connectionState = useChatStore((s) => s.connectionState);
   const isLoadingHistory = useChatStore((s) => s.isLoadingHistory);
@@ -58,16 +59,16 @@ export default function ChatScreen() {
   );
 
   // Use ref for connection params so the effect only triggers on isReady
-  const connectionRef = useRef({ ipAddress: '', gatewayToken: '' });
+  const connectionRef = useRef({ ipAddress: '', gatewayToken: '', wsUrl: '' });
   useEffect(() => {
-    connectionRef.current = { ipAddress: ipAddress ?? '', gatewayToken: gatewayToken ?? '' };
-    console.log('[chat] connectionRef updated: ip=' + (ipAddress ?? 'null') + ' token=' + (gatewayToken ? gatewayToken.substring(0, 8) + '...' : 'null'));
-  }, [ipAddress, gatewayToken]);
+    connectionRef.current = { ipAddress: ipAddress ?? '', gatewayToken: gatewayToken ?? '', wsUrl: wsUrl ?? '' };
+    console.log('[chat] connectionRef updated: ip=' + (ipAddress ?? 'null') + ' wsUrl=' + (wsUrl ?? 'null'));
+  }, [ipAddress, gatewayToken, wsUrl]);
 
   useEffect(() => {
     console.log('[chat] Connection effect: isReady=' + isReady + ' ip=' + connectionRef.current.ipAddress);
     if (isReady && connectionRef.current.ipAddress) {
-      useChatStore.getState().connect(connectionRef.current.ipAddress, connectionRef.current.gatewayToken);
+      useChatStore.getState().connect(connectionRef.current.ipAddress, connectionRef.current.gatewayToken, connectionRef.current.wsUrl || undefined);
     }
     return () => {
       console.log('[chat] Effect cleanup: disconnecting');

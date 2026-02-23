@@ -5,6 +5,7 @@ export interface ServerStatus {
   openclawRunning: boolean;
   gatewayToken: string | null;
   lastHealthCheck: string | null;
+  wsUrl: string | null;
 }
 
 export interface ServerPool {
@@ -21,6 +22,7 @@ export function serverStatusFromJson(json: Record<string, unknown>): ServerStatu
     openclawRunning: json['openclaw_running'] as boolean,
     gatewayToken: (json['gateway_token'] as string) ?? null,
     lastHealthCheck: (json['last_health_check'] as string) ?? null,
+    wsUrl: (json['ws_url'] as string) ?? null,
   };
 }
 

@@ -23,7 +23,7 @@ interface ChatState {
   setModel: (model: ModelId) => Promise<void>;
   setInputText: (text: string) => void;
   sendMessage: () => void;
-  connect: (serverIp: string, gatewayToken: string) => void;
+  connect: (serverIp: string, gatewayToken: string, wsUrl?: string) => void;
   disconnect: () => void;
   addMessage: (message: ChatMessage) => void;
   updateLastAssistantMessage: (content: string) => void;
@@ -241,7 +241,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  connect: (serverIp, gatewayToken) => {
+  connect: (serverIp, gatewayToken, wsUrl?) => {
     const { connectionState: curState, ws: existingWs } = get();
 
     // Duplicate connection guard
@@ -254,7 +254,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const gen = get()._connGeneration + 1;
     set({ _connGeneration: gen });
 
-    console.log('[ws] Connecting to ws://' + serverIp + ':18789 gen=' + gen + ' token=' + (gatewayToken ? gatewayToken.substring(0, 8) + '...' : 'NONE'));
+    const wsEndpoint = wsUrl || `ws://${serverIp}:18789`;
+    console.log('[ws] Connecting to ' + wsEndpoint + ' gen=' + gen);
 
     if (existingWs) {
       console.log('[ws] Closing existing WebSocket before reconnect');
@@ -266,7 +267,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set({ connectionState: 'connecting', ws: null });
 
-    const ws = new WebSocket(`ws://${serverIp}:18789`);
+    const ws = new WebSocket(wsEndpoint);
 
     ws.onopen = () => {
       // Stale check
@@ -403,7 +404,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const state = get();
         if (state.connectionState === 'disconnected') {
           console.log('[ws] Auto-reconnecting...');
-          state.connect(serverIp, gatewayToken);
+          state.connect(serverIp, gatewayToken, wsUrl);
         }
       }, 1000);
     };
