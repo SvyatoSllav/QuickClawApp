@@ -80,7 +80,7 @@ export default function Sidebar() {
     { label: 'Analytics', icon: BarChart3, disabled: true },
     { label: 'Server', icon: Server, disabled: true },
     { label: 'Training', icon: BookOpen, disabled: true },
-    { label: 'Support', icon: HelpCircle },
+    { label: 'Support', icon: HelpCircle, screen: 'support' },
   ];
 
   const renderItem = (item: MenuItem, isActive: boolean) => {

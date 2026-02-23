@@ -116,4 +116,12 @@ export const en = {
   // Files screen
   filesTitle: 'Files',
   filesOnServer: 'Files on server',
+
+  // Support screen
+  supportSectionLabel: 'CONTACT US',
+  supportDescription: 'Describe your issue or question and we will get back to you as soon as possible.',
+  supportPlaceholder: 'Describe your issue...',
+  supportSend: 'Send Message',
+  supportSentTitle: 'Message Sent',
+  supportSentMessage: 'Thank you! We will review your message and get back to you.',
 } as const;
