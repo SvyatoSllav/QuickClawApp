@@ -9,6 +9,7 @@ urlpatterns = [
     path('api/payments/', include('apps.payments.urls')),
     path('api/telegram/', include('apps.telegram_app.urls')),
     path('api/subscription/', include('apps.payments.subscription_urls')),
+    path('api/support/', include('apps.support.urls')),
     path('api/', include('apps.servers.urls')),
     path('api/', include('apps.servers.desktop_urls')),
     path('api/', include('apps.servers.mobile_urls')),
