@@ -88,11 +88,11 @@ function resetHealthWatchdog(get: () => ChatState) {
   healthWatchdog = setTimeout(() => {
     const { connectionState, ws } = get();
     if (connectionState === 'connected' && ws) {
-      console.log('[ws] Health watchdog: no events for 15s, forcing reconnect');
+      console.log('[ws] Health watchdog: no events for 60s, forcing reconnect');
       remoteLog('warn', 'ws', 'health watchdog timeout, forcing reconnect');
       ws.close();
     }
-  }, 15000);
+  }, 60000);
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
