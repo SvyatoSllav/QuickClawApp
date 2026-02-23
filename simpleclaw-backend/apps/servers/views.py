@@ -62,6 +62,50 @@ class SkillsSearchView(APIView):
             return Response({'skills': [], 'total': 0, 'error': 'Marketplace unavailable'}, status=502)
 
 
+class SkillDetailView(APIView):
+    """GET /api/skills/<slug>/ — fetch skill detail via SkillsMP search (no per-skill endpoint)"""
+
+    def get(self, request, slug):
+        cache_key = f'skillsmp:detail:{slug}'
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(json.loads(cached))
+
+        base_url = getattr(settings, 'SKILLSMP_BASE_URL', 'https://skillsmp.com/api/v1')
+        api_key = getattr(settings, 'SKILLSMP_API_KEY', '')
+
+        try:
+            # SkillsMP has no per-skill endpoint; search by name and match by id
+            resp = http_requests.get(
+                f'{base_url}/skills/search',
+                params={'q': slug, 'limit': 5, 'sortBy': 'stars'},
+                headers={'Authorization': f'Bearer {api_key}', 'Accept': 'application/json'},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            raw = resp.json()
+
+            inner = raw.get('data', raw) if raw.get('success') else raw
+            skills = inner.get('skills', [])
+
+            # Try exact match by id first, then by name
+            match = None
+            for s in skills:
+                if s.get('id') == slug or s.get('name') == slug:
+                    match = s
+                    break
+            if not match and skills:
+                match = skills[0]
+
+            if match:
+                cache.set(cache_key, json.dumps(match), SKILLSMP_CACHE_TTL)
+                return Response(match)
+            return Response({'error': 'Skill not found'}, status=404)
+        except http_requests.RequestException as e:
+            logger.warning('SkillsMP detail failed for %s: %s', slug, e)
+            return Response({'error': 'Marketplace unavailable'}, status=502)
+
+
 class ServerStatusView(APIView):
     def get(self, request):
         """Статус сервера пользователя"""

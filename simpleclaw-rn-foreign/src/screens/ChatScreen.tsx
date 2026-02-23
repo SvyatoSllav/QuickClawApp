@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { View, FlatList, KeyboardAvoidingView, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent, StyleSheet } from 'react-native';
+import { View, FlatList, Keyboard, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { ArrowDown } from 'lucide-react-native';
 import { useDeployStore } from '../stores/deployStore';
@@ -26,6 +26,19 @@ export default function ChatScreen() {
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fabOpacity = useSharedValue(0);
   const prevMessageCount = useRef(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height),
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0),
+    );
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   // Filter out blank assistant messages except the last one (loading indicator)
   const visibleMessages = React.useMemo(() => {
@@ -117,9 +130,8 @@ export default function ChatScreen() {
   const showEmptyState = isReady && !isInitialLoading && visibleMessages.length === 0;
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <View
+      style={{ flex: 1, backgroundColor: colors.background, paddingBottom: keyboardHeight > 0 ? keyboardHeight + 8 : 0 }}
     >
       <ChatHeader />
 
@@ -175,7 +187,7 @@ export default function ChatScreen() {
           <ChatInput />
         </View>
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

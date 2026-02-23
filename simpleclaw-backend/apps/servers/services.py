@@ -44,8 +44,12 @@ DOCKER_COMPOSE_WITH_CHROME = """services:
       - "18789:18789"
     env_file:
       - .env
+    environment:
+      - PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
     volumes:
       - ./openclaw-config.yaml:/app/config.yaml
+      - ./skills/human-browser:/app/skills/human-browser
+      - /root/playwright-cache:/home/node/.cache/ms-playwright
       - ./data:/app/data
       - config:/home/node/.openclaw
     depends_on:
@@ -542,6 +546,64 @@ class ServerManager:
         # NOTE: Lightpanda browser profile is configured by configure_searxng_provider().
         return True
 
+    def install_human_browser(self):
+        """Install human-browser skill (Playwright stealth browser with residential proxy).
+
+        Uploads SKILL.md, browser-human.js, and package.json to the host skill directory
+        (volume-mounted into the container). Installs npm deps and Playwright chromium
+        using an ephemeral container so binaries end up on the host.
+        """
+        import os
+        path = self.server.openclaw_path
+        skill_dir = f'{path}/skills/human-browser'
+        logger.info(f'Installing human-browser skill on {self.server.ip_address}...')
+
+        # Local skill files in the backend repo
+        local_skills_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'skills', 'human-browser',
+        )
+
+        # Create directories on server host
+        self.exec_command(f'mkdir -p {skill_dir}/scripts')
+
+        # Upload skill files
+        for rel_path in ['SKILL.md', 'package.json', 'scripts/browser-human.js']:
+            local_path = os.path.join(local_skills_dir, rel_path)
+            try:
+                with open(local_path, 'r') as f:
+                    content = f.read()
+            except FileNotFoundError:
+                logger.warning(f'human-browser file not found: {local_path}')
+                continue
+            self.upload_file(content, f'{skill_dir}/{rel_path}')
+
+        # Install npm deps via ephemeral container (host has no node)
+        self.exec_command(
+            f'docker run --rm -u 0 '
+            f'-v {skill_dir}:/skill -w /skill '
+            f'openclaw-chrome:latest '
+            f'sh -c "npm install --no-fund --no-audit 2>&1"',
+            timeout=120,
+        )
+
+        # Install Playwright chromium to persistent host cache
+        self.exec_command(
+            f'docker run --rm -u 0 '
+            f'-v {skill_dir}:/skill '
+            f'-v /root/playwright-cache:/root/.cache/ms-playwright '
+            f'-w /skill '
+            f'openclaw-chrome:latest '
+            f'sh -c "npx playwright install chromium 2>&1"',
+            timeout=300,
+        )
+
+        # Fix ownership for node user (uid 1000)
+        self.exec_command(f'chown -R 1000:1000 {skill_dir}')
+        self.exec_command('chown -R 1000:1000 /root/playwright-cache')
+
+        logger.info(f'human-browser skill installed on {self.server.ip_address}')
+
     def _upload_docker_files(self, path):
         """Upload Dockerfile, docker-compose, SearXNG settings, and adapters to server"""
         self.upload_file(DOCKERFILE_CONTENT, f'{path}/Dockerfile')
@@ -552,6 +614,8 @@ class ServerManager:
 
     def set_model(self, model_slug: str) -> tuple[bool, str]:
         """Change the active model on a running OpenClaw container.
+
+        Updates both the global default and all per-agent model overrides.
 
         Args:
             model_slug: Frontend model ID like 'claude-sonnet-4' or 'minimax-m2.5'.
@@ -565,6 +629,8 @@ class ServerManager:
         openrouter_model = self._ensure_openrouter_prefix(base_model)
 
         cli = 'docker exec openclaw node /app/openclaw.mjs'
+
+        # 1. Set global default model
         out, err, exit_code = self.exec_command(
             f'{cli} models set {openrouter_model}',
             timeout=30,
@@ -574,11 +640,41 @@ class ServerManager:
             logger.warning('set_model failed for %s: %s', openrouter_model, err or out)
             return False, (err or out).strip()
 
+        # 2. Update per-agent model overrides so all agents use the new model
+        self._update_agent_models(openrouter_model)
+
         # Re-apply aliases so /model command still works after models set
         self._apply_model_aliases()
 
         logger.info('Model changed to %s on %s', openrouter_model, self.server.ip_address)
         return True, openrouter_model
+
+    def _update_agent_models(self, openrouter_model: str):
+        """Update the model field on all agents in the config."""
+        cli = 'docker exec openclaw node /app/openclaw.mjs'
+        # Read current config to get agent list
+        out, err, code = self.exec_command(f'{cli} config get agents.list', timeout=15)
+        if code != 0:
+            logger.warning('Failed to read agents list: %s', err or out)
+            return
+
+        try:
+            agents = json.loads(out.strip())
+        except (json.JSONDecodeError, ValueError):
+            logger.warning('Failed to parse agents list: %s', out[:200])
+            return
+
+        for i, agent in enumerate(agents):
+            if agent.get('model'):
+                agent['model'] = openrouter_model
+
+        agents_json = json.dumps(agents)
+        out, err, code = self.exec_command(
+            f"{cli} config set agents.list '{agents_json}'",
+            timeout=15,
+        )
+        if code != 0:
+            logger.warning('Failed to update agent models: %s', (err or out)[:200])
 
     @staticmethod
     def _ensure_openrouter_prefix(model: str) -> str:
@@ -792,6 +888,9 @@ limits:
             self.upload_file(config_content, f'{path}/openclaw-config.yaml')
             self._upload_docker_files(path)
 
+            # Upload human-browser skill files to host (mounted into container)
+            self._upload_human_browser_files(path)
+
             # Stop existing container and clear stale config
             self.exec_command(f'cd {path} && docker compose down 2>/dev/null || true')
             self.exec_command('docker volume rm openclaw_config 2>/dev/null || true')
@@ -811,6 +910,9 @@ limits:
 
             # Install browser (the slow part — ~3-5 min)
             self.install_browser_in_container()
+
+            # Install human-browser Playwright deps (needs running container image)
+            self.install_human_browser()
 
             # Run doctor + set gateway mode + bind to LAN for mobile access
             self.exec_command('docker exec openclaw node /app/openclaw.mjs doctor --fix')
@@ -912,12 +1014,18 @@ limits:
             # Ensure latest docker-compose with SearXNG + Lightpanda
             self._upload_docker_files(path)
 
+            # Upload human-browser skill files to host (mounted into container)
+            self._upload_human_browser_files(path)
+
             # Recreate to pick up new .env (restart doesn't reload env vars)
             self.exec_command(f'cd {path} && docker compose up -d --force-recreate')
             time.sleep(8)
 
             # Reinstall Chromium (lost when container is recreated from image)
             self.install_browser_in_container()
+
+            # Install human-browser Playwright deps
+            self.install_human_browser()
 
             self._fix_permissions()
 
@@ -1203,6 +1311,9 @@ limits:
             self.upload_file(config_content, f'{path}/openclaw-config.yaml')
             self._upload_docker_files(path)
 
+            # Upload human-browser skill files to host (mounted into container)
+            self._upload_human_browser_files(path)
+
             # Stop existing container and clear stale config
             self.exec_command(f'cd {path} && docker compose down 2>/dev/null || true')
             self.exec_command('docker volume rm openclaw_config 2>/dev/null || true')
@@ -1230,6 +1341,9 @@ limits:
 
             # Install browser in container
             self.install_browser_in_container()
+
+            # Install human-browser Playwright deps
+            self.install_human_browser()
 
             # Run doctor to fix initial setup issues
             self.exec_command('docker exec openclaw node /app/openclaw.mjs doctor --fix')
@@ -1684,6 +1798,8 @@ limits:
         'blogwatcher', 'gifgrep', 'github', 'gog', 'himalaya',
         'mcporter', 'nano-banana-pro', 'notion', 'obsidian', 'tmux', 'trello',
         'skill-creator',
+        # Stealth browser skill (Playwright + residential proxy + human behavior)
+        'human-browser',
     }
 
     # VPS-useless skills to permanently delete (not even kept in skills-disabled)

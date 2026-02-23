@@ -41,7 +41,7 @@ export default function ChatHeader() {
 
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.container, { paddingTop: 0 }]}>
         {/* Hamburger */}
         <Pressable onPress={toggleSidebar} hitSlop={8} style={styles.hamburger}>
           <Menu size={22} color={colors.foreground} />
@@ -66,7 +66,7 @@ export default function ChatHeader() {
       {showDropdown && (
         <>
           <Pressable
-            style={StyleSheet.absoluteFill}
+            style={styles.overlay}
             onPress={() => setShowDropdown(false)}
           />
           <View style={styles.dropdown}>
@@ -96,7 +96,6 @@ export default function ChatHeader() {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'relative',
-    zIndex: 50,
   },
   container: {
     flexDirection: 'row',
@@ -166,5 +165,13 @@ const styles = StyleSheet.create({
   dropdownLabelActive: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: -1000,
+    zIndex: 99,
   },
 });

@@ -6,6 +6,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 import {
   MessageSquare,
@@ -37,6 +38,7 @@ interface MenuItem {
 }
 
 export default function Sidebar() {
+  const insets = useSafeAreaInsets();
   const isSidebarOpen = useNavigationStore((s) => s.isSidebarOpen);
   const closeSidebar = useNavigationStore((s) => s.closeSidebar);
   const setScreen = useNavigationStore((s) => s.setScreen);
@@ -139,7 +141,7 @@ export default function Sidebar() {
         ]}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <View style={styles.headerLeft}>
             <Text style={{ fontSize: 22 }}>{'\uD83E\uDD80'}</Text>
             <Text style={styles.headerTitle}>EasyClaw</Text>

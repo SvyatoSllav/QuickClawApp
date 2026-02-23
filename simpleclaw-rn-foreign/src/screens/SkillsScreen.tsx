@@ -185,25 +185,13 @@ function SkillCard({ skill, onPress }: { skill: SkillsmpSkill; onPress?: () => v
 
       {/* Body */}
       <View style={s.cardBody}>
-        {/* Line 1: export name */}
-        <View style={s.codeLine}>
-          <Text style={s.lineNum}>1</Text>
-          <Text style={s.codeKeyword}>export </Text>
-          <Text style={s.codeName}>{skill.name}</Text>
-        </View>
-
-        {/* Line 2: from "author" */}
+        {/* Author row */}
         {skill.author && (
-          <View style={s.codeLine}>
-            <Text style={s.lineNum}>2</Text>
+          <View style={s.authorRow}>
             {avatarUri && (
-              <Image
-                source={{ uri: avatarUri }}
-                style={s.authorAvatar}
-              />
+              <Image source={{ uri: avatarUri }} style={s.authorAvatar} />
             )}
-            <Text style={s.codeFrom}>from </Text>
-            <Text style={s.codeAuthor}>"{skill.author}"</Text>
+            <Text style={s.authorName}>{skill.author}</Text>
           </View>
         )}
 
@@ -364,47 +352,21 @@ const s = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  codeLine: {
+  authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  lineNum: {
-    width: 32,
-    fontSize: 12,
-    fontFamily: 'monospace',
-    color: '#D1D5DB',
-    marginRight: 8,
-    backgroundColor: 'rgba(240,232,220,0.2)',
-    paddingLeft: 8,
-    paddingRight: 4,
-  },
-  codeKeyword: {
-    fontSize: 18,
-    fontFamily: 'monospace',
-    color: '#8B5CF6',
-  },
-  codeName: {
-    fontSize: 18,
-    fontFamily: 'monospace',
-    fontWeight: '700',
-    color: '#1A1A1A',
-  },
-  codeFrom: {
-    fontSize: 12,
-    fontFamily: 'monospace',
-    color: '#3B82F6',
-  },
-  codeAuthor: {
-    fontSize: 12,
-    fontFamily: 'monospace',
-    color: '#16A34A',
+    gap: 6,
+    marginBottom: 6,
   },
   authorAvatar: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+  },
+  authorName: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
   },
   cardDesc: {
     fontSize: 12,

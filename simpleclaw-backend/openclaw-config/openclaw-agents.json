@@ -10,7 +10,7 @@
         "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Research Analyst", "emoji": "🔍" },
         "workspace": "/home/node/.openclaw/agents/researcher",
-        "skills": ["summarize", "blogwatcher", "weather", "session-logs", "mcporter"],
+        "skills": ["summarize", "blogwatcher", "weather", "session-logs", "mcporter", "human-browser"],
         "tools": {
           "allow": ["web_search", "web_fetch", "browser", "read", "write", "edit", "grep", "find", "ls", "exec", "memory_search", "memory_get"]
         }
@@ -21,7 +21,7 @@
         "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Content Creator", "emoji": "✍️" },
         "workspace": "/home/node/.openclaw/agents/writer",
-        "skills": ["summarize", "nano-banana-pro", "openai-image-gen", "gifgrep", "obsidian", "session-logs"],
+        "skills": ["summarize", "nano-banana-pro", "openai-image-gen", "gifgrep", "obsidian", "session-logs", "human-browser"],
         "tools": {
           "allow": ["web_search", "web_fetch", "read", "write", "edit", "grep", "find", "ls", "exec", "memory_search", "memory_get"]
         }
@@ -32,7 +32,7 @@
         "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Coding Assistant", "emoji": "💻" },
         "workspace": "/home/node/.openclaw/agents/coder",
-        "skills": ["github", "coding-agent", "tmux", "session-logs", "mcporter"],
+        "skills": ["github", "coding-agent", "tmux", "session-logs", "mcporter", "human-browser"],
         "tools": {
           "allow": ["read", "write", "edit", "apply_patch", "grep", "find", "ls", "exec", "web_search", "web_fetch", "browser"]
         }
@@ -43,7 +43,7 @@
         "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Data Analyst", "emoji": "📊" },
         "workspace": "/home/node/.openclaw/agents/analyst",
-        "skills": ["summarize", "nano-pdf", "gog", "session-logs"],
+        "skills": ["summarize", "nano-pdf", "gog", "session-logs", "human-browser"],
         "tools": {
           "allow": ["read", "write", "edit", "grep", "find", "ls", "exec", "web_search", "web_fetch", "memory_search", "memory_get"]
         }
@@ -54,7 +54,7 @@
         "model": "openrouter/google/gemini-3-flash-preview",
         "identity": { "name": "Personal Assistant", "emoji": "📋" },
         "workspace": "/home/node/.openclaw/agents/assistant",
-        "skills": ["gog", "trello", "notion", "himalaya", "weather", "session-logs"],
+        "skills": ["gog", "trello", "notion", "himalaya", "weather", "session-logs", "human-browser"],
         "tools": {
           "allow": ["cron", "message", "read", "write", "edit", "grep", "find", "ls", "exec", "web_search", "web_fetch", "memory_search", "memory_get"]
         }

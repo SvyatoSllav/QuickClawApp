@@ -25,6 +25,18 @@ export const AVAILABLE_MODELS: ModelOption[] = [
   { id: 'minimax-m2.5', label: 'MiniMax M2.5', icon: 'minimax' },
 ];
 
+/** Map frontend model IDs to OpenRouter full paths */
+export const MODEL_TO_OPENROUTER: Record<ModelId, string> = {
+  'claude-sonnet-4': 'openrouter/anthropic/claude-sonnet-4',
+  'claude-opus-4.5': 'openrouter/anthropic/claude-opus-4.5',
+  'claude-sonnet-4.5': 'openrouter/anthropic/claude-sonnet-4-5-20250929',
+  'claude-haiku-4.5': 'openrouter/anthropic/claude-haiku-4.5',
+  'gpt-4o': 'openrouter/openai/gpt-4o',
+  'gemini-3-flash': 'openrouter/google/gemini-3-flash-preview',
+  'gemini-2.5-flash': 'openrouter/google/gemini-2.5-flash',
+  'minimax-m2.5': 'openrouter/minimax/minimax-m2.5',
+};
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';

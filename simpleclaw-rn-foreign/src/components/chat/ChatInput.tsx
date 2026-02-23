@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Image, Pressable, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/text';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import { Paperclip, Mic, Send } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ChatInput() {
+  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const inputText = useChatStore((s) => s.inputText);
   const setInputText = useChatStore((s) => s.setInputText);
@@ -50,7 +52,7 @@ export default function ChatInput() {
   const isMultiline = inputHeight > 52;
 
   return (
-    <View style={styles.outerContainer}>
+    <View style={[styles.outerContainer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {attachments.length > 0 && (
         <View style={styles.attachmentsRow}>
           {attachments.map((att, i) => (
@@ -128,8 +130,7 @@ export default function ChatInput() {
 const styles = StyleSheet.create({
   outerContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    paddingBottom: 12,
+    paddingTop: 8,
   },
   attachmentsRow: {
     flexDirection: 'row',

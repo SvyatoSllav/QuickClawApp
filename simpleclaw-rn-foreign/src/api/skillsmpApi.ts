@@ -47,6 +47,30 @@ export async function searchSkills(
   return data;
 }
 
+export interface SkillDetail extends SkillsmpSkill {
+  readme?: string;
+  content?: string;
+  version?: string;
+  dependencies?: string[];
+  category?: string;
+}
+
+// Detail cache
+const detailCache = new Map<string, { data: SkillDetail; expiry: number }>();
+
+export async function getSkillDetail(slug: string): Promise<SkillDetail> {
+  const cached = detailCache.get(slug);
+  if (cached && cached.expiry > Date.now()) {
+    return cached.data;
+  }
+
+  const response = await apiClient.get(`/skills/${slug}/`);
+  const data: SkillDetail = response.data;
+
+  detailCache.set(slug, { data, expiry: Date.now() + CACHE_TTL });
+  return data;
+}
+
 export interface SkillCategory {
   key: string;
   label: string;

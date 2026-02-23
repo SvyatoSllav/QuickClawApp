@@ -13,6 +13,7 @@ async function ensureConfigured() {
   const GoogleSignin = await getGoogleSignin();
   GoogleSignin.configure({
     webClientId: AppConfig.googleClientId,
+    iosClientId: AppConfig.googleClientIdIos,
     offlineAccess: true,
   });
   configured = true;

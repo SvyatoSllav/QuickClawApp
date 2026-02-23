@@ -1,0 +1,8 @@
+{
+  "name": "human-browser",
+  "version": "1.0.0",
+  "description": "Stealth browser skill for OpenClaw — Playwright + residential proxy + human behavior",
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}
