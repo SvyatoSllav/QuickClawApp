@@ -9,6 +9,7 @@ import {
   Image,
   Linking,
   Switch,
+  Alert,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -50,6 +51,7 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
   const agents = useAgentStore((s) => s.agents);
   const fetchAgents = useAgentStore((s) => s.fetchAgents);
   const sendRequest = useChatStore((s) => s.sendRequest);
+  const connectionState = useChatStore((s) => s.connectionState);
 
   const [toggles, setToggles] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -62,19 +64,28 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
   // Fetch detail and initialize toggles when skill changes
   useEffect(() => {
     if (visible && skill) {
+      console.log('[skills] Modal opened for skill:', skill.name, 'slug:', skill.slug, 'id:', skill.id);
+      console.log('[skills] WS connectionState:', connectionState);
+
       const slug = skill.slug || skill.id || skill.name;
       setDetailLoading(true);
       setDetail(null);
       getSkillDetail(slug)
-        .then((d) => setDetail(d))
+        .then((d) => {
+          console.log('[skills] Detail fetched OK for', slug, 'keys:', d ? Object.keys(d) : 'null');
+          setDetail(d);
+        })
         .catch((e) => console.log('[skills] detail fetch error:', e))
         .finally(() => setDetailLoading(false));
 
       // Initialize toggles from current agent install state
       const initial: Record<string, boolean> = {};
       for (const agent of agents) {
-        initial[agent.id] = agent.skills?.includes(skill.name) ?? false;
+        const installed = agent.skills?.includes(skill.name) ?? false;
+        initial[agent.id] = installed;
+        console.log('[skills] Agent', agent.id, 'skills:', JSON.stringify(agent.skills), '→ includes', skill.name, '=', installed);
       }
+      console.log('[skills] Initial toggles:', JSON.stringify(initial));
       setToggles(initial);
     }
     if (visible) {
@@ -103,7 +114,11 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
   }));
 
   const toggleAgent = (agentId: string) => {
-    setToggles((prev) => ({ ...prev, [agentId]: !prev[agentId] }));
+    setToggles((prev) => {
+      const next = { ...prev, [agentId]: !prev[agentId] };
+      console.log('[skills] Toggle agent', agentId, ':', prev[agentId], '→', next[agentId]);
+      return next;
+    });
   };
 
   const hasChanges = agents.some((a) => {
@@ -112,53 +127,81 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
   });
 
   const handleSubmit = async () => {
-    if (!skill || !hasChanges) return;
-    setSubmitting(true);
+    console.log('[skills] handleSubmit called — skill:', skill?.name, 'hasChanges:', hasChanges, 'connectionState:', connectionState);
+    console.log('[skills] Current toggles:', JSON.stringify(toggles));
+    for (const a of agents) {
+      console.log('[skills]   Agent', a.id, 'server skills:', JSON.stringify(a.skills), 'toggle:', toggles[a.id]);
+    }
 
+    if (!skill || !hasChanges) return;
+
+    if (connectionState !== 'connected') {
+      console.log('[skills] BLOCKED — not connected, showing alert');
+      Alert.alert('Not connected', 'Cannot reach the server. Check your connection and try again.');
+      return;
+    }
+
+    setSubmitting(true);
+    let hadError = false;
     const promises: Promise<void>[] = [];
+
     for (const agent of agents) {
       const wasInstalled = agent.skills?.includes(skill.name) ?? false;
       const wantInstalled = toggles[agent.id] ?? false;
+      const method = wantInstalled && !wasInstalled
+        ? 'skills.install'
+        : !wantInstalled && wasInstalled
+          ? 'skills.uninstall'
+          : null;
 
-      if (wantInstalled && !wasInstalled) {
-        promises.push(
-          new Promise<void>((resolve) => {
-            sendRequest(
-              'skills.install',
-              { name: skill.name, installId: agent.id, timeoutMs: 30000 },
-              (response: any) => {
-                if (!response.ok) {
-                  console.log('[skills] install error:', response.error);
-                }
-                resolve();
-              },
-            );
-            setTimeout(resolve, 35000);
-          }),
-        );
-      } else if (!wantInstalled && wasInstalled) {
-        promises.push(
-          new Promise<void>((resolve) => {
-            sendRequest(
-              'skills.uninstall',
-              { name: skill.name, installId: agent.id, timeoutMs: 30000 },
-              (response: any) => {
-                if (!response.ok) {
-                  console.log('[skills] uninstall error:', response.error);
-                }
-                resolve();
-              },
-            );
-            setTimeout(resolve, 35000);
-          }),
-        );
+      if (!method) {
+        console.log('[skills] Agent', agent.id, '— no change (was:', wasInstalled, 'want:', wantInstalled, ')');
+        continue;
       }
+
+      console.log('[skills] Sending', method, 'for agent', agent.id, 'skill', skill.name);
+
+      promises.push(
+        new Promise<void>((resolve) => {
+          const reqId = sendRequest(
+            method,
+            { name: skill.name, installId: agent.id, timeoutMs: 30000 },
+            (response: any) => {
+              console.log('[skills]', method, 'response for agent', agent.id, ':', JSON.stringify(response).substring(0, 500));
+              if (!response.ok) {
+                console.log('[skills]', method, 'FAILED for agent', agent.id, '— error:', response.error);
+                hadError = true;
+              }
+              resolve();
+            },
+          );
+          console.log('[skills] sendRequest returned reqId:', reqId);
+          if (reqId === null) {
+            console.log('[skills] sendRequest returned null — WS disconnected mid-submit');
+            hadError = true;
+            resolve();
+            return;
+          }
+          setTimeout(() => {
+            console.log('[skills] 35s timeout fired for', method, 'agent', agent.id);
+            resolve();
+          }, 35000);
+        }),
+      );
     }
 
+    console.log('[skills] Waiting for', promises.length, 'promises...');
     await Promise.all(promises);
+    console.log('[skills] All promises resolved, hadError:', hadError, '— refetching agents...');
     await fetchAgents();
     setSubmitting(false);
-    onClose();
+
+    if (hadError) {
+      Alert.alert('Error', 'Some skill changes failed. Check your connection and try again.');
+    } else {
+      console.log('[skills] Submit success, closing modal');
+      onClose();
+    }
   };
 
   if (!visible && backdropOpacity.value === 0) return null;

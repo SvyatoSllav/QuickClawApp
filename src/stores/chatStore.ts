@@ -169,7 +169,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     console.log('[ws] loadHistory:', sessionKey);
     remoteLog('info', 'ws', 'loadHistory', { sessionKey });
     set({ isLoadingHistory: true });
-    get().sendRequest('chat.history', { sessionKey }, (data) => {
+    const reqId = get().sendRequest('chat.history', { sessionKey }, (data) => {
       console.log('[ws] loadHistory response:', data.ok ? `${data.result?.messages?.length ?? 0} messages` : 'FAILED', data.error || '');
       remoteLog('info', 'ws', 'loadHistory result', { ok: data.ok, count: data.result?.messages?.length ?? 0, session: sessionKey });
       if (data.ok && data.result?.messages) {
@@ -186,6 +186,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set({ isLoadingHistory: false });
       }
     });
+    if (reqId === null) {
+      console.log('[ws] loadHistory: sendRequest returned null, clearing loading state');
+      set({ isLoadingHistory: false });
+    }
   },
 
   sendMessage: () => {
@@ -342,15 +346,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const hadMessages = get().messages.length > 0;
             console.log('[ws] Connect SUCCESS gen=' + gen + ' (reconnect:', hadMessages, ')');
             remoteLog('info', 'ws', 'connected', { gen, reconnect: hadMessages });
-            // Atomically set both ws and connectionState together
-            set({ connectionState: 'connected', ws });
 
             if (hadMessages) {
               // Reconnect: keep existing messages, just re-fetch sessions quietly
+              set({ connectionState: 'connected', ws });
               const { useSessionStore } = require('./sessionStore');
               useSessionStore.getState().fetchSessions();
             } else {
-              // Fresh connect: full agent/session init
+              // Fresh connect: mark loading until history arrives
+              set({ connectionState: 'connected', ws, isLoadingHistory: true });
               const { useAgentStore } = require('./agentStore');
               useAgentStore.getState().fetchAgents();
             }

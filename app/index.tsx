@@ -1,11 +1,14 @@
-import React, { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, ActivityIndicator, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigationStore } from '../src/stores/navigationStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { useOnboardingStore } from '../src/stores/onboardingStore';
 import { useSubscriptionStore } from '../src/stores/subscriptionStore';
+import { useDeployStore } from '../src/stores/deployStore';
+import { useChatStore } from '../src/stores/chatStore';
 import { useInitAuth } from '../src/hooks/useInitAuth';
+import { remoteLog } from '../src/services/remoteLog';
 import OnboardingScreen from '../src/screens/OnboardingScreen';
 import AuthScreen from '../src/screens/AuthScreen';
 import PlanScreen from '../src/screens/PlanScreen';
@@ -32,6 +35,48 @@ export default function MainScreen() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const hasOnboarded = useOnboardingStore((s) => s.hasCompletedOnboarding);
   const isSubscribed = useSubscriptionStore((s) => s.isSubscribed);
+
+  // --- Global WebSocket lifecycle (stays alive across all screens) ---
+  const isReady = useDeployStore((s) => s.isReady);
+  const ipAddress = useDeployStore((s) => s.ipAddress);
+  const gatewayToken = useDeployStore((s) => s.gatewayToken);
+  const wsUrl = useDeployStore((s) => s.wsUrl);
+
+  const connRef = useRef({ ipAddress: '', gatewayToken: '', wsUrl: '' });
+  useEffect(() => {
+    connRef.current = { ipAddress: ipAddress ?? '', gatewayToken: gatewayToken ?? '', wsUrl: wsUrl ?? '' };
+  }, [ipAddress, gatewayToken, wsUrl]);
+
+  // Connect when server is ready, disconnect on logout
+  useEffect(() => {
+    console.log('[main] WS effect: isReady=' + isReady + ' ip=' + connRef.current.ipAddress);
+    if (isReady && connRef.current.ipAddress) {
+      useChatStore.getState().connect(connRef.current.ipAddress, connRef.current.gatewayToken, connRef.current.wsUrl || undefined);
+    }
+    return () => {
+      if (isReady) {
+        console.log('[main] WS cleanup: disconnecting (isReady changed)');
+        useChatStore.getState().disconnect();
+      }
+    };
+  }, [isReady]);
+
+  // Reconnect when app returns to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        const { connectionState: cs, ws: curWs } = useChatStore.getState();
+        console.log('[main] AppState → active, ws state:', cs, 'hasWs:', !!curWs);
+        remoteLog('info', 'main', 'AppState active', { wsState: cs, hasWs: !!curWs, isReady });
+        if (isReady && connRef.current.ipAddress && cs === 'disconnected') {
+          console.log('[main] Foreground reconnect triggered');
+          remoteLog('info', 'main', 'foreground reconnect');
+          useChatStore.getState().connect(connRef.current.ipAddress, connRef.current.gatewayToken, connRef.current.wsUrl || undefined);
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [isReady]);
 
   useEffect(() => {
     if (!initComplete || authLoading) return;

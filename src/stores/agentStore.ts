@@ -78,14 +78,19 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         console.log('[agents] config.get response:', cfgData.ok ? 'ok' : 'FAILED', cfgData.error || '');
         if (cfgData.ok && cfgData.result?.config?.agents?.list) {
           const configAgents = cfgData.result.config.agents.list as any[];
+          console.log('[agents] config agents count:', configAgents.length);
           const enriched = agentsList.map((agent) => {
             const cfgAgent = configAgents.find((c: any) => c.id === agent.id);
             if (cfgAgent) {
+              console.log('[agents] Enriching agent', agent.id, '— skills:', JSON.stringify(cfgAgent.skills), 'description:', cfgAgent.description?.substring(0, 60));
               return { ...agent, skills: cfgAgent.skills, description: cfgAgent.description };
             }
+            console.log('[agents] No config entry for agent', agent.id);
             return agent;
           });
           set({ agents: enriched });
+        } else {
+          console.log('[agents] config.get — no agents.list in result, raw keys:', cfgData.ok ? Object.keys(cfgData.result?.config || {}) : 'N/A');
         }
       });
     });

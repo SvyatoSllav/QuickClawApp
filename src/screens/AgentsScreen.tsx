@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { Menu, ChevronRight } from 'lucide-react-native';
 import { useNavigationStore } from '../stores/navigationStore';
 import { useAgentStore } from '../stores/agentStore';
+import { useChatStore } from '../stores/chatStore';
 import { colors } from '../config/colors';
 
 const AGENT_EMOJIS: Record<string, string> = {
@@ -36,8 +37,18 @@ export default function AgentsScreen() {
   const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
   const setScreen = useNavigationStore((s) => s.setScreen);
   const agents = useAgentStore((s) => s.agents);
+  const fetchAgents = useAgentStore((s) => s.fetchAgents);
   const switchAgent = useAgentStore((s) => s.switchAgent);
   const isLoading = useAgentStore((s) => s.isLoading);
+  const connectionState = useChatStore((s) => s.connectionState);
+
+  // Fetch agents if store is empty but WS is connected
+  useEffect(() => {
+    if (agents.length === 0 && !isLoading && connectionState === 'connected') {
+      console.log('[agents-screen] Agents empty, fetching...');
+      fetchAgents();
+    }
+  }, [agents.length, isLoading, connectionState]);
 
   const handleSelect = (id: string) => {
     switchAgent(id);
