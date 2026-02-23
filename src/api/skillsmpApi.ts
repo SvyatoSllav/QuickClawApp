@@ -50,6 +50,8 @@ export async function searchSkills(
 export interface SkillDetail extends SkillsmpSkill {
   readme?: string;
   content?: string;
+  metadata?: Record<string, string>;
+  homepage?: string;
   version?: string;
   dependencies?: string[];
   category?: string;
@@ -74,22 +76,20 @@ export async function getSkillDetail(slug: string): Promise<SkillDetail> {
 export interface SkillCategory {
   key: string;
   label: string;
-  count: number;
   icon: string;
-  subcategories?: { label: string; count: number }[];
 }
 
 export const SKILL_CATEGORIES: SkillCategory[] = [
-  { key: 'tools', label: 'Tools', count: 71840, icon: 'Wrench' },
-  { key: 'development', label: 'Development', count: 56892, icon: 'Code' },
-  { key: 'business', label: 'Business', count: 44784, icon: 'Briefcase' },
-  { key: 'data-ai', label: 'Data & AI', count: 37420, icon: 'BrainCircuit' },
-  { key: 'devops', label: 'DevOps', count: 30103, icon: 'Container' },
-  { key: 'testing-security', label: 'Testing & Security', count: 28556, icon: 'ShieldCheck' },
-  { key: 'documentation', label: 'Documentation', count: 20194, icon: 'FileText' },
-  { key: 'content-media', label: 'Content & Media', count: 19703, icon: 'Image' },
-  { key: 'research', label: 'Research', count: 10209, icon: 'FlaskConical' },
-  { key: 'databases', label: 'Databases', count: 4511, icon: 'Database' },
-  { key: 'lifestyle', label: 'Lifestyle', count: 3939, icon: 'Heart' },
-  { key: 'blockchain', label: 'Blockchain', count: 3648, icon: 'Link' },
+  { key: 'tools', label: 'Tools', icon: 'Wrench' },
+  { key: 'development', label: 'Development', icon: 'Code' },
+  { key: 'business', label: 'Business', icon: 'Briefcase' },
+  { key: 'data-ai', label: 'Data & AI', icon: 'BrainCircuit' },
+  { key: 'devops', label: 'DevOps', icon: 'Container' },
+  { key: 'testing-security', label: 'Testing & Security', icon: 'ShieldCheck' },
+  { key: 'documentation', label: 'Documentation', icon: 'FileText' },
+  { key: 'content-media', label: 'Content & Media', icon: 'Image' },
+  { key: 'research', label: 'Research', icon: 'FlaskConical' },
+  { key: 'databases', label: 'Databases', icon: 'Database' },
+  { key: 'lifestyle', label: 'Lifestyle', icon: 'Heart' },
+  { key: 'blockchain', label: 'Blockchain', icon: 'Link' },
 ];

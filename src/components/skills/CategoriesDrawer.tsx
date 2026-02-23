@@ -53,11 +53,6 @@ interface Props {
   activeCategory: string | null;
 }
 
-function formatCount(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
-  return String(n);
-}
-
 export default function CategoriesDrawer({ visible, onClose, onSelect, activeCategory }: Props) {
   const translateX = useSharedValue(DRAWER_WIDTH);
   const backdropOpacity = useSharedValue(0);
@@ -133,9 +128,6 @@ export default function CategoriesDrawer({ visible, onClose, onSelect, activeCat
                     {cat.label}
                   </Text>
                 </View>
-                <Text style={localStyles.categoryCount}>
-                  {formatCount(cat.count)}
-                </Text>
               </Pressable>
             );
           })}
@@ -201,10 +193,5 @@ const localStyles = StyleSheet.create({
   categoryLabelActive: {
     fontWeight: '700',
     color: colors.primary,
-  },
-  categoryCount: {
-    fontSize: 13,
-    color: '#8B8B8B',
-    fontWeight: '500',
   },
 });

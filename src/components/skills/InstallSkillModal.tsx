@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Pressable,
   Dimensions,
   StyleSheet,
   ScrollView,
-  Switch,
   ActivityIndicator,
   Image,
   Linking,
@@ -48,11 +47,9 @@ function formatInstalls(n?: number): string {
 
 export default function InstallSkillModal({ visible, skill, onClose }: Props) {
   const agents = useAgentStore((s) => s.agents);
-  const activeAgentId = useAgentStore((s) => s.activeAgentId);
   const fetchAgents = useAgentStore((s) => s.fetchAgents);
   const sendRequest = useChatStore((s) => s.sendRequest);
 
-  const [toggles, setToggles] = useState<Record<string, boolean>>({});
   const [installing, setInstalling] = useState(false);
   const [detail, setDetail] = useState<SkillDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -71,26 +68,10 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
         .catch((e) => console.log('[skills] detail fetch error:', e))
         .finally(() => setDetailLoading(false));
     }
-  }, [visible, skill]);
-
-  // Reset toggles when skill or visibility changes
-  useEffect(() => {
-    if (visible && skill) {
-      const initial: Record<string, boolean> = {};
-      for (const agent of agents) {
-        const alreadyInstalled = agent.skills?.includes(skill.name) ?? false;
-        if (alreadyInstalled) {
-          initial[agent.id] = true;
-        } else if (agent.id === activeAgentId) {
-          initial[agent.id] = true;
-        } else {
-          initial[agent.id] = false;
-        }
-      }
-      setToggles(initial);
+    if (visible) {
       setInstalling(false);
     }
-  }, [visible, skill, agents, activeAgentId]);
+  }, [visible, skill]);
 
   // Animate
   useEffect(() => {
@@ -112,50 +93,27 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
     opacity: backdropOpacity.value,
   }));
 
-  const isAlreadyInstalled = useCallback(
-    (agentId: string) => {
-      if (!skill) return false;
-      const agent = agents.find((a) => a.id === agentId);
-      return agent?.skills?.includes(skill.name) ?? false;
-    },
-    [agents, skill],
+  const isInstalledOnAny = agents.some(
+    (a) => skill && (a.skills?.includes(skill.name) ?? false),
   );
 
-  const toggleAgent = (agentId: string) => {
-    if (isAlreadyInstalled(agentId)) return;
-    setToggles((prev) => ({ ...prev, [agentId]: !prev[agentId] }));
-  };
-
-  const selectedCount = Object.entries(toggles).filter(
-    ([id, on]) => on && !isAlreadyInstalled(id),
-  ).length;
-
   const handleInstall = async () => {
-    if (!skill || selectedCount === 0) return;
+    if (!skill) return;
     setInstalling(true);
 
-    const toInstall = Object.entries(toggles)
-      .filter(([id, on]) => on && !isAlreadyInstalled(id))
-      .map(([id]) => id);
-
-    let hasError = false;
-
-    for (const agentId of toInstall) {
-      await new Promise<void>((resolve) => {
-        sendRequest(
-          'skills.install',
-          { name: skill.name, installId: agentId, timeoutMs: 30000 },
-          (response: any) => {
-            if (!response.ok) {
-              hasError = true;
-              console.log('[skills] install error:', response.error);
-            }
-            resolve();
-          },
-        );
-        setTimeout(resolve, 35000);
-      });
-    }
+    await new Promise<void>((resolve) => {
+      sendRequest(
+        'skills.install',
+        { name: skill.name, timeoutMs: 30000 },
+        (response: any) => {
+          if (!response.ok) {
+            console.log('[skills] install error:', response.error);
+          }
+          resolve();
+        },
+      );
+      setTimeout(resolve, 35000);
+    });
 
     await fetchAgents();
     setInstalling(false);
@@ -243,17 +201,25 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
             )}
 
             {/* Links */}
-            {(skill?.githubUrl || skill?.skillUrl) && (
+            {(skill?.githubUrl || skill?.skillUrl || detail?.homepage) && (
               <View style={s.linksRow}>
-                {skill.githubUrl && (
+                {detail?.homepage && (
+                  <Pressable
+                    onPress={() => Linking.openURL(detail.homepage!)}
+                    style={s.linkButton}
+                  >
+                    <Text style={s.linkText}>Homepage</Text>
+                  </Pressable>
+                )}
+                {skill?.githubUrl && (
                   <Pressable
                     onPress={() => Linking.openURL(skill.githubUrl!)}
                     style={s.linkButton}
                   >
-                    <Text style={s.linkText}>View on GitHub</Text>
+                    <Text style={s.linkText}>GitHub</Text>
                   </Pressable>
                 )}
-                {skill.skillUrl && (
+                {skill?.skillUrl && (
                   <Pressable
                     onPress={() => Linking.openURL(skill.skillUrl!)}
                     style={s.linkButton}
@@ -262,6 +228,11 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
                   </Pressable>
                 )}
               </View>
+            )}
+
+            {/* Metadata from SKILL.md */}
+            {detail?.metadata?.emoji && (
+              <Text style={s.metadataEmoji}>{detail.metadata.emoji}</Text>
             )}
           </View>
 
@@ -275,36 +246,26 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
             </View>
           ) : null}
 
-          {/* Agents section */}
-          <View style={s.agentsSection}>
-            <Text style={s.sectionTitle}>Install on agents</Text>
-            {agents.map((agent) => {
-              const installed = isAlreadyInstalled(agent.id);
-              return (
-                <Pressable
-                  key={agent.id}
-                  style={s.agentRow}
-                  onPress={() => toggleAgent(agent.id)}
-                  disabled={installed || installing}
-                >
-                  <Text style={s.agentEmoji}>{agentEmoji(agent)}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.agentNameText}>{agentName(agent)}</Text>
+          {/* Agents section — read-only */}
+          {agents.length > 0 && (
+            <View style={s.agentsSection}>
+              <Text style={s.sectionTitle}>Agents</Text>
+              {agents.map((agent) => {
+                const installed = skill ? (agent.skills?.includes(skill.name) ?? false) : false;
+                return (
+                  <View key={agent.id} style={s.agentRow}>
+                    <Text style={s.agentEmoji}>{agentEmoji(agent)}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.agentNameText}>{agentName(agent)}</Text>
+                    </View>
                     {installed && (
-                      <Text style={s.installedLabel}>Already installed</Text>
+                      <Text style={s.installedBadge}>Installed</Text>
                     )}
                   </View>
-                  <Switch
-                    value={toggles[agent.id] ?? false}
-                    onValueChange={() => toggleAgent(agent.id)}
-                    disabled={installed || installing}
-                    trackColor={{ false: '#E5E7EB', true: colors.primary }}
-                    thumbColor="#FFFFFF"
-                  />
-                </Pressable>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+          )}
         </ScrollView>
 
         {/* Install button */}
@@ -312,16 +273,16 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
           <Pressable
             style={[
               s.installButton,
-              (selectedCount === 0 || installing) && s.installButtonDisabled,
+              (isInstalledOnAny || installing) && s.installButtonDisabled,
             ]}
             onPress={handleInstall}
-            disabled={selectedCount === 0 || installing}
+            disabled={isInstalledOnAny || installing}
           >
             {installing ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Text style={s.installButtonText}>
-                Install on {selectedCount} agent{selectedCount !== 1 ? 's' : ''}
+                {isInstalledOnAny ? 'Already installed' : 'Install skill'}
               </Text>
             )}
           </Pressable>
@@ -523,10 +484,14 @@ const s = StyleSheet.create({
     fontWeight: '600',
     color: colors.foreground,
   },
-  installedLabel: {
+  installedBadge: {
     fontSize: 12,
-    color: colors.destructive,
-    marginTop: 2,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  metadataEmoji: {
+    fontSize: 28,
+    marginTop: 8,
   },
   footer: {
     paddingHorizontal: 20,

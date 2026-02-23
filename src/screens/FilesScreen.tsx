@@ -40,7 +40,6 @@ export default function FilesScreen() {
         <Pressable onPress={toggleSidebar} hitSlop={8} style={{ padding: 4 }}>
           <Menu size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={localStyles.headerTitle}>Files</Text>
         <View style={{ flex: 1 }} />
         {/* Model pill */}
         <Pressable
@@ -86,11 +85,6 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
   },
   modelPill: {
     flexDirection: 'row',

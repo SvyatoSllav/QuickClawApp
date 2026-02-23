@@ -31,7 +31,10 @@ export default function SkillsScreen() {
   const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
   const [query, setQuery] = useState('');
   const [skills, setSkills] = useState<SkillsmpSkill[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeCategoryLabel, setActiveCategoryLabel] = useState<string | null>(null);
@@ -40,16 +43,35 @@ export default function SkillsScreen() {
 
   const doSearch = useCallback(async (searchQuery: string) => {
     setIsLoading(true);
+    setPage(1);
     try {
       const result = await searchSkills(searchQuery, 1, 20, 'stars');
       setSkills(result.skills ?? []);
+      setTotal(result.total ?? 0);
     } catch (e) {
       console.log('[skills] search error:', e);
       setSkills([]);
+      setTotal(0);
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || skills.length >= total) return;
+    const nextPage = page + 1;
+    setIsLoadingMore(true);
+    try {
+      const searchQuery = activeCategoryLabel || query;
+      const result = await searchSkills(searchQuery, nextPage, 20, 'stars');
+      setSkills((prev) => [...prev, ...(result.skills ?? [])]);
+      setPage(nextPage);
+    } catch (e) {
+      console.log('[skills] load more error:', e);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, skills.length, total, page, activeCategoryLabel, query]);
 
   useEffect(() => {
     doSearch('');
@@ -75,6 +97,8 @@ export default function SkillsScreen() {
     doSearch('');
   };
 
+  const hasMore = skills.length < total;
+
   return (
     <View style={s.container}>
       {/* Header */}
@@ -82,7 +106,6 @@ export default function SkillsScreen() {
         <Pressable onPress={toggleSidebar} hitSlop={8} style={{ padding: 4 }}>
           <Menu size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={s.headerTitle}>Skills</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 }}>
@@ -133,6 +156,11 @@ export default function SkillsScreen() {
           </View>
         ) : (
           <View style={{ gap: 12, marginTop: 4 }}>
+            {total > 0 && (
+              <Text style={s.resultsCount}>
+                {skills.length} of {total} skills
+              </Text>
+            )}
             {skills.map((skill, index) => (
               <SkillCard
                 key={skill.id || index}
@@ -143,6 +171,19 @@ export default function SkillsScreen() {
                 }}
               />
             ))}
+            {hasMore && (
+              <Pressable
+                style={s.loadMoreButton}
+                onPress={loadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Text style={s.loadMoreText}>Load more</Text>
+                )}
+              </Pressable>
+            )}
           </View>
         )}
       </ScrollView>
@@ -221,11 +262,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
   },
   pageTitle: {
     fontSize: 26,
@@ -306,6 +342,25 @@ const s = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: '#8B8B8B',
+  },
+  resultsCount: {
+    fontSize: 13,
+    color: '#8B8B8B',
+    fontWeight: '500',
+  },
+  loadMoreButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: '#FFFFFF',
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
 
   // Card — terminal style
