@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { View, FlatList, Keyboard, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent, StyleSheet } from 'react-native';
+import { View, FlatList, Keyboard, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent, StyleSheet, AppState } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { ArrowDown } from 'lucide-react-native';
 import { useDeployStore } from '../stores/deployStore';
@@ -12,6 +12,7 @@ import ConnectingOverlay from '../components/chat/ConnectingOverlay';
 import SpinnerIcon from '../components/ui/SpinnerIcon';
 import { Text } from '@/components/ui/text';
 import { colors } from '../config/colors';
+import { remoteLog } from '../services/remoteLog';
 
 const SCROLL_THRESHOLD = 120;
 
@@ -65,8 +66,26 @@ export default function ChatScreen() {
     console.log('[chat] connectionRef updated: ip=' + (ipAddress ?? 'null') + ' wsUrl=' + (wsUrl ?? 'null'));
   }, [ipAddress, gatewayToken, wsUrl]);
 
+  // Reconnect WS when app returns to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        const { connectionState: cs, ws: curWs } = useChatStore.getState();
+        console.log('[chat] AppState → active, ws state:', cs, 'hasWs:', !!curWs);
+        remoteLog('info', 'chat', 'AppState active', { wsState: cs, hasWs: !!curWs, isReady });
+        if (isReady && connectionRef.current.ipAddress && cs === 'disconnected') {
+          console.log('[chat] Foreground reconnect triggered');
+          remoteLog('info', 'chat', 'foreground reconnect');
+          useChatStore.getState().connect(connectionRef.current.ipAddress, connectionRef.current.gatewayToken, connectionRef.current.wsUrl || undefined);
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [isReady]);
+
   useEffect(() => {
     console.log('[chat] Connection effect: isReady=' + isReady + ' ip=' + connectionRef.current.ipAddress);
+    remoteLog('info', 'chat', 'connection effect', { isReady, ip: connectionRef.current.ipAddress });
     if (isReady && connectionRef.current.ipAddress) {
       useChatStore.getState().connect(connectionRef.current.ipAddress, connectionRef.current.gatewayToken, connectionRef.current.wsUrl || undefined);
     }

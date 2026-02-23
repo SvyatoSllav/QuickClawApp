@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   Linking,
+  Switch,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -50,14 +51,15 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
   const fetchAgents = useAgentStore((s) => s.fetchAgents);
   const sendRequest = useChatStore((s) => s.sendRequest);
 
-  const [installing, setInstalling] = useState(false);
+  const [toggles, setToggles] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
   const [detail, setDetail] = useState<SkillDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const backdropOpacity = useSharedValue(0);
 
-  // Fetch detail when skill changes
+  // Fetch detail and initialize toggles when skill changes
   useEffect(() => {
     if (visible && skill) {
       const slug = skill.slug || skill.id || skill.name;
@@ -67,9 +69,16 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
         .then((d) => setDetail(d))
         .catch((e) => console.log('[skills] detail fetch error:', e))
         .finally(() => setDetailLoading(false));
+
+      // Initialize toggles from current agent install state
+      const initial: Record<string, boolean> = {};
+      for (const agent of agents) {
+        initial[agent.id] = agent.skills?.includes(skill.name) ?? false;
+      }
+      setToggles(initial);
     }
     if (visible) {
-      setInstalling(false);
+      setSubmitting(false);
     }
   }, [visible, skill]);
 
@@ -93,30 +102,62 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
     opacity: backdropOpacity.value,
   }));
 
-  const isInstalledOnAny = agents.some(
-    (a) => skill && (a.skills?.includes(skill.name) ?? false),
-  );
+  const toggleAgent = (agentId: string) => {
+    setToggles((prev) => ({ ...prev, [agentId]: !prev[agentId] }));
+  };
 
-  const handleInstall = async () => {
-    if (!skill) return;
-    setInstalling(true);
+  const hasChanges = agents.some((a) => {
+    const current = skill ? (a.skills?.includes(skill.name) ?? false) : false;
+    return (toggles[a.id] ?? false) !== current;
+  });
 
-    await new Promise<void>((resolve) => {
-      sendRequest(
-        'skills.install',
-        { name: skill.name, timeoutMs: 30000 },
-        (response: any) => {
-          if (!response.ok) {
-            console.log('[skills] install error:', response.error);
-          }
-          resolve();
-        },
-      );
-      setTimeout(resolve, 35000);
-    });
+  const handleSubmit = async () => {
+    if (!skill || !hasChanges) return;
+    setSubmitting(true);
 
+    const promises: Promise<void>[] = [];
+    for (const agent of agents) {
+      const wasInstalled = agent.skills?.includes(skill.name) ?? false;
+      const wantInstalled = toggles[agent.id] ?? false;
+
+      if (wantInstalled && !wasInstalled) {
+        promises.push(
+          new Promise<void>((resolve) => {
+            sendRequest(
+              'skills.install',
+              { name: skill.name, installId: agent.id, timeoutMs: 30000 },
+              (response: any) => {
+                if (!response.ok) {
+                  console.log('[skills] install error:', response.error);
+                }
+                resolve();
+              },
+            );
+            setTimeout(resolve, 35000);
+          }),
+        );
+      } else if (!wantInstalled && wasInstalled) {
+        promises.push(
+          new Promise<void>((resolve) => {
+            sendRequest(
+              'skills.uninstall',
+              { name: skill.name, installId: agent.id, timeoutMs: 30000 },
+              (response: any) => {
+                if (!response.ok) {
+                  console.log('[skills] uninstall error:', response.error);
+                }
+                resolve();
+              },
+            );
+            setTimeout(resolve, 35000);
+          }),
+        );
+      }
+    }
+
+    await Promise.all(promises);
     await fetchAgents();
-    setInstalling(false);
+    setSubmitting(false);
     onClose();
   };
 
@@ -138,20 +179,20 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
     <View style={StyleSheet.absoluteFill} pointerEvents={visible ? 'auto' : 'none'}>
       {/* Backdrop */}
       <Animated.View style={[s.backdrop, backdropStyle]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={installing ? undefined : onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={submitting ? undefined : onClose} />
       </Animated.View>
 
       {/* Modal — full screen */}
       <Animated.View style={[s.modal, modalStyle]}>
         {/* Header */}
         <View style={s.header}>
-          <Pressable onPress={onClose} hitSlop={8} disabled={installing} style={s.backButton}>
+          <Pressable onPress={onClose} hitSlop={8} disabled={submitting} style={s.backButton}>
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
           <Text style={s.headerTitle} numberOfLines={1}>
             {skill?.name ?? 'Skill'}
           </Text>
-          <Pressable onPress={onClose} hitSlop={8} disabled={installing}>
+          <Pressable onPress={onClose} hitSlop={8} disabled={submitting}>
             <X size={20} color={colors.foreground} />
           </Pressable>
         </View>
@@ -187,6 +228,13 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
 
             {/* Description */}
             <Text style={s.description}>{displayDetail?.description}</Text>
+
+            {/* Updated date */}
+            {skill?.updatedAt && (
+              <Text style={s.updatedAt}>
+                Updated {new Date(skill.updatedAt).toLocaleDateString()}
+              </Text>
+            )}
 
             {/* Tags */}
             {tags.length > 0 && (
@@ -246,44 +294,43 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
             </View>
           ) : null}
 
-          {/* Agents section — read-only */}
+          {/* Agents section — per-agent toggles */}
           {agents.length > 0 && (
             <View style={s.agentsSection}>
               <Text style={s.sectionTitle}>Agents</Text>
-              {agents.map((agent) => {
-                const installed = skill ? (agent.skills?.includes(skill.name) ?? false) : false;
-                return (
-                  <View key={agent.id} style={s.agentRow}>
-                    <Text style={s.agentEmoji}>{agentEmoji(agent)}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.agentNameText}>{agentName(agent)}</Text>
-                    </View>
-                    {installed && (
-                      <Text style={s.installedBadge}>Installed</Text>
-                    )}
+              {agents.map((agent) => (
+                <View key={agent.id} style={s.agentRow}>
+                  <Text style={s.agentEmoji}>{agentEmoji(agent)}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.agentNameText}>{agentName(agent)}</Text>
                   </View>
-                );
-              })}
+                  <Switch
+                    value={toggles[agent.id] ?? false}
+                    onValueChange={() => toggleAgent(agent.id)}
+                    disabled={submitting}
+                    trackColor={{ false: '#D1D5DB', true: colors.primary }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+              ))}
             </View>
           )}
         </ScrollView>
 
-        {/* Install button */}
+        {/* Submit button */}
         <View style={s.footer}>
           <Pressable
             style={[
               s.installButton,
-              (isInstalledOnAny || installing) && s.installButtonDisabled,
+              (!hasChanges || submitting) && s.installButtonDisabled,
             ]}
-            onPress={handleInstall}
-            disabled={isInstalledOnAny || installing}
+            onPress={handleSubmit}
+            disabled={!hasChanges || submitting}
           >
-            {installing ? (
+            {submitting ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={s.installButtonText}>
-                {isInstalledOnAny ? 'Already installed' : 'Install skill'}
-              </Text>
+              <Text style={s.installButtonText}>Submit</Text>
             )}
           </Pressable>
         </View>
@@ -410,6 +457,11 @@ const s = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: '#374151',
+    marginBottom: 8,
+  },
+  updatedAt: {
+    fontSize: 12,
+    color: '#9CA3AF',
     marginBottom: 12,
   },
   tagsRow: {
@@ -483,11 +535,6 @@ const s = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.foreground,
-  },
-  installedBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#10B981',
   },
   metadataEmoji: {
     fontSize: 28,
