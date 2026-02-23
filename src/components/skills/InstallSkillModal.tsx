@@ -128,76 +128,73 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
 
   const handleSubmit = async () => {
     console.log('[skills] handleSubmit called — skill:', skill?.name, 'hasChanges:', hasChanges, 'connectionState:', connectionState);
-    console.log('[skills] Current toggles:', JSON.stringify(toggles));
-    for (const a of agents) {
-      console.log('[skills]   Agent', a.id, 'server skills:', JSON.stringify(a.skills), 'toggle:', toggles[a.id]);
-    }
-
     if (!skill || !hasChanges) return;
 
     if (connectionState !== 'connected') {
-      console.log('[skills] BLOCKED — not connected, showing alert');
       Alert.alert('Not connected', 'Cannot reach the server. Check your connection and try again.');
       return;
     }
 
     setSubmitting(true);
-    let hadError = false;
-    const promises: Promise<void>[] = [];
 
-    for (const agent of agents) {
-      const wasInstalled = agent.skills?.includes(skill.name) ?? false;
-      const wantInstalled = toggles[agent.id] ?? false;
-      const method = wantInstalled && !wasInstalled
-        ? 'skills.install'
-        : !wantInstalled && wasInstalled
-          ? 'skills.uninstall'
-          : null;
+    // First get config to obtain baseHash and current agent skills
+    const configResult: any = await new Promise((resolve) => {
+      const reqId = sendRequest('config.get', {}, resolve);
+      if (!reqId) resolve({ ok: false, error: 'WS disconnected' });
+      else setTimeout(() => resolve({ ok: false, error: 'timeout' }), 15000);
+    });
 
-      if (!method) {
-        console.log('[skills] Agent', agent.id, '— no change (was:', wasInstalled, 'want:', wantInstalled, ')');
-        continue;
-      }
-
-      console.log('[skills] Sending', method, 'for agent', agent.id, 'skill', skill.name);
-
-      promises.push(
-        new Promise<void>((resolve) => {
-          const reqId = sendRequest(
-            method,
-            { name: skill.name, installId: agent.id, timeoutMs: 30000 },
-            (response: any) => {
-              console.log('[skills]', method, 'response for agent', agent.id, ':', JSON.stringify(response).substring(0, 500));
-              if (!response.ok) {
-                console.log('[skills]', method, 'FAILED for agent', agent.id, '— error:', response.error);
-                hadError = true;
-              }
-              resolve();
-            },
-          );
-          console.log('[skills] sendRequest returned reqId:', reqId);
-          if (reqId === null) {
-            console.log('[skills] sendRequest returned null — WS disconnected mid-submit');
-            hadError = true;
-            resolve();
-            return;
-          }
-          setTimeout(() => {
-            console.log('[skills] 35s timeout fired for', method, 'agent', agent.id);
-            resolve();
-          }, 35000);
-        }),
-      );
+    if (!configResult.ok) {
+      console.log('[skills] config.get failed:', configResult.error);
+      setSubmitting(false);
+      Alert.alert('Error', 'Failed to read config. Try again.');
+      return;
     }
 
-    console.log('[skills] Waiting for', promises.length, 'promises...');
-    await Promise.all(promises);
-    console.log('[skills] All promises resolved, hadError:', hadError, '— refetching agents...');
+    const baseHash = configResult.result?.hash;
+    const serverAgents: any[] = configResult.result?.config?.agents?.list ?? [];
+
+    // Safety: refuse to patch if server returned no agents (would wipe config)
+    if (serverAgents.length === 0) {
+      console.log('[skills] config.get returned 0 agents — aborting to prevent data loss');
+      setSubmitting(false);
+      Alert.alert('Error', 'Server returned empty agent list. Try again.');
+      return;
+    }
+
+    // Build updated agents.list preserving ALL fields, only changing skills
+    const updatedList = serverAgents.map((cfgAgent: any) => {
+      const currentSkills: string[] = cfgAgent.skills ?? [];
+      const wantInstalled = toggles[cfgAgent.id] ?? false;
+      const hasSkill = currentSkills.includes(skill.name);
+
+      let nextSkills = currentSkills;
+      if (wantInstalled && !hasSkill) {
+        nextSkills = [...currentSkills, skill.name];
+      } else if (!wantInstalled && hasSkill) {
+        nextSkills = currentSkills.filter((s: string) => s !== skill.name);
+      }
+
+      // Spread full agent object to preserve model, workspace, tools, identity, etc.
+      return { ...cfgAgent, skills: nextSkills };
+    });
+
+    const patch = { agents: { list: updatedList } };
+    console.log('[skills] Sending config.patch baseHash:', baseHash, 'agents:', JSON.stringify(updatedList));
+
+    const patchResult: any = await new Promise((resolve) => {
+      const reqId = sendRequest('config.patch', { baseHash, raw: JSON.stringify(patch) }, resolve);
+      if (!reqId) resolve({ ok: false, error: 'WS disconnected' });
+      else setTimeout(() => resolve({ ok: false, error: 'timeout' }), 15000);
+    });
+
+    console.log('[skills] config.patch response:', JSON.stringify(patchResult).substring(0, 500));
     await fetchAgents();
     setSubmitting(false);
 
-    if (hadError) {
-      Alert.alert('Error', 'Some skill changes failed. Check your connection and try again.');
+    if (!patchResult.ok) {
+      console.log('[skills] config.patch FAILED:', patchResult.error);
+      Alert.alert('Error', 'Failed to update skills. Try again.');
     } else {
       console.log('[skills] Submit success, closing modal');
       onClose();

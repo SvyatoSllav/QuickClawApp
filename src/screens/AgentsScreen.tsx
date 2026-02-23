@@ -39,6 +39,7 @@ export default function AgentsScreen() {
   const agents = useAgentStore((s) => s.agents);
   const fetchAgents = useAgentStore((s) => s.fetchAgents);
   const switchAgent = useAgentStore((s) => s.switchAgent);
+  const activeAgentId = useAgentStore((s) => s.activeAgentId);
   const isLoading = useAgentStore((s) => s.isLoading);
   const connectionState = useChatStore((s) => s.connectionState);
 
@@ -83,12 +84,16 @@ export default function AgentsScreen() {
               const description = agent.description || FALLBACK_DESCRIPTIONS[agent.id] || '';
               const bgColor = EMOJI_BG_COLORS[agent.id] ?? '#F3F4F6';
               const isPopular = POPULAR_AGENTS.has(agent.id);
+              const isActive = agent.id === activeAgentId;
 
               return (
                 <Pressable
                   key={agent.id}
                   onPress={() => handleSelect(agent.id)}
-                  style={localStyles.agentCard}
+                  style={[
+                    localStyles.agentCard,
+                    isActive && localStyles.agentCardActive,
+                  ]}
                 >
                   <View style={[localStyles.emojiCircle, { backgroundColor: bgColor }]}>
                     <Text style={{ fontSize: 24 }}>{emoji}</Text>
@@ -152,11 +157,17 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     gap: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 2,
+  },
+  agentCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: '#FFFBF5',
   },
   emojiCircle: {
     width: 48,
