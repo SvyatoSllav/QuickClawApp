@@ -96,7 +96,6 @@ export default function ChatHeader() {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'relative',
-    zIndex: 1,
   },
   container: {
     flexDirection: 'row',
