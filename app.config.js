@@ -17,6 +17,11 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.simpleclaw.app",
       usesAppleSignIn: true,
+      infoPlist: {
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: true,
+        },
+      },
     },
     android: {
       adaptiveIcon: {

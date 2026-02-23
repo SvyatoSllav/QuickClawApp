@@ -14,7 +14,6 @@ import { colors } from '../../config/colors';
 export default function ChatHeader() {
   const insets = useSafeAreaInsets();
   const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
-  const isSidebarOpen = useNavigationStore((s) => s.isSidebarOpen);
   const openSessionDrawer = useNavigationStore((s) => s.openSessionDrawer);
   const selectedModel = useChatStore((s) => s.selectedModel);
   const activeSessionKey = useChatStore((s) => s.activeSessionKey);
@@ -42,28 +41,26 @@ export default function ChatHeader() {
 
   return (
     <View style={styles.wrapper}>
-      {!isSidebarOpen && (
-        <View style={[styles.container, { paddingTop: 0 }]}>
-          {/* Hamburger */}
-          <Pressable onPress={toggleSidebar} hitSlop={8} style={styles.hamburger}>
-            <Menu size={22} color={colors.foreground} />
-          </Pressable>
+      <View style={[styles.container, { paddingTop: 0 }]}>
+        {/* Hamburger */}
+        <Pressable onPress={toggleSidebar} hitSlop={8} style={styles.hamburger}>
+          <Menu size={22} color={colors.foreground} />
+        </Pressable>
 
-          {/* Session name + chevron (centered, clickable) */}
-          <Pressable onPress={openSessionDrawer} style={styles.sessionPill}>
-            <Text style={styles.sessionText} numberOfLines={1}>{sessionTitle}</Text>
-            <ChevronDown size={16} color={colors.mutedForeground} />
-          </Pressable>
+        {/* Session name + chevron (centered, clickable) */}
+        <Pressable onPress={openSessionDrawer} style={styles.sessionPill}>
+          <Text style={styles.sessionText} numberOfLines={1}>{sessionTitle}</Text>
+          <ChevronDown size={16} color={colors.mutedForeground} />
+        </Pressable>
 
-          {/* Model icon button */}
-          <Pressable
-            onPress={() => setShowDropdown(!showDropdown)}
-            style={styles.modelButton}
-          >
-            {CurrentModelIcon && <CurrentModelIcon size={18} />}
-          </Pressable>
-        </View>
-      )}
+        {/* Model icon button */}
+        <Pressable
+          onPress={() => setShowDropdown(!showDropdown)}
+          style={styles.modelButton}
+        >
+          {CurrentModelIcon && <CurrentModelIcon size={18} />}
+        </Pressable>
+      </View>
 
       {/* Model dropdown */}
       {showDropdown && (
@@ -99,7 +96,7 @@ export default function ChatHeader() {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'relative',
-    zIndex: 50,
+    zIndex: 1,
   },
   container: {
     flexDirection: 'row',
