@@ -3,6 +3,7 @@ import { ModelId, ChatMessage, ChatAttachment, AVAILABLE_MODELS, MODEL_TO_OPENRO
 import apiClient from '../api/client';
 import { setServerModel } from '../api/profileApi';
 import { getItem, setItem } from '../services/secureStorage';
+import { remoteLog } from '../services/remoteLog';
 
 const SELECTED_MODEL_KEY = 'selected_model';
 
@@ -23,7 +24,7 @@ interface ChatState {
   setModel: (model: ModelId) => Promise<void>;
   setInputText: (text: string) => void;
   sendMessage: () => void;
-  connect: (serverIp: string, gatewayToken: string) => void;
+  connect: (serverIp: string, gatewayToken: string, wsUrl?: string) => void;
   disconnect: () => void;
   addMessage: (message: ChatMessage) => void;
   updateLastAssistantMessage: (content: string) => void;
@@ -39,7 +40,11 @@ interface ChatState {
 
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let healthWatchdog: ReturnType<typeof setTimeout> | null = null;
+let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
 let requestCounter = 0;
+
+// Track last connection params for reconnect
+let lastConnectParams: { serverIp: string; gatewayToken: string; wsUrl?: string } | null = null;
 
 /** Strip provider prefix: "anthropic/claude-sonnet-4" → "claude-sonnet-4", "openrouter/minimax/minimax-m2.5" → "minimax-m2.5" */
 function stripProviderPrefix(raw: string): string {
@@ -84,10 +89,11 @@ function resetHealthWatchdog(get: () => ChatState) {
   healthWatchdog = setTimeout(() => {
     const { connectionState, ws } = get();
     if (connectionState === 'connected' && ws) {
-      console.log('[ws] Health watchdog: no events for 15s, forcing reconnect');
+      console.log('[ws] Health watchdog: no events for 60s, forcing reconnect');
+      remoteLog('warn', 'ws', 'health watchdog timeout, forcing reconnect');
       ws.close();
     }
-  }, 15000);
+  }, 60000);
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -140,6 +146,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { ws, connectionState } = get();
     if (!ws || connectionState !== 'connected') {
       console.log('[ws] sendRequest SKIPPED (not connected):', method, 'state:', connectionState, 'ws:', !!ws);
+      remoteLog('warn', 'ws', 'sendRequest skipped', { method, state: connectionState, hasWs: !!ws });
       return null;
     }
 
@@ -161,9 +168,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadHistory: (sessionKey) => {
     console.log('[ws] loadHistory:', sessionKey);
+    remoteLog('info', 'ws', 'loadHistory', { sessionKey });
     set({ isLoadingHistory: true });
-    get().sendRequest('chat.history', { sessionKey }, (data) => {
+    const reqId = get().sendRequest('chat.history', { sessionKey }, (data) => {
       console.log('[ws] loadHistory response:', data.ok ? `${data.result?.messages?.length ?? 0} messages` : 'FAILED', data.error || '');
+      remoteLog('info', 'ws', 'loadHistory result', { ok: data.ok, count: data.result?.messages?.length ?? 0, session: sessionKey });
       if (data.ok && data.result?.messages) {
         const messages: ChatMessage[] = data.result.messages
           .filter((m: any) => (m.role === 'user' || m.role === 'assistant') && normalizeContent(m.content))
@@ -178,6 +187,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set({ isLoadingHistory: false });
       }
     });
+    if (reqId === null) {
+      console.log('[ws] loadHistory: sendRequest returned null, clearing loading state');
+      set({ isLoadingHistory: false });
+    }
   },
 
   sendMessage: () => {
@@ -188,6 +201,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Self-healing: if state says connected but ws is gone, fix it
     if (connectionState === 'connected' && !ws) {
       console.warn('[ws] State corrupted: connected but no ws — resetting to disconnected');
+      remoteLog('error', 'ws', 'state corrupted: connected but no ws');
       set({ connectionState: 'disconnected', ws: null });
       return;
     }
@@ -227,6 +241,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     console.log('[ws] sendMessage → chat.send id=' + requestId + ' session=' + activeSessionKey);
+    remoteLog('info', 'ws', 'chat.send', { session: activeSessionKey, textLen: text.length, attachments: attachments.length });
     try {
       ws.send(
         JSON.stringify({
@@ -236,12 +251,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           params,
         }),
       );
-    } catch (e) {
+    } catch (e: any) {
       console.error('[ws] sendMessage send failed:', e);
+      remoteLog('error', 'ws', 'chat.send exception', { error: e?.message });
     }
   },
 
-  connect: (serverIp, gatewayToken) => {
+  connect: (serverIp, gatewayToken, wsUrl?) => {
     const { connectionState: curState, ws: existingWs } = get();
 
     // Duplicate connection guard
@@ -254,7 +270,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const gen = get()._connGeneration + 1;
     set({ _connGeneration: gen });
 
-    console.log('[ws] Connecting to ws://' + serverIp + ':18789 gen=' + gen + ' token=' + (gatewayToken ? gatewayToken.substring(0, 8) + '...' : 'NONE'));
+    // Store params for AppState foreground reconnect
+    lastConnectParams = { serverIp, gatewayToken, wsUrl };
+
+    const wsEndpoint = wsUrl || `ws://${serverIp}:18789`;
+    console.log('[ws] Connecting to ' + wsEndpoint + ' gen=' + gen);
+    remoteLog('info', 'ws', 'connecting', { endpoint: wsEndpoint, gen });
 
     if (existingWs) {
       console.log('[ws] Closing existing WebSocket before reconnect');
@@ -266,12 +287,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set({ connectionState: 'connecting', ws: null });
 
-    const ws = new WebSocket(`ws://${serverIp}:18789`);
+    const ws = new WebSocket(wsEndpoint);
 
     ws.onopen = () => {
       // Stale check
       if (get()._connGeneration !== gen) { ws.close(); return; }
       console.log('[ws] WebSocket opened, waiting for challenge...');
+      remoteLog('info', 'ws', 'onopen', { gen });
     };
 
     ws.onmessage = (event) => {
@@ -283,7 +305,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       try {
         const data = JSON.parse(event.data);
-        console.log('[ws] ← recv:', data.type, data.event || data.id || '', data.ok !== undefined ? 'ok=' + data.ok : '');
+        const msgSummary = data.type + ' ' + (data.event || data.id || data.method || '') + (data.ok !== undefined ? ' ok=' + data.ok : '');
+        console.log('[ws] ← recv:', msgSummary);
+        remoteLog('info', 'ws.recv', msgSummary, {
+          gen,
+          ...(data.error ? { error: JSON.stringify(data.error).substring(0, 200) } : {}),
+          ...(data.payload?.state ? { state: data.payload.state } : {}),
+          ...(data.payload?.sessionKey ? { sessionKey: data.payload.sessionKey } : {}),
+        });
 
         // Handle challenge — send connect request
         if (data.type === 'event' && data.event === 'connect.challenge') {
@@ -317,20 +346,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (data.ok || data.payload) {
             const hadMessages = get().messages.length > 0;
             console.log('[ws] Connect SUCCESS gen=' + gen + ' (reconnect:', hadMessages, ')');
-            // Atomically set both ws and connectionState together
-            set({ connectionState: 'connected', ws });
+            remoteLog('info', 'ws', 'connected', { gen, reconnect: hadMessages });
 
             if (hadMessages) {
               // Reconnect: keep existing messages, just re-fetch sessions quietly
+              set({ connectionState: 'connected', ws });
               const { useSessionStore } = require('./sessionStore');
               useSessionStore.getState().fetchSessions();
             } else {
-              // Fresh connect: full agent/session init
+              // Fresh connect: mark loading until history arrives
+              set({ connectionState: 'connected', ws, isLoadingHistory: true });
               const { useAgentStore } = require('./agentStore');
               useAgentStore.getState().fetchAgents();
             }
+            // Start keepalive pings to prevent health watchdog from firing on idle screens
+            if (keepaliveInterval) clearInterval(keepaliveInterval);
+            keepaliveInterval = setInterval(() => {
+              const { ws: curWs, connectionState: cs } = get();
+              if (curWs && cs === 'connected') {
+                try { curWs.send(JSON.stringify({ type: 'ping' })); } catch {}
+              }
+            }, 30000);
           } else {
             console.error('[ws] Connect FAILED:', JSON.stringify(data.error || data));
+            remoteLog('error', 'ws', 'connect failed', { error: data.error || data });
           }
           return;
         }
@@ -341,6 +380,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (handler) {
             get()._responseHandlers.delete(data.id);
             console.log('[ws] RPC response for', data.id, 'ok:', !!data.ok, data.error ? 'error:' + JSON.stringify(data.error) : '');
+            remoteLog('info', 'ws.rpc', data.id, { ok: !!data.ok, error: data.error ? JSON.stringify(data.error).substring(0, 300) : undefined });
             handler({ ok: !!data.ok, result: data.payload, error: data.error });
             return;
           }
@@ -356,22 +396,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (payload.state === 'delta' && payload.message?.content) {
             const content = normalizeContent(payload.message.content);
             console.log('[ws] chat delta len=' + content.length + ' preview="' + content.substring(0, 50) + '"');
+            remoteLog('info', 'ws.chat', 'delta', { len: content.length, session: payload.sessionKey });
             get().updateLastAssistantMessage(content);
           } else if (payload.state === 'final') {
             const finalContent = payload.message?.content ? normalizeContent(payload.message.content) : null;
             console.log('[ws] Chat message final for session:', payload.sessionKey, 'finalLen=' + (finalContent?.length ?? 'none'));
+            remoteLog('info', 'ws.chat', 'final', { len: finalContent?.length ?? 0, session: payload.sessionKey });
             // If final has content and it's longer than what we have, use it
             if (finalContent && finalContent.length > 0) {
               get().updateLastAssistantMessage(finalContent);
             }
+          } else {
+            remoteLog('info', 'ws.chat', 'other', { state: payload.state, session: payload.sessionKey });
           }
         }
 
         // Handle chat.send response
         if (data.type === 'res' && data.id?.startsWith('req-') && !data.ok) {
           console.error('[ws] chat.send FAILED:', JSON.stringify(data.error || data));
+          remoteLog('error', 'ws', 'chat.send failed', { error: data.error || data });
         }
         if (data.type === 'res' && data.ok && data.id?.startsWith('req-')) {
+          remoteLog('info', 'ws', 'chat.send OK, creating assistant placeholder', { reqId: data.id });
           const assistantMsg: ChatMessage = {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
@@ -380,8 +426,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           };
           set((s) => ({ messages: [...s.messages, assistantMsg] }));
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('[ws] Message parse error:', e, 'raw:', String(event.data).substring(0, 200));
+        remoteLog('error', 'ws', 'parse error', { error: e?.message, raw: String(event.data).substring(0, 200) });
       }
     };
 
@@ -392,25 +439,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return;
       }
       console.log('[ws] WebSocket CLOSED gen=' + gen + ' code=' + event.code + ' reason="' + (event.reason || '') + '"');
+      remoteLog('warn', 'ws', 'closed', { gen, code: event.code, reason: event.reason || '' });
       set({ connectionState: 'disconnected', ws: null });
 
-      // Stop health watchdog
+      // Stop health watchdog and keepalive
       if (healthWatchdog) { clearTimeout(healthWatchdog); healthWatchdog = null; }
+      if (keepaliveInterval) { clearInterval(keepaliveInterval); keepaliveInterval = null; }
 
-      // Auto-reconnect after 1s
+      // Auto-reconnect after 2s
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       reconnectTimeout = setTimeout(() => {
         const state = get();
         if (state.connectionState === 'disconnected') {
           console.log('[ws] Auto-reconnecting...');
-          state.connect(serverIp, gatewayToken);
+          remoteLog('info', 'ws', 'auto-reconnecting after close');
+          state.connect(serverIp, gatewayToken, wsUrl);
         }
-      }, 1000);
+      }, 2000);
     };
 
     ws.onerror = (event) => {
       if (get()._connGeneration !== gen) return;
       console.error('[ws] WebSocket ERROR gen=' + gen);
+      remoteLog('error', 'ws', 'error', { gen });
       ws.close();
     };
 
@@ -429,6 +480,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (healthWatchdog) {
       clearTimeout(healthWatchdog);
       healthWatchdog = null;
+    }
+    if (keepaliveInterval) {
+      clearInterval(keepaliveInterval);
+      keepaliveInterval = null;
     }
     const ws = get().ws;
     if (ws) {

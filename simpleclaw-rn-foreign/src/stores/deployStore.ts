@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getServerStatus } from '../api/serverApi';
 import { AppConfig } from '../config/appConfig';
+import { remoteLog } from '../services/remoteLog';
 
 interface DeployState {
   assigned: boolean;
@@ -8,6 +9,7 @@ interface DeployState {
   status: string;
   ipAddress: string | null;
   gatewayToken: string | null;
+  wsUrl: string | null;
   isReady: boolean;
   _intervalId: ReturnType<typeof setInterval> | null;
   startPolling: () => void;
@@ -21,6 +23,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
   status: '',
   ipAddress: null,
   gatewayToken: null,
+  wsUrl: null,
   isReady: false,
   _intervalId: null,
 
@@ -62,14 +65,20 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         status: serverStatus.status ?? '',
         ipAddress: serverStatus.ipAddress ?? null,
         gatewayToken: serverStatus.gatewayToken ?? null,
+        wsUrl: serverStatus.wsUrl ?? null,
         isReady,
       });
 
-      if (isReady || serverStatus.status === 'error') {
+      if (isReady) {
+        remoteLog('info', 'deploy', 'server ready', { ip: serverStatus.ipAddress, wsUrl: serverStatus.wsUrl });
+        get().stopPolling();
+      } else if (serverStatus.status === 'error') {
+        remoteLog('error', 'deploy', 'server error', { status: serverStatus.status });
         get().stopPolling();
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('[deploy] checkStatus() ERROR:', e);
+      remoteLog('error', 'deploy', 'checkStatus error', { error: e?.message });
     }
   },
 }));

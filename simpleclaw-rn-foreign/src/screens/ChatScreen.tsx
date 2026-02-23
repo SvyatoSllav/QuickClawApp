@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { View, FlatList, Keyboard, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { ArrowDown } from 'lucide-react-native';
@@ -17,15 +17,13 @@ const SCROLL_THRESHOLD = 120;
 
 export default function ChatScreen() {
   const isReady = useDeployStore((s) => s.isReady);
-  const ipAddress = useDeployStore((s) => s.ipAddress);
-  const gatewayToken = useDeployStore((s) => s.gatewayToken);
   const messages = useChatStore((s) => s.messages);
   const connectionState = useChatStore((s) => s.connectionState);
   const isLoadingHistory = useChatStore((s) => s.isLoadingHistory);
   const flatListRef = useRef<FlatList>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fabOpacity = useSharedValue(0);
-  const prevMessageCount = useRef(0);
+
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
@@ -53,62 +51,36 @@ export default function ChatScreen() {
   }, [messages]);
 
   // Loading state: server ready but WS not connected yet, or history still fetching
-  const isInitialLoading = isReady && messages.length === 0 && (
+  const isInitialLoading = isReady && (
     connectionState !== 'connected' || isLoadingHistory
   );
 
-  // Use ref for connection params so the effect only triggers on isReady
-  const connectionRef = useRef({ ipAddress: '', gatewayToken: '' });
-  useEffect(() => {
-    connectionRef.current = { ipAddress: ipAddress ?? '', gatewayToken: gatewayToken ?? '' };
-    console.log('[chat] connectionRef updated: ip=' + (ipAddress ?? 'null') + ' token=' + (gatewayToken ? gatewayToken.substring(0, 8) + '...' : 'null'));
-  }, [ipAddress, gatewayToken]);
-
-  useEffect(() => {
-    console.log('[chat] Connection effect: isReady=' + isReady + ' ip=' + connectionRef.current.ipAddress);
-    if (isReady && connectionRef.current.ipAddress) {
-      useChatStore.getState().connect(connectionRef.current.ipAddress, connectionRef.current.gatewayToken);
-    }
-    return () => {
-      console.log('[chat] Effect cleanup: disconnecting');
-      useChatStore.getState().disconnect();
-    };
-  }, [isReady]);
-
+  // Fetch sessions when connection comes up (WS managed globally in app/index.tsx)
   useEffect(() => {
     if (connectionState === 'connected') {
       useSessionStore.getState().fetchSessions();
     }
   }, [connectionState]);
 
-  // Auto-scroll when new messages arrive
+  // Track whether we need to snap to bottom on next content size change
+  const needsSnapToBottom = useRef(true);
   useEffect(() => {
-    if (visibleMessages.length > 0) {
-      const wasEmpty = prevMessageCount.current === 0;
-      if (wasEmpty || isAtBottom) {
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: !wasEmpty }), 100);
-      }
-      prevMessageCount.current = visibleMessages.length;
+    if (isLoadingHistory) {
+      needsSnapToBottom.current = true;
     }
-  }, [visibleMessages.length]);
-
-  // Scroll to bottom when history finishes loading
-  const prevLoading = useRef(isLoadingHistory);
-  useEffect(() => {
-    if (prevLoading.current && !isLoadingHistory) {
-      flatListRef.current?.scrollToEnd({ animated: false });
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 300);
-      setIsAtBottom(true);
-    }
-    prevLoading.current = isLoadingHistory;
   }, [isLoadingHistory]);
 
-  const handleContentSizeChange = () => {
-    if (visibleMessages.length > 0 && isAtBottom) {
+  // onContentSizeChange fires AFTER FlatList has measured all items — reliable scroll point
+  const handleContentSizeChange = useCallback((_w: number, h: number) => {
+    if (h === 0) return;
+    if (needsSnapToBottom.current && visibleMessages.length > 0 && !isInitialLoading) {
+      needsSnapToBottom.current = false;
+      setIsAtBottom(true);
+      flatListRef.current?.scrollToEnd({ animated: false });
+    } else if (isAtBottom) {
       flatListRef.current?.scrollToEnd({ animated: false });
     }
-  };
+  }, [visibleMessages.length, isInitialLoading, isAtBottom]);
 
   const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -127,7 +99,7 @@ export default function ChatScreen() {
     pointerEvents: fabOpacity.value === 0 ? 'none' as const : 'auto' as const,
   }));
 
-  const showEmptyState = isReady && !isInitialLoading && visibleMessages.length === 0;
+  const showEmptyState = isReady && !isInitialLoading && !isLoadingHistory && visibleMessages.length === 0;
 
   return (
     <View

@@ -9,7 +9,6 @@ import { Progress } from '@/components/ui/progress';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { useUsageStore } from '../stores/usageStore';
-import { useSubscriptionStore } from '../stores/subscriptionStore';
 import { cancelSubscription } from '../api/subscriptionApi';
 import { formatDate } from '../utils/formatDate';
 import IntegrationsCard from '../components/integrations/IntegrationsCard';
@@ -25,7 +24,6 @@ export default function ProfileScreen() {
   const goBack = useNavigationStore((s) => s.goBack);
   const setScreen = useNavigationStore((s) => s.setScreen);
   const usage = useUsageStore();
-  const presentCustomerCenter = useSubscriptionStore((s) => s.presentCustomerCenter);
   const [showTelegramSheet, setShowTelegramSheet] = useState(false);
 
   React.useEffect(() => {
@@ -108,18 +106,11 @@ export default function ProfileScreen() {
                 />
               </View>
 
-              <View className="flex-row gap-3">
-                <Button variant="outline" onPress={presentCustomerCenter} className="flex-1">
-                  <Text className="text-xs font-medium uppercase" style={{ letterSpacing: 1.5, color: colors.foreground }}>
-                    {t('manageSubscription', 'Manage')}
-                  </Text>
-                </Button>
-                <Button variant="ghost" onPress={handleCancel} className="self-start">
-                  <Text className="text-destructive text-xs font-medium uppercase" style={{ letterSpacing: 1.5 }}>
-                    {t('cancelSubscription')}
-                  </Text>
-                </Button>
-              </View>
+              <Button variant="ghost" onPress={handleCancel} className="self-start">
+                <Text className="text-destructive text-xs font-medium uppercase" style={{ letterSpacing: 1.5 }}>
+                  {t('cancelSubscription')}
+                </Text>
+              </Button>
             </CardContent>
           </Card>
         )}

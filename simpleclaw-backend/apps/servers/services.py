@@ -29,7 +29,7 @@ RUN apt-get update -qq && \\
 # Redirect Brave Search API to local SearXNG adapter
 RUN sed -i 's|https://api.search.brave.com/res/v1/web/search|http://searxng-adapter:3000/res/v1/web/search|g' /app/dist/*.js
 
-USER node
+USER root
 """
 
 # docker-compose: OpenClaw + SearXNG + Lightpanda + Valkey
@@ -45,13 +45,13 @@ DOCKER_COMPOSE_WITH_CHROME = """services:
     env_file:
       - .env
     environment:
-      - PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
+      - PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
     volumes:
       - ./openclaw-config.yaml:/app/config.yaml
       - ./skills/human-browser:/app/skills/human-browser
-      - /root/playwright-cache:/home/node/.cache/ms-playwright
+      - /root/playwright-cache:/root/.cache/ms-playwright
       - ./data:/app/data
-      - config:/home/node/.openclaw
+      - config:/root/.openclaw
     depends_on:
       - searxng
       - lightpanda
@@ -525,9 +525,9 @@ class ServerManager:
         # Очистка stale lock-файлов от предыдущих падений Chrome
         self.exec_command(
             'docker exec openclaw rm -f '
-            '/home/node/.openclaw/browser/headless/user-data/SingletonLock '
-            '/home/node/.openclaw/browser/headless/user-data/SingletonSocket '
-            '/home/node/.openclaw/browser/headless/user-data/SingletonCookie '
+            '/root/.openclaw/browser/headless/user-data/SingletonLock '
+            '/root/.openclaw/browser/headless/user-data/SingletonSocket '
+            '/root/.openclaw/browser/headless/user-data/SingletonCookie '
             '2>/dev/null || true'
         )
 
@@ -779,7 +779,7 @@ class ServerManager:
             f'{cli} config set agents.defaults.contextTokens 100000',
 
             # --- Local RAG — semantic memory search across sessions ---
-            f"""{cli} config set agents.defaults.memorySearch '{{"enabled": true, "provider": "local", "store": {{"path": "/home/node/.openclaw/memory.db"}}}}'""",
+            f"""{cli} config set agents.defaults.memorySearch '{{"enabled": true, "provider": "local", "store": {{"path": "/root/.openclaw/memory.db"}}}}'""",
 
             # --- Enable HTTP chat completions endpoint (for mobile app) ---
             f"""{cli} config set gateway.http.endpoints.chatCompletions '{{"enabled": true}}'""",
@@ -905,7 +905,7 @@ limits:
 
             # Clear stale internal config
             self.exec_command(
-                "docker exec openclaw rm -rf /home/node/.openclaw/openclaw.json 2>/dev/null || true"
+                "docker exec openclaw rm -rf /root/.openclaw/openclaw.json 2>/dev/null || true"
             )
 
             # Install browser (the slow part — ~3-5 min)
@@ -1083,11 +1083,8 @@ limits:
             return False
 
     def _fix_permissions(self):
-        """Fix /home/node/.openclaw ownership — Docker volume is created as root
-        but OpenClaw runs as node."""
-        self.exec_command(
-            'docker exec -u root openclaw chown -R node:node /home/node/.openclaw'
-        )
+        """No-op: OpenClaw now runs as root inside the container."""
+        pass
 
     def _apply_config(self, openrouter_key, openrouter_model, telegram_owner_id=None):
         """
@@ -1109,8 +1106,8 @@ limits:
         self.upload_file(auth_json, '/tmp/_openclaw_auth.json')
         agent_dirs = ['main'] + self.AGENT_IDS
         for agent_id in agent_dirs:
-            agent_path = f'/home/node/.openclaw/agents/{agent_id}/agent'
-            self.exec_command(f'docker exec -u root openclaw mkdir -p {agent_path}')
+            agent_path = f'/root/.openclaw/agents/{agent_id}/agent'
+            self.exec_command(f'docker exec openclaw mkdir -p {agent_path}')
             self.exec_command(
                 f'docker cp /tmp/_openclaw_auth.json openclaw:{agent_path}/auth-profiles.json'
             )
@@ -1160,7 +1157,7 @@ limits:
 
         # 3. Auth profiles file must exist and contain the key
         out, _, code = self.exec_command(
-            'docker exec openclaw cat /home/node/.openclaw/agents/main/agent/auth-profiles.json 2>/dev/null'
+            'docker exec openclaw cat /root/.openclaw/agents/main/agent/auth-profiles.json 2>/dev/null'
         )
         if code != 0 or openrouter_key not in out:
             failures.append('auth-profiles.json missing or wrong key')
@@ -1187,7 +1184,7 @@ limits:
 
         # 7. telegram-allowFrom.json must have correct allowFrom
         out, _, code = self.exec_command(
-            'docker exec openclaw cat /home/node/.openclaw/credentials/telegram-allowFrom.json 2>/dev/null'
+            'docker exec openclaw cat /root/.openclaw/credentials/telegram-allowFrom.json 2>/dev/null'
         )
         expected_id = f'"{telegram_owner_id}"' if telegram_owner_id else '"*"'
         if code != 0 or expected_id not in out:
@@ -1336,7 +1333,7 @@ limits:
 
             # Clear any stale internal config
             self.exec_command(
-                "docker exec openclaw rm -rf /home/node/.openclaw/openclaw.json 2>/dev/null || true"
+                "docker exec openclaw rm -rf /root/.openclaw/openclaw.json 2>/dev/null || true"
             )
 
             # Install browser in container
@@ -1617,7 +1614,7 @@ limits:
         """Deploy multi-agent workspace files and config to the OpenClaw container.
 
         Copies SOUL.md, IDENTITY.md, TOOLS.md for each agent into
-        /home/node/.openclaw/agents/{id}/ and applies the agents config
+        /root/.openclaw/agents/{id}/ and applies the agents config
         via openclaw.json merge.
 
         All agent models are forced to use OpenRouter provider. The model
@@ -1642,9 +1639,9 @@ limits:
 
         # Create agent workspace directories and upload files
         for agent_id in self.AGENT_IDS:
-            container_dir = f'/home/node/.openclaw/agents/{agent_id}'
+            container_dir = f'/root/.openclaw/agents/{agent_id}'
             self.exec_command(
-                f'docker exec -u root openclaw mkdir -p {container_dir}'
+                f'docker exec openclaw mkdir -p {container_dir}'
             )
 
             for filename in self.AGENT_FILES:
@@ -1711,8 +1708,8 @@ limits:
         self.exec_command('rm -f /tmp/_oc_agents.json')
 
         # Ensure main agent dir exists (warm_deploy_standby doesn't create it)
-        main_agent_dir = '/home/node/.openclaw/agents/main/agent'
-        self.exec_command(f'docker exec -u root openclaw mkdir -p {main_agent_dir}')
+        main_agent_dir = '/root/.openclaw/agents/main/agent'
+        self.exec_command(f'docker exec openclaw mkdir -p {main_agent_dir}')
 
         # Write auth-profiles with default=openrouter to ALL agents
         if openrouter_key:
@@ -1727,8 +1724,8 @@ limits:
             })
             self.upload_file(auth_profiles, '/tmp/_openclaw_auth.json')
             for agent_id in ['main'] + self.AGENT_IDS:
-                agent_auth_dir = f'/home/node/.openclaw/agents/{agent_id}/agent'
-                self.exec_command(f'docker exec -u root openclaw mkdir -p {agent_auth_dir}')
+                agent_auth_dir = f'/root/.openclaw/agents/{agent_id}/agent'
+                self.exec_command(f'docker exec openclaw mkdir -p {agent_auth_dir}')
                 self.exec_command(
                     f'docker cp /tmp/_openclaw_auth.json openclaw:{agent_auth_dir}/auth-profiles.json'
                 )
@@ -1737,25 +1734,20 @@ limits:
         else:
             # No key provided — copy from main agent to sub-agents if main exists
             for agent_id in self.AGENT_IDS:
-                agent_auth_dir = f'/home/node/.openclaw/agents/{agent_id}/agent'
-                self.exec_command(f'docker exec -u root openclaw mkdir -p {agent_auth_dir}')
+                agent_auth_dir = f'/root/.openclaw/agents/{agent_id}/agent'
+                self.exec_command(f'docker exec openclaw mkdir -p {agent_auth_dir}')
                 for fname in ['auth-profiles.json', 'models.json']:
                     self.exec_command(
-                        f'docker exec -u root openclaw sh -c '
+                        f'docker exec openclaw sh -c '
                         f'"[ -f {main_agent_dir}/{fname} ] && '
                         f'cp {main_agent_dir}/{fname} {agent_auth_dir}/{fname} || true"'
                     )
-
-        # Fix permissions
-        self.exec_command(
-            'docker exec -u root openclaw chown -R node:node /home/node/.openclaw/agents'
-        )
 
         # Verify agent directories exist
         missing_agents = []
         for agent_id in self.AGENT_IDS:
             out, _, code = self.exec_command(
-                f'docker exec openclaw ls /home/node/.openclaw/agents/{agent_id}/SOUL.md 2>/dev/null'
+                f'docker exec openclaw ls /root/.openclaw/agents/{agent_id}/SOUL.md 2>/dev/null'
             )
             if code != 0:
                 missing_agents.append(agent_id)
@@ -1768,7 +1760,7 @@ limits:
 
     # ─── ClawdMatrix Engine (On-Demand Skills) ─────────────────────────
     #
-    # Skills are stored in /home/node/.openclaw/clawdmatrix/ (NOT /app/skills/)
+    # Skills are stored in /root/.openclaw/clawdmatrix/ (NOT /app/skills/)
     # so they don't appear in <available_skills> and don't cost tokens per message.
     # CLAUDE.md contains domain routing rules that tell the model to `read` the
     # relevant skill file only when the user's message matches a domain.
@@ -1875,8 +1867,8 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
         )
 
         # Clean up old locations
-        self.exec_command('docker exec -u root openclaw rm -rf /app/clawdmatrix')
-        self.exec_command('docker exec -u root openclaw rm -rf /home/node/.openclaw/clawdmatrix')
+        self.exec_command('docker exec openclaw rm -rf /app/clawdmatrix')
+        self.exec_command('docker exec openclaw rm -rf /root/.openclaw/clawdmatrix')
 
         # Deploy skill files to /app/skills/ (standard OpenClaw location)
         for skill_name in self.CLAWDMATRIX_SKILLS:
@@ -1889,7 +1881,7 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
                 continue
 
             self.exec_command(
-                f'docker exec -u root openclaw mkdir -p /app/skills/{skill_name}'
+                f'docker exec openclaw mkdir -p /app/skills/{skill_name}'
             )
             tmp_path = f'/tmp/_clawdmatrix_{skill_name}.md'
             self.upload_file(content, tmp_path)
@@ -1897,9 +1889,6 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
                 f'docker cp {tmp_path} openclaw:/app/skills/{skill_name}/SKILL.md'
             )
             self.exec_command(f'rm -f {tmp_path}')
-
-        # Fix permissions
-        self.exec_command('docker exec -u root openclaw chown -R node:node /app/skills')
 
         # Prune unused built-in skills to save tokens
         self.prune_builtin_skills()
@@ -1915,7 +1904,7 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
         token overhead. VPS-useless skills are permanently deleted.
         """
         logger.info(f'Pruning built-in skills on {self.server.ip_address}...')
-        self.exec_command('docker exec -u root openclaw mkdir -p /app/skills-disabled')
+        self.exec_command('docker exec openclaw mkdir -p /app/skills-disabled')
 
         result = self.exec_command('docker exec openclaw ls /app/skills/')
         if isinstance(result, tuple):
@@ -1929,24 +1918,20 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
                 if skill in self.OPENCLAW_REMOVE_SKILLS:
                     # Permanently delete VPS-useless skills
                     self.exec_command(
-                        f'docker exec -u root openclaw rm -rf /app/skills/{skill}'
+                        f'docker exec openclaw rm -rf /app/skills/{skill}'
                     )
                 else:
                     # Move potentially useful skills to disabled
                     self.exec_command(
-                        f'docker exec -u root openclaw mv /app/skills/{skill} /app/skills-disabled/{skill}'
+                        f'docker exec openclaw mv /app/skills/{skill} /app/skills-disabled/{skill}'
                     )
                 removed += 1
 
         # Also clean VPS-useless from skills-disabled if present
         for skill in self.OPENCLAW_REMOVE_SKILLS:
             self.exec_command(
-                f'docker exec -u root openclaw rm -rf /app/skills-disabled/{skill}'
+                f'docker exec openclaw rm -rf /app/skills-disabled/{skill}'
             )
-
-        # Give node user ownership so the model can mv skills back on demand
-        self.exec_command('docker exec -u root openclaw chown -R node:node /app/skills')
-        self.exec_command('docker exec -u root openclaw chown -R node:node /app/skills-disabled')
 
         logger.info(
             f'Pruned {removed} skills on {self.server.ip_address}, '
@@ -1969,12 +1954,9 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
         self.upload_file(self.CLAWDMATRIX_CLAUDE_MD, '/tmp/_clawdmatrix_claude.md')
         self.exec_command(
             'docker cp /tmp/_clawdmatrix_claude.md '
-            'openclaw:/home/node/.openclaw/CLAUDE.md'
+            'openclaw:/root/.openclaw/CLAUDE.md'
         )
         self.exec_command('rm -f /tmp/_clawdmatrix_claude.md')
-        self.exec_command(
-            'docker exec -u root openclaw chown node:node /home/node/.openclaw/CLAUDE.md'
-        )
 
         logger.info(f'ClawdMatrix enabled on {self.server.ip_address}')
         return True
@@ -1984,18 +1966,18 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
         logger.info(f'Disabling ClawdMatrix on {self.server.ip_address}...')
 
         self.exec_command(
-            'docker exec openclaw rm -f /home/node/.openclaw/CLAUDE.md'
+            'docker exec openclaw rm -f /root/.openclaw/CLAUDE.md'
         )
         self.exec_command(
-            f'docker exec -u root openclaw rm -rf {self.CLAWDMATRIX_SKILLS_PATH}'
+            f'docker exec openclaw rm -rf {self.CLAWDMATRIX_SKILLS_PATH}'
         )
         # Clean up old locations too
         self.exec_command(
-            'docker exec -u root openclaw rm -rf /app/clawdmatrix'
+            'docker exec openclaw rm -rf /app/clawdmatrix'
         )
         for skill_name in self.CLAWDMATRIX_SKILLS:
             self.exec_command(
-                f'docker exec -u root openclaw rm -rf /app/skills/{skill_name}'
+                f'docker exec openclaw rm -rf /app/skills/{skill_name}'
             )
 
         logger.info(f'ClawdMatrix disabled on {self.server.ip_address}')
@@ -2017,7 +1999,7 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
 
         # Check CLAUDE.md exists with domain routing
         out, _, code = self.exec_command(
-            'docker exec openclaw cat /home/node/.openclaw/CLAUDE.md 2>/dev/null'
+            'docker exec openclaw cat /root/.openclaw/CLAUDE.md 2>/dev/null'
         )
         if code != 0 or 'Quality Gates' not in out:
             failures.append('CLAUDE.md missing or no quality gates')

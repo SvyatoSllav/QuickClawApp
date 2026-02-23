@@ -35,6 +35,7 @@ interface MenuItem {
   icon: typeof MessageSquare;
   screen?: AppScreen;
   badge?: number;
+  disabled?: boolean;
 }
 
 export default function Sidebar() {
@@ -76,14 +77,27 @@ export default function Sidebar() {
 
   const managementItems: MenuItem[] = [
     { label: 'Integrations', icon: Link, screen: 'profile' },
-    { label: 'Analytics', icon: BarChart3 },
-    { label: 'Server', icon: Server },
-    { label: 'Training', icon: BookOpen },
-    { label: 'Support', icon: HelpCircle },
+    { label: 'Analytics', icon: BarChart3, disabled: true },
+    { label: 'Server', icon: Server, disabled: true },
+    { label: 'Training', icon: BookOpen, disabled: true },
+    { label: 'Support', icon: HelpCircle, screen: 'support' },
   ];
 
   const renderItem = (item: MenuItem, isActive: boolean) => {
     const Icon = item.icon;
+
+    if (item.disabled) {
+      return (
+        <View key={item.label} style={[styles.menuItem, { opacity: 0.4 }]}>
+          <Icon size={20} color="#6B7280" />
+          <Text style={styles.menuLabel}>{item.label}</Text>
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonText}>Soon</Text>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <Pressable
         key={item.label}
@@ -244,6 +258,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
+  },
+  comingSoonBadge: {
+    backgroundColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  comingSoonText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   separator: {
     height: 1,

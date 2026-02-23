@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { Menu, ChevronRight } from 'lucide-react-native';
 import { useNavigationStore } from '../stores/navigationStore';
 import { useAgentStore } from '../stores/agentStore';
+import { useChatStore } from '../stores/chatStore';
 import { colors } from '../config/colors';
 
 const AGENT_EMOJIS: Record<string, string> = {
@@ -36,8 +37,19 @@ export default function AgentsScreen() {
   const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
   const setScreen = useNavigationStore((s) => s.setScreen);
   const agents = useAgentStore((s) => s.agents);
+  const fetchAgents = useAgentStore((s) => s.fetchAgents);
   const switchAgent = useAgentStore((s) => s.switchAgent);
+  const activeAgentId = useAgentStore((s) => s.activeAgentId);
   const isLoading = useAgentStore((s) => s.isLoading);
+  const connectionState = useChatStore((s) => s.connectionState);
+
+  // Fetch agents if store is empty but WS is connected
+  useEffect(() => {
+    if (agents.length === 0 && !isLoading && connectionState === 'connected') {
+      console.log('[agents-screen] Agents empty, fetching...');
+      fetchAgents();
+    }
+  }, [agents.length, isLoading, connectionState]);
 
   const handleSelect = (id: string) => {
     switchAgent(id);
@@ -51,7 +63,6 @@ export default function AgentsScreen() {
         <Pressable onPress={toggleSidebar} hitSlop={8} style={{ padding: 4 }}>
           <Menu size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={localStyles.headerTitle}>Agents</Text>
       </View>
 
       {isLoading ? (
@@ -73,12 +84,16 @@ export default function AgentsScreen() {
               const description = agent.description || FALLBACK_DESCRIPTIONS[agent.id] || '';
               const bgColor = EMOJI_BG_COLORS[agent.id] ?? '#F3F4F6';
               const isPopular = POPULAR_AGENTS.has(agent.id);
+              const isActive = agent.id === activeAgentId;
 
               return (
                 <Pressable
                   key={agent.id}
                   onPress={() => handleSelect(agent.id)}
-                  style={localStyles.agentCard}
+                  style={[
+                    localStyles.agentCard,
+                    isActive && localStyles.agentCardActive,
+                  ]}
                 >
                   <View style={[localStyles.emojiCircle, { backgroundColor: bgColor }]}>
                     <Text style={{ fontSize: 24 }}>{emoji}</Text>
@@ -119,11 +134,6 @@ const localStyles = StyleSheet.create({
     paddingVertical: 12,
     gap: 12,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
-  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
@@ -147,11 +157,17 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     gap: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 2,
+  },
+  agentCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: '#FFFBF5',
   },
   emojiCircle: {
     width: 48,
