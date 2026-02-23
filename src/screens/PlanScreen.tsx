@@ -96,17 +96,20 @@ export default function PlanScreen() {
   const setScreen = useNavigationStore((s) => s.setScreen);
   const goBack = useNavigationStore((s) => s.goBack);
 
-  useEffect(() => {
-    console.log('[PlanScreen] mounted, calling loadOfferings()');
-    loadOfferings();
-  }, []);
+  // Skip loading offerings for now — use webPurchase skip flow
+  // useEffect(() => {
+  //   loadOfferings();
+  // }, []);
 
   console.log('[PlanScreen] render — packages:', packages.length, 'selectedPackage:', selectedPackage?.identifier ?? 'null', 'loading:', loading, 'error:', error, 'buttonDisabled:', loading || (!selectedPackage && packages.length > 0));
 
   const handleSubscribe = async () => {
     const isWeb = Platform.OS === 'web';
-    console.log('[PlanScreen] handleSubscribe called — platform:', Platform.OS, 'branch:', isWeb ? 'webPurchase' : 'purchaseSelected');
-    const success = isWeb
+    const noPackages = packages.length === 0;
+    // Use webPurchase (fake webhook) when on web or when no RC packages available (dev/skip)
+    const useSkip = isWeb || noPackages;
+    console.log('[PlanScreen] handleSubscribe called — platform:', Platform.OS, 'skip:', useSkip);
+    const success = useSkip
       ? await webPurchase()
       : await purchaseSelected();
     console.log('[PlanScreen] handleSubscribe result:', success);
@@ -195,7 +198,7 @@ export default function PlanScreen() {
       <View style={styles.footer}>
         <Button
           onPress={handleSubscribe}
-          disabled={loading || (!selectedPackage && packages.length > 0)}
+          disabled={loading}
           className="w-full"
           style={{ backgroundColor: colors.primary }}
         >
