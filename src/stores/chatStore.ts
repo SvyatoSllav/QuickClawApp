@@ -1,7 +1,10 @@
 import { create } from 'zustand';
-import { ModelId, ChatMessage, ChatAttachment, AVAILABLE_MODELS } from '../types/chat';
+import { ModelId, ChatMessage, ChatAttachment, AVAILABLE_MODELS, MODEL_TO_OPENROUTER } from '../types/chat';
 import apiClient from '../api/client';
 import { setServerModel } from '../api/profileApi';
+import { getItem, setItem } from '../services/secureStorage';
+
+const SELECTED_MODEL_KEY = 'selected_model';
 
 type ResponseHandler = (data: { ok: boolean; result?: any; error?: any }) => void;
 
@@ -15,6 +18,7 @@ interface ChatState {
   activeSessionKey: string;
   isLoadingHistory: boolean;
   _responseHandlers: Map<string, ResponseHandler>;
+  _connGeneration: number;
 
   setModel: (model: ModelId) => Promise<void>;
   setInputText: (text: string) => void;
@@ -34,21 +38,22 @@ interface ChatState {
 }
 
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+let healthWatchdog: ReturnType<typeof setTimeout> | null = null;
 let requestCounter = 0;
 
-/** Strip openrouter/<provider>/ prefix: "openrouter/minimax/minimax-m2.5" → "minimax-m2.5" */
-function stripOpenRouterPrefix(raw: string): string {
+/** Strip provider prefix: "anthropic/claude-sonnet-4" → "claude-sonnet-4", "openrouter/minimax/minimax-m2.5" → "minimax-m2.5" */
+function stripProviderPrefix(raw: string): string {
   const parts = raw.split('/');
   // openrouter/<provider>/<model> → take last part
   if (parts.length >= 3 && parts[0] === 'openrouter') return parts.slice(2).join('/');
-  // openrouter/<model> → take last part
-  if (parts.length === 2 && parts[0] === 'openrouter') return parts[1];
+  // <provider>/<model> → take model part (handles anthropic/, openai/, google/, etc.)
+  if (parts.length === 2) return parts[1];
   return raw;
 }
 
 /** Resolve a server model string to a known ModelId */
 function resolveServerModel(serverModel: string): ModelId | null {
-  const stripped = stripOpenRouterPrefix(serverModel);
+  const stripped = stripProviderPrefix(serverModel);
   const normalized = stripped.toLowerCase().replace(/[-._]/g, '');
 
   // Exact match against stripped value
@@ -73,6 +78,18 @@ function resolveServerModel(serverModel: string): ModelId | null {
   return null;
 }
 
+/** Reset health watchdog — call on every server event. Forces reconnect if no events for 15s. */
+function resetHealthWatchdog(get: () => ChatState) {
+  if (healthWatchdog) clearTimeout(healthWatchdog);
+  healthWatchdog = setTimeout(() => {
+    const { connectionState, ws } = get();
+    if (connectionState === 'connected' && ws) {
+      console.log('[ws] Health watchdog: no events for 15s, forcing reconnect');
+      ws.close();
+    }
+  }, 15000);
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   selectedModel: 'claude-sonnet-4',
@@ -83,16 +100,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeSessionKey: 'main',
   isLoadingHistory: false,
   _responseHandlers: new Map(),
+  _connGeneration: 0,
 
   setModel: async (model) => {
+    console.log('[chat] setModel called:', model);
     set({ selectedModel: model });
+    setItem(SELECTED_MODEL_KEY, model);
+
+    const openrouterModel = MODEL_TO_OPENROUTER[model] || model;
+    const { sendRequest, activeSessionKey } = get();
+
+    // Per-session override via WebSocket (immediate, no restart)
+    sendRequest('sessions.patch', { key: activeSessionKey, model: openrouterModel }, (data) => {
+      console.log('[chat] sessions.patch model response:', data.ok ? 'ok' : 'FAILED', JSON.stringify(data.error || ''));
+    });
+
+    // Persist to backend profile (for next login). Skip setServerModel — it SSHes
+    // into the server and triggers a gateway restart which kills the WebSocket.
     try {
-      await Promise.all([
-        apiClient.patch('/profile/', { selected_model: model }),
-        setServerModel(model),
-      ]);
-    } catch {
-      // silent — local state is enough
+      await apiClient.patch('/profile/', { selected_model: model });
+    } catch (e: any) {
+      console.error('[chat] setModel profile save ERROR:', e?.response?.status, e?.message);
     }
   },
 
@@ -111,7 +139,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendRequest: (method, params, onResponse) => {
     const { ws, connectionState } = get();
     if (!ws || connectionState !== 'connected') {
-      console.log('[ws] sendRequest SKIPPED (not connected):', method, 'state:', connectionState);
+      console.log('[ws] sendRequest SKIPPED (not connected):', method, 'state:', connectionState, 'ws:', !!ws);
       return null;
     }
 
@@ -121,7 +149,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     console.log('[ws] sendRequest:', method, 'id:', id, 'params:', JSON.stringify(params).substring(0, 200));
-    ws.send(JSON.stringify({ type: 'req', id, method, params }));
+    try {
+      ws.send(JSON.stringify({ type: 'req', id, method, params }));
+    } catch (e) {
+      console.error('[ws] sendRequest send failed:', e);
+      get()._responseHandlers.delete(id);
+      return null;
+    }
     return id;
   },
 
@@ -150,6 +184,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { inputText, ws, connectionState, activeSessionKey, attachments } = get();
     const text = inputText.trim();
     console.log('[ws] sendMessage called: text="' + text.substring(0, 50) + '" state=' + connectionState + ' session=' + activeSessionKey + ' attachments=' + attachments.length);
+
+    // Self-healing: if state says connected but ws is gone, fix it
+    if (connectionState === 'connected' && !ws) {
+      console.warn('[ws] State corrupted: connected but no ws — resetting to disconnected');
+      set({ connectionState: 'disconnected', ws: null });
+      return;
+    }
+
     if ((!text && attachments.length === 0) || connectionState !== 'connected' || !ws) {
       console.log('[ws] sendMessage SKIPPED: noText=' + (!text && attachments.length === 0) + ' notConnected=' + (connectionState !== 'connected') + ' noWs=' + !ws);
       return;
@@ -169,9 +211,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     const requestId = `req-${Date.now()}`;
+    const selectedModel = get().selectedModel;
+    const modelForServer = MODEL_TO_OPENROUTER[selectedModel] || selectedModel;
     const params: Record<string, any> = {
       sessionKey: activeSessionKey,
       message: text,
+      model: modelForServer,
       idempotencyKey: requestId,
     };
 
@@ -184,15 +229,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     }
 
-    console.log('[ws] sendMessage → chat.send id=' + requestId + ' session=' + activeSessionKey);
-    ws.send(
-      JSON.stringify({
-        type: 'req',
-        id: requestId,
-        method: 'chat.send',
-        params,
-      }),
-    );
+    console.log('[ws] sendMessage → chat.send id=' + requestId + ' session=' + activeSessionKey + ' model=' + modelForServer);
+    try {
+      ws.send(
+        JSON.stringify({
+          type: 'req',
+          id: requestId,
+          method: 'chat.send',
+          params,
+        }),
+      );
+    } catch (e) {
+      console.error('[ws] sendMessage send failed:', e);
+    }
   },
 
   connect: (serverIp, gatewayToken) => {
@@ -204,22 +253,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return;
     }
 
-    console.log('[ws] Connecting to ws://' + serverIp + ':18789 token=' + (gatewayToken ? gatewayToken.substring(0, 8) + '...' : 'NONE'));
+    // Bump generation — all callbacks from previous connections become stale
+    const gen = get()._connGeneration + 1;
+    set({ _connGeneration: gen });
+
+    console.log('[ws] Connecting to ws://' + serverIp + ':18789 gen=' + gen + ' token=' + (gatewayToken ? gatewayToken.substring(0, 8) + '...' : 'NONE'));
 
     if (existingWs) {
       console.log('[ws] Closing existing WebSocket before reconnect');
       existingWs.close();
     }
 
-    set({ connectionState: 'connecting' });
+    // Clear stale response handlers from previous connection
+    get()._responseHandlers.clear();
+
+    set({ connectionState: 'connecting', ws: null });
 
     const ws = new WebSocket(`ws://${serverIp}:18789`);
 
     ws.onopen = () => {
+      // Stale check
+      if (get()._connGeneration !== gen) { ws.close(); return; }
       console.log('[ws] WebSocket opened, waiting for challenge...');
     };
 
     ws.onmessage = (event) => {
+      // Stale check
+      if (get()._connGeneration !== gen) return;
+
+      // Reset health watchdog on every message
+      resetHealthWatchdog(get);
+
       try {
         const data = JSON.parse(event.data);
         console.log('[ws] ← recv:', data.type, data.event || data.id || '', data.ok !== undefined ? 'ok=' + data.ok : '');
@@ -243,7 +307,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   mode: 'ui',
                 },
                 caps: [],
-                scopes: ['operator.read', 'operator.write'],
+                scopes: ['operator.read', 'operator.write', 'operator.admin'],
                 auth: { token: gatewayToken },
               },
             }),
@@ -254,10 +318,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // Handle connect response
         if (data.type === 'res' && data.id === 'connect-init') {
           if (data.ok || data.payload) {
-            console.log('[ws] Connect SUCCESS — now connected');
-            set({ connectionState: 'connected' });
-            const { useAgentStore } = require('./agentStore');
-            useAgentStore.getState().fetchAgents();
+            const hadMessages = get().messages.length > 0;
+            console.log('[ws] Connect SUCCESS gen=' + gen + ' (reconnect:', hadMessages, ')');
+            // Atomically set both ws and connectionState together
+            set({ connectionState: 'connected', ws });
+
+            if (hadMessages) {
+              // Reconnect: keep existing messages, just re-fetch sessions quietly
+              const { useSessionStore } = require('./sessionStore');
+              useSessionStore.getState().fetchSessions();
+            } else {
+              // Fresh connect: full agent/session init
+              const { useAgentStore } = require('./agentStore');
+              useAgentStore.getState().fetchAgents();
+            }
           } else {
             console.error('[ws] Connect FAILED:', JSON.stringify(data.error || data));
           }
@@ -305,9 +379,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
 
     ws.onclose = (event) => {
-      console.log('[ws] WebSocket CLOSED code=' + event.code + ' reason="' + (event.reason || '') + '" wasClean=' + event.wasClean);
+      // Stale check: only handle if this is still the active connection
+      if (get()._connGeneration !== gen) {
+        console.log('[ws] Stale onclose (gen=' + gen + ' current=' + get()._connGeneration + '), ignoring');
+        return;
+      }
+      console.log('[ws] WebSocket CLOSED gen=' + gen + ' code=' + event.code + ' reason="' + (event.reason || '') + '"');
       set({ connectionState: 'disconnected', ws: null });
-      // Auto-reconnect after 3s
+
+      // Stop health watchdog
+      if (healthWatchdog) { clearTimeout(healthWatchdog); healthWatchdog = null; }
+
+      // Auto-reconnect after 1s
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       reconnectTimeout = setTimeout(() => {
         const state = get();
@@ -315,22 +398,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
           console.log('[ws] Auto-reconnecting...');
           state.connect(serverIp, gatewayToken);
         }
-      }, 3000);
+      }, 1000);
     };
 
     ws.onerror = (event) => {
-      console.error('[ws] WebSocket ERROR:', event);
+      if (get()._connGeneration !== gen) return;
+      console.error('[ws] WebSocket ERROR gen=' + gen);
       ws.close();
     };
 
+    // Store ws immediately so it's available during handshake
     set({ ws });
   },
 
   disconnect: () => {
     console.log('[ws] disconnect() called');
+    // Bump generation to invalidate all callbacks
+    set((s) => ({ _connGeneration: s._connGeneration + 1 }));
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
       reconnectTimeout = null;
+    }
+    if (healthWatchdog) {
+      clearTimeout(healthWatchdog);
+      healthWatchdog = null;
     }
     const ws = get().ws;
     if (ws) {
@@ -338,6 +429,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ws.close();
     }
     set({ ws: null, connectionState: 'disconnected' });
+    get()._responseHandlers.clear();
   },
 
   addMessage: (message) =>
@@ -356,8 +448,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }),
 
   syncModelFromServer: (serverModel) => {
-    const resolved = resolveServerModel(serverModel);
-    if (resolved) set({ selectedModel: resolved });
+    // Only sync from server if no locally saved model
+    getItem(SELECTED_MODEL_KEY).then((saved) => {
+      if (saved) {
+        const savedModel = AVAILABLE_MODELS.find((m) => m.id === saved);
+        if (savedModel) {
+          set({ selectedModel: savedModel.id });
+          return;
+        }
+      }
+      const resolved = resolveServerModel(serverModel);
+      if (resolved) set({ selectedModel: resolved });
+    });
   },
 
   clearMessages: () => set({ messages: [] }),

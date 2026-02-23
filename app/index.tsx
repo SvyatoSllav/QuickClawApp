@@ -80,7 +80,7 @@ export default function MainScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
       {renderScreen()}
       <SessionDrawer visible={isSessionDrawerOpen} onClose={closeSessionDrawer} />
       <Sidebar />
