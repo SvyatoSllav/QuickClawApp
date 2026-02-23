@@ -45,7 +45,7 @@ module.exports = {
       [
         "@react-native-google-signin/google-signin",
         {
-          iosUrlScheme: "com.googleusercontent.apps.1568931022-iil9topt7v2n8p6m97crp4tc410800mf",
+          iosUrlScheme: "com.googleusercontent.apps.1568931022-4fn2jd2jttsd45r3ogii6j0n2dfmcgc4",
         },
       ],
     ],
