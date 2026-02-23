@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, TextInput, ActivityIndicator, Image } from 'react-native';
 import { Text } from '@/components/ui/text';
-import { Menu, Search, Grid3X3, Heart } from 'lucide-react-native';
+import { Menu, Search, Grid3X3, Star, Download, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useNavigationStore } from '../stores/navigationStore';
 import { colors } from '../config/colors';
 import { searchSkills, SkillsmpSkill, SkillCategory } from '../api/skillsmpApi';
 import CategoriesDrawer from '../components/skills/CategoriesDrawer';
 import InstallSkillModal from '../components/skills/InstallSkillModal';
 
-function formatStars(n: number): string {
+const PAGE_SIZE = 5;
+
+function formatCount(n?: number): string {
+  if (n == null) return '0';
   if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
   return String(n);
 }
@@ -24,9 +27,6 @@ function getAuthorAvatar(author?: string): string | null {
   return `https://github.com/${author}.png?size=40`;
 }
 
-// Traffic-light dot colors for the terminal title bar
-const DOT_COLORS = ['#FF5F57', '#FEBC2E', '#28C840'];
-
 export default function SkillsScreen() {
   const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
   const [query, setQuery] = useState('');
@@ -34,20 +34,19 @@ export default function SkillsScreen() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeCategoryLabel, setActiveCategoryLabel] = useState<string | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<SkillsmpSkill | null>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
 
-  const doSearch = useCallback(async (searchQuery: string) => {
+  const fetchPage = useCallback(async (searchQuery: string, pageNum: number) => {
     setIsLoading(true);
-    setPage(1);
     try {
-      const result = await searchSkills(searchQuery, 1, 20, 'stars');
+      const result = await searchSkills(searchQuery, pageNum, PAGE_SIZE, 'stars');
       setSkills(result.skills ?? []);
       setTotal(result.total ?? 0);
+      setPage(pageNum);
     } catch (e) {
       console.log('[skills] search error:', e);
       setSkills([]);
@@ -57,47 +56,45 @@ export default function SkillsScreen() {
     }
   }, []);
 
-  const loadMore = useCallback(async () => {
-    if (isLoadingMore || skills.length >= total) return;
-    const nextPage = page + 1;
-    setIsLoadingMore(true);
-    try {
-      const searchQuery = activeCategoryLabel || query;
-      const result = await searchSkills(searchQuery, nextPage, 20, 'stars');
-      setSkills((prev) => [...prev, ...(result.skills ?? [])]);
-      setPage(nextPage);
-    } catch (e) {
-      console.log('[skills] load more error:', e);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [isLoadingMore, skills.length, total, page, activeCategoryLabel, query]);
-
   useEffect(() => {
-    doSearch('');
-  }, [doSearch]);
+    fetchPage('', 1);
+  }, [fetchPage]);
 
   const handleSearch = () => {
     setActiveCategory(null);
     setActiveCategoryLabel(null);
-    doSearch(query);
+    fetchPage(query, 1);
   };
 
   const handleCategorySelect = (cat: SkillCategory) => {
     setActiveCategory(cat.key);
     setActiveCategoryLabel(cat.label);
     setQuery(cat.label);
-    doSearch(cat.label);
+    fetchPage(cat.label, 1);
   };
 
   const handleClearCategory = () => {
     setActiveCategory(null);
     setActiveCategoryLabel(null);
     setQuery('');
-    doSearch('');
+    fetchPage('', 1);
   };
 
-  const hasMore = skills.length < total;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentQuery = activeCategoryLabel || query;
+
+  const goToPage = (p: number) => {
+    if (p < 1 || p > totalPages || p === page) return;
+    fetchPage(currentQuery, p);
+  };
+
+  // Build page numbers to display (max 5 visible)
+  const getPageNumbers = (): number[] => {
+    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (page <= 3) return [1, 2, 3, 4, 5];
+    if (page >= totalPages - 2) return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [page - 2, page - 1, page, page + 1, page + 2];
+  };
 
   return (
     <View style={s.container}>
@@ -158,7 +155,7 @@ export default function SkillsScreen() {
           <View style={{ gap: 12, marginTop: 4 }}>
             {total > 0 && (
               <Text style={s.resultsCount}>
-                {skills.length} of {total} skills
+                {total} skills found
               </Text>
             )}
             {skills.map((skill, index) => (
@@ -171,18 +168,38 @@ export default function SkillsScreen() {
                 }}
               />
             ))}
-            {hasMore && (
-              <Pressable
-                style={s.loadMoreButton}
-                onPress={loadMore}
-                disabled={isLoadingMore}
-              >
-                {isLoadingMore ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Text style={s.loadMoreText}>Load more</Text>
-                )}
-              </Pressable>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <View style={s.pagination}>
+                <Pressable
+                  onPress={() => goToPage(page - 1)}
+                  disabled={page === 1}
+                  style={[s.pageArrow, page === 1 && s.pageArrowDisabled]}
+                >
+                  <ChevronLeft size={18} color={page === 1 ? '#D1D5DB' : colors.foreground} />
+                </Pressable>
+
+                {getPageNumbers().map((p) => (
+                  <Pressable
+                    key={p}
+                    onPress={() => goToPage(p)}
+                    style={[s.pageNumber, p === page && s.pageNumberActive]}
+                  >
+                    <Text style={[s.pageNumberText, p === page && s.pageNumberTextActive]}>
+                      {p}
+                    </Text>
+                  </Pressable>
+                ))}
+
+                <Pressable
+                  onPress={() => goToPage(page + 1)}
+                  disabled={page === totalPages}
+                  style={[s.pageArrow, page === totalPages && s.pageArrowDisabled]}
+                >
+                  <ChevronRight size={18} color={page === totalPages ? '#D1D5DB' : colors.foreground} />
+                </Pressable>
+              </View>
             )}
           </View>
         )}
@@ -209,24 +226,27 @@ function SkillCard({ skill, onPress }: { skill: SkillsmpSkill; onPress?: () => v
 
   return (
     <Pressable style={s.card} onPress={onPress}>
-      {/* Title bar — terminal style */}
-      <View style={s.cardTitleBar}>
-        <View style={s.cardDots}>
-          {DOT_COLORS.map((c) => (
-            <View key={c} style={[s.dot, { backgroundColor: c }]} />
-          ))}
-        </View>
-        <Text style={s.cardFileName} numberOfLines={1}>
-          {skill.name}.md
+      {/* Card header — skill name + stars */}
+      <View style={s.cardHeader}>
+        <Text style={s.cardHeaderName} numberOfLines={1}>
+          {skill.name}
         </Text>
         {skill.stars != null && (
-          <Text style={s.cardStars}>{'\u2B50'} {formatStars(skill.stars)}</Text>
+          <View style={s.cardStatsInline}>
+            <Star size={12} color="#F59E0B" />
+            <Text style={s.cardStatText}>{formatCount(skill.stars)}</Text>
+          </View>
         )}
       </View>
 
-      {/* Body */}
+      {/* Card body */}
       <View style={s.cardBody}>
-        {/* Author row */}
+        {/* Skill name — large */}
+        <Text style={s.cardSkillName} numberOfLines={1}>
+          {skill.name}
+        </Text>
+
+        {/* Author */}
         {skill.author && (
           <View style={s.authorRow}>
             {avatarUri && (
@@ -240,12 +260,19 @@ function SkillCard({ skill, onPress }: { skill: SkillsmpSkill; onPress?: () => v
         <Text style={s.cardDesc} numberOfLines={2}>
           {skill.description}
         </Text>
-      </View>
 
-      {/* Footer */}
-      <View style={s.cardFooter}>
-        <Text style={s.cardDate}>{formatDate(skill.updatedAt)}</Text>
-        <Heart size={14} color="#D1D5DB" />
+        {/* Bottom row: date + installs */}
+        <View style={s.cardMeta}>
+          {skill.updatedAt ? (
+            <Text style={s.cardMetaText}>{formatDate(skill.updatedAt)}</Text>
+          ) : null}
+          {skill.installs != null && (
+            <View style={s.cardMetaItem}>
+              <Download size={12} color="#9CA3AF" />
+              <Text style={s.cardMetaText}>{formatCount(skill.installs)}</Text>
+            </View>
+          )}
+        </View>
       </View>
     </Pressable>
   );
@@ -348,100 +375,137 @@ const s = StyleSheet.create({
     color: '#8B8B8B',
     fontWeight: '500',
   },
-  loadMoreButton: {
+
+  // Pagination
+  pagination: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
+    gap: 6,
+    marginTop: 8,
+  },
+  pageArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: '#FFFFFF',
   },
-  loadMoreText: {
+  pageArrowDisabled: {
+    opacity: 0.4,
+  },
+  pageNumber: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pageNumberActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  pageNumberText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.primary,
+    color: '#374151',
+  },
+  pageNumberTextActive: {
+    color: '#FFFFFF',
   },
 
-  // Card — terminal style
+  // Card
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  cardTitleBar: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(240,232,220,0.3)',
-    paddingHorizontal: 14,
+    justifyContent: 'space-between',
+    backgroundColor: '#F9F6F1',
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    gap: 8,
   },
-  cardDots: {
-    flexDirection: 'row',
-    gap: 5,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    opacity: 0.6,
-  },
-  cardFileName: {
+  cardHeaderName: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'monospace',
     color: '#6B7280',
+    marginRight: 8,
   },
-  cardStars: {
+  cardStatsInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  cardStatText: {
     fontSize: 12,
+    fontWeight: '600',
     color: '#6B7280',
-    fontWeight: '500',
   },
   cardBody: {
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+  },
+  cardSkillName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 6,
   },
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   authorAvatar: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
   },
   authorName: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#6B7280',
+    color: '#9CA3AF',
   },
   cardDesc: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6B7280',
     lineHeight: 20,
-    marginTop: 8,
+    marginBottom: 10,
   },
-  cardFooter: {
+  cardMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(240,232,220,0.2)',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    gap: 12,
   },
-  cardDate: {
+  cardMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  cardMetaText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#9CA3AF',
+    fontWeight: '500',
   },
 });

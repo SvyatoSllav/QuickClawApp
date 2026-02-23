@@ -40,6 +40,7 @@ interface ChatState {
 
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let healthWatchdog: ReturnType<typeof setTimeout> | null = null;
+let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
 let requestCounter = 0;
 
 // Track last connection params for reconnect
@@ -358,6 +359,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
               const { useAgentStore } = require('./agentStore');
               useAgentStore.getState().fetchAgents();
             }
+            // Start keepalive pings to prevent health watchdog from firing on idle screens
+            if (keepaliveInterval) clearInterval(keepaliveInterval);
+            keepaliveInterval = setInterval(() => {
+              const { ws: curWs, connectionState: cs } = get();
+              if (curWs && cs === 'connected') {
+                try { curWs.send(JSON.stringify({ type: 'ping' })); } catch {}
+              }
+            }, 30000);
           } else {
             console.error('[ws] Connect FAILED:', JSON.stringify(data.error || data));
             remoteLog('error', 'ws', 'connect failed', { error: data.error || data });
@@ -433,8 +442,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       remoteLog('warn', 'ws', 'closed', { gen, code: event.code, reason: event.reason || '' });
       set({ connectionState: 'disconnected', ws: null });
 
-      // Stop health watchdog
+      // Stop health watchdog and keepalive
       if (healthWatchdog) { clearTimeout(healthWatchdog); healthWatchdog = null; }
+      if (keepaliveInterval) { clearInterval(keepaliveInterval); keepaliveInterval = null; }
 
       // Auto-reconnect after 2s
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
@@ -470,6 +480,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (healthWatchdog) {
       clearTimeout(healthWatchdog);
       healthWatchdog = null;
+    }
+    if (keepaliveInterval) {
+      clearInterval(keepaliveInterval);
+      keepaliveInterval = null;
     }
     const ws = get().ws;
     if (ws) {
