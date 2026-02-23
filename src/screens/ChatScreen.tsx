@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { View, FlatList, KeyboardAvoidingView, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import { View, FlatList, KeyboardAvoidingView, Platform, Pressable, NativeSyntheticEvent, NativeScrollEvent, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { ArrowDown } from 'lucide-react-native';
 import { useDeployStore } from '../stores/deployStore';
@@ -9,6 +9,9 @@ import ChatHeader from '../components/chat/ChatHeader';
 import ChatInput from '../components/chat/ChatInput';
 import MessageBubble from '../components/chat/MessageBubble';
 import ConnectingOverlay from '../components/chat/ConnectingOverlay';
+import SpinnerIcon from '../components/ui/SpinnerIcon';
+import { Text } from '@/components/ui/text';
+import { colors } from '../config/colors';
 
 const SCROLL_THRESHOLD = 120;
 
@@ -22,40 +25,74 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fabOpacity = useSharedValue(0);
+  const prevMessageCount = useRef(0);
+
+  // Filter out blank assistant messages except the last one (loading indicator)
+  const visibleMessages = React.useMemo(() => {
+    const lastMsg = messages[messages.length - 1];
+    const isLastLoading = lastMsg && lastMsg.role === 'assistant' && !lastMsg.content;
+    return messages.filter((msg, idx) => {
+      if (msg.role === 'assistant' && !msg.content) {
+        return isLastLoading && idx === messages.length - 1;
+      }
+      return true;
+    });
+  }, [messages]);
+
+  // Loading state: server ready but WS not connected yet, or history still fetching
+  const isInitialLoading = isReady && messages.length === 0 && (
+    connectionState !== 'connected' || isLoadingHistory
+  );
+
+  // Use ref for connection params so the effect only triggers on isReady
+  const connectionRef = useRef({ ipAddress: '', gatewayToken: '' });
+  useEffect(() => {
+    connectionRef.current = { ipAddress: ipAddress ?? '', gatewayToken: gatewayToken ?? '' };
+    console.log('[chat] connectionRef updated: ip=' + (ipAddress ?? 'null') + ' token=' + (gatewayToken ? gatewayToken.substring(0, 8) + '...' : 'null'));
+  }, [ipAddress, gatewayToken]);
 
   useEffect(() => {
-    if (isReady && ipAddress) {
-      useChatStore.getState().connect(ipAddress, gatewayToken ?? '');
+    console.log('[chat] Connection effect: isReady=' + isReady + ' ip=' + connectionRef.current.ipAddress);
+    if (isReady && connectionRef.current.ipAddress) {
+      useChatStore.getState().connect(connectionRef.current.ipAddress, connectionRef.current.gatewayToken);
     }
-    return () => useChatStore.getState().disconnect();
-  }, [isReady, ipAddress, gatewayToken]);
+    return () => {
+      console.log('[chat] Effect cleanup: disconnecting');
+      useChatStore.getState().disconnect();
+    };
+  }, [isReady]);
 
-  // Fetch session list when WebSocket connects
   useEffect(() => {
     if (connectionState === 'connected') {
       useSessionStore.getState().fetchSessions();
     }
   }, [connectionState]);
 
-  // Auto-scroll on new messages (only if already at bottom)
+  // Auto-scroll when new messages arrive
   useEffect(() => {
-    if (messages.length > 0 && isAtBottom) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    if (visibleMessages.length > 0) {
+      const wasEmpty = prevMessageCount.current === 0;
+      if (wasEmpty || isAtBottom) {
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: !wasEmpty }), 100);
+      }
+      prevMessageCount.current = visibleMessages.length;
     }
-  }, [messages.length]);
+  }, [visibleMessages.length]);
 
-  // Scroll to bottom after history loads
+  // Scroll to bottom when history finishes loading
   const prevLoading = useRef(isLoadingHistory);
   useEffect(() => {
     if (prevLoading.current && !isLoadingHistory) {
-      // History just finished loading — scroll to bottom
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 150);
+      flatListRef.current?.scrollToEnd({ animated: false });
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 300);
+      setIsAtBottom(true);
     }
     prevLoading.current = isLoadingHistory;
   }, [isLoadingHistory]);
 
   const handleContentSizeChange = () => {
-    if (messages.length > 0 && isAtBottom) {
+    if (visibleMessages.length > 0 && isAtBottom) {
       flatListRef.current?.scrollToEnd({ animated: false });
     }
   };
@@ -77,28 +114,44 @@ export default function ChatScreen() {
     pointerEvents: fabOpacity.value === 0 ? 'none' as const : 'auto' as const,
   }));
 
+  const showEmptyState = isReady && !isInitialLoading && visibleMessages.length === 0;
+
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-background"
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ChatHeader />
 
       {!isReady ? (
         <ConnectingOverlay />
+      ) : isInitialLoading ? (
+        <View style={localStyles.emptyState}>
+          <SpinnerIcon size={36} />
+        </View>
       ) : (
-        <View className="flex-1">
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <MessageBubble message={item} />}
-            contentContainerClassName="px-4 pt-4 pb-2"
-            className="flex-1"
-            onContentSizeChange={handleContentSizeChange}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-          />
+        <View style={{ flex: 1 }}>
+          {showEmptyState ? (
+            <View style={localStyles.emptyState}>
+              <View style={localStyles.emptyIcon}>
+                <Text style={{ fontSize: 40 }}>{'\uD83E\uDD80'}</Text>
+              </View>
+              <Text style={localStyles.emptyTitle}>Start a conversation</Text>
+              <Text style={localStyles.emptySubtitle}>Select an agent or type a message</Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={visibleMessages}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <MessageBubble message={item} />}
+              contentContainerClassName="px-4 pt-4 pb-2"
+              className="flex-1"
+              onContentSizeChange={handleContentSizeChange}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+            />
+          )}
 
           {/* Scroll-to-bottom FAB */}
           <Animated.View
@@ -113,18 +166,9 @@ export default function ChatScreen() {
           >
             <Pressable
               onPress={scrollToBottom}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: '#27272a',
-                borderWidth: 1,
-                borderColor: '#3f3f46',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              style={localStyles.fab}
             >
-              <ArrowDown size={20} color="#a1a1aa" />
+              <ArrowDown size={20} color="#6B7280" />
             </Pressable>
           </Animated.View>
 
@@ -134,3 +178,47 @@ export default function ChatScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const localStyles = StyleSheet.create({
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    color: '#8B8B8B',
+    textAlign: 'center',
+  },
+  fab: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8E0D4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+});

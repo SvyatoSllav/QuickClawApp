@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ModelId, ChatMessage, ChatAttachment, AVAILABLE_MODELS } from '../types/chat';
 import apiClient from '../api/client';
+import { setServerModel } from '../api/profileApi';
 
 type ResponseHandler = (data: { ok: boolean; result?: any; error?: any }) => void;
 
@@ -35,12 +36,23 @@ interface ChatState {
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let requestCounter = 0;
 
+/** Strip openrouter/<provider>/ prefix: "openrouter/minimax/minimax-m2.5" → "minimax-m2.5" */
+function stripOpenRouterPrefix(raw: string): string {
+  const parts = raw.split('/');
+  // openrouter/<provider>/<model> → take last part
+  if (parts.length >= 3 && parts[0] === 'openrouter') return parts.slice(2).join('/');
+  // openrouter/<model> → take last part
+  if (parts.length === 2 && parts[0] === 'openrouter') return parts[1];
+  return raw;
+}
+
 /** Resolve a server model string to a known ModelId */
 function resolveServerModel(serverModel: string): ModelId | null {
-  const normalized = serverModel.toLowerCase().replace(/[-._]/g, '');
+  const stripped = stripOpenRouterPrefix(serverModel);
+  const normalized = stripped.toLowerCase().replace(/[-._]/g, '');
 
-  // Exact match
-  const exact = AVAILABLE_MODELS.find((m) => m.id === serverModel);
+  // Exact match against stripped value
+  const exact = AVAILABLE_MODELS.find((m) => m.id === stripped);
   if (exact) return exact.id;
 
   // Normalized substring match
@@ -53,7 +65,7 @@ function resolveServerModel(serverModel: string): ModelId | null {
   // Provider keyword match
   for (const keyword of ['claude', 'gpt', 'gemini', 'minimax'] as const) {
     if (normalized.includes(keyword)) {
-      const match = AVAILABLE_MODELS.find((m) => m.icon === (keyword === 'gpt' ? 'gpt' : keyword === 'claude' ? 'claude' : keyword === 'gemini' ? 'gemini' : 'minimax'));
+      const match = AVAILABLE_MODELS.find((m) => m.icon === keyword);
       if (match) return match.id;
     }
   }
@@ -75,7 +87,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setModel: async (model) => {
     set({ selectedModel: model });
     try {
-      await apiClient.patch('/profile/', { selected_model: model });
+      await Promise.all([
+        apiClient.patch('/profile/', { selected_model: model }),
+        setServerModel(model),
+      ]);
     } catch {
       // silent — local state is enough
     }
@@ -95,23 +110,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendRequest: (method, params, onResponse) => {
     const { ws, connectionState } = get();
-    if (!ws || connectionState !== 'connected') return null;
+    if (!ws || connectionState !== 'connected') {
+      console.log('[ws] sendRequest SKIPPED (not connected):', method, 'state:', connectionState);
+      return null;
+    }
 
     const id = `rpc-${++requestCounter}-${Date.now()}`;
     if (onResponse) {
       get()._responseHandlers.set(id, onResponse);
     }
 
+    console.log('[ws] sendRequest:', method, 'id:', id, 'params:', JSON.stringify(params).substring(0, 200));
     ws.send(JSON.stringify({ type: 'req', id, method, params }));
     return id;
   },
 
   loadHistory: (sessionKey) => {
+    console.log('[ws] loadHistory:', sessionKey);
     set({ isLoadingHistory: true });
     get().sendRequest('chat.history', { sessionKey }, (data) => {
+      console.log('[ws] loadHistory response:', data.ok ? `${data.result?.messages?.length ?? 0} messages` : 'FAILED', data.error || '');
       if (data.ok && data.result?.messages) {
         const messages: ChatMessage[] = data.result.messages
-          .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+          .filter((m: any) => (m.role === 'user' || m.role === 'assistant') && normalizeContent(m.content))
           .map((m: any, i: number) => ({
             id: `hist-${i}-${Date.now()}`,
             role: m.role as 'user' | 'assistant',
@@ -128,7 +149,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: () => {
     const { inputText, ws, connectionState, activeSessionKey, attachments } = get();
     const text = inputText.trim();
-    if ((!text && attachments.length === 0) || connectionState !== 'connected' || !ws) return;
+    console.log('[ws] sendMessage called: text="' + text.substring(0, 50) + '" state=' + connectionState + ' session=' + activeSessionKey + ' attachments=' + attachments.length);
+    if ((!text && attachments.length === 0) || connectionState !== 'connected' || !ws) {
+      console.log('[ws] sendMessage SKIPPED: noText=' + (!text && attachments.length === 0) + ' notConnected=' + (connectionState !== 'connected') + ' noWs=' + !ws);
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -159,6 +184,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     }
 
+    console.log('[ws] sendMessage → chat.send id=' + requestId + ' session=' + activeSessionKey);
     ws.send(
       JSON.stringify({
         type: 'req',
@@ -170,9 +196,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   connect: (serverIp, gatewayToken) => {
-    const existing = get().ws;
-    if (existing) {
-      existing.close();
+    const { connectionState: curState, ws: existingWs } = get();
+
+    // Duplicate connection guard
+    if ((curState === 'connecting' || curState === 'connected') && existingWs) {
+      console.log('[ws] Already', curState, '— skipping duplicate connect to', serverIp);
+      return;
+    }
+
+    console.log('[ws] Connecting to ws://' + serverIp + ':18789 token=' + (gatewayToken ? gatewayToken.substring(0, 8) + '...' : 'NONE'));
+
+    if (existingWs) {
+      console.log('[ws] Closing existing WebSocket before reconnect');
+      existingWs.close();
     }
 
     set({ connectionState: 'connecting' });
@@ -180,15 +216,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const ws = new WebSocket(`ws://${serverIp}:18789`);
 
     ws.onopen = () => {
-      // Wait for challenge event, then send connect request
+      console.log('[ws] WebSocket opened, waiting for challenge...');
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log('[ws] ← recv:', data.type, data.event || data.id || '', data.ok !== undefined ? 'ok=' + data.ok : '');
 
         // Handle challenge — send connect request
         if (data.type === 'event' && data.event === 'connect.challenge') {
+          console.log('[ws] Challenge received, sending auth as control-ui mode=ui');
           ws.send(
             JSON.stringify({
               type: 'req',
@@ -198,13 +236,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 minProtocol: 3,
                 maxProtocol: 3,
                 client: {
-                  id: 'gateway-client',
-                  displayName: 'AwesomeClaw',
+                  id: 'openclaw-control-ui',
+                  displayName: 'EasyClaw',
                   version: '1.0.0',
                   platform: 'mobile',
-                  mode: 'backend',
+                  mode: 'ui',
                 },
                 caps: [],
+                scopes: ['operator.read', 'operator.write'],
                 auth: { token: gatewayToken },
               },
             }),
@@ -213,11 +252,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         // Handle connect response
-        if (data.type === 'res' && data.id === 'connect-init' && (data.ok || data.payload)) {
-          set({ connectionState: 'connected' });
-          // Fetch agents on connect — this sets session key and loads history
-          const { useAgentStore } = require('./agentStore');
-          useAgentStore.getState().fetchAgents();
+        if (data.type === 'res' && data.id === 'connect-init') {
+          if (data.ok || data.payload) {
+            console.log('[ws] Connect SUCCESS — now connected');
+            set({ connectionState: 'connected' });
+            const { useAgentStore } = require('./agentStore');
+            useAgentStore.getState().fetchAgents();
+          } else {
+            console.error('[ws] Connect FAILED:', JSON.stringify(data.error || data));
+          }
           return;
         }
 
@@ -226,7 +269,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const handler = get()._responseHandlers.get(data.id);
           if (handler) {
             get()._responseHandlers.delete(data.id);
-            // OpenClaw uses 'payload' instead of 'result'
+            console.log('[ws] RPC response for', data.id, 'ok:', !!data.ok, data.error ? 'error:' + JSON.stringify(data.error) : '');
             handler({ ok: !!data.ok, result: data.payload, error: data.error });
             return;
           }
@@ -237,13 +280,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const payload = data.payload;
           const activeKey = get().activeSessionKey;
 
-          // Ignore events from other sessions
           if (payload.sessionKey && payload.sessionKey !== activeKey) return;
 
           if (payload.state === 'delta' && payload.message?.content) {
             get().updateLastAssistantMessage(normalizeContent(payload.message.content));
           } else if (payload.state === 'final') {
-            // Message complete — nothing extra needed
+            console.log('[ws] Chat message final for session:', payload.sessionKey);
           }
         }
 
@@ -257,24 +299,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
           };
           set((s) => ({ messages: [...s.messages, assistantMsg] }));
         }
-      } catch {
-        // ignore parse errors
+      } catch (e) {
+        console.error('[ws] Message parse error:', e, 'raw:', String(event.data).substring(0, 200));
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      console.log('[ws] WebSocket CLOSED code=' + event.code + ' reason="' + (event.reason || '') + '" wasClean=' + event.wasClean);
       set({ connectionState: 'disconnected', ws: null });
       // Auto-reconnect after 3s
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       reconnectTimeout = setTimeout(() => {
         const state = get();
         if (state.connectionState === 'disconnected') {
+          console.log('[ws] Auto-reconnecting...');
           state.connect(serverIp, gatewayToken);
         }
       }, 3000);
     };
 
-    ws.onerror = () => {
+    ws.onerror = (event) => {
+      console.error('[ws] WebSocket ERROR:', event);
       ws.close();
     };
 
@@ -282,12 +327,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   disconnect: () => {
+    console.log('[ws] disconnect() called');
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
       reconnectTimeout = null;
     }
     const ws = get().ws;
-    if (ws) ws.close();
+    if (ws) {
+      console.log('[ws] Closing WebSocket from disconnect()');
+      ws.close();
+    }
     set({ ws: null, connectionState: 'disconnected' });
   },
 

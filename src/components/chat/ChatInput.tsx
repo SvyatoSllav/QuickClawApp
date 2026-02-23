@@ -1,12 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { View, Image, Pressable } from 'react-native';
+import { View, Image, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/text';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useChatStore } from '../../stores/chatStore';
 import { colors } from '../../config/colors';
-import AttachIcon from '../icons/AttachIcon';
+import { Paperclip, Mic, Send } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ChatInput() {
@@ -19,6 +18,7 @@ export default function ChatInput() {
   const addAttachment = useChatStore((s) => s.addAttachment);
   const removeAttachment = useChatStore((s) => s.removeAttachment);
   const [inputHeight, setInputHeight] = useState(48);
+  const [isFocused, setIsFocused] = useState(false);
   const lastHeight = useRef(48);
 
   const canSend =
@@ -50,34 +50,33 @@ export default function ChatInput() {
   const isMultiline = inputHeight > 52;
 
   return (
-    <View className="border-t border-border">
+    <View style={styles.outerContainer}>
       {attachments.length > 0 && (
-        <View className="flex-row gap-2 px-4 pt-3">
+        <View style={styles.attachmentsRow}>
           {attachments.map((att, i) => (
-            <View key={i} className="relative">
+            <View key={i} style={styles.attachmentThumb}>
               <Image
                 source={{ uri: att.uri }}
                 style={{ width: 56, height: 56, borderRadius: 8 }}
               />
               <Pressable
                 onPress={() => removeAttachment(i)}
-                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive items-center justify-center"
+                style={styles.removeAttachment}
               >
-                <Text className="text-[10px] text-destructive-foreground font-bold">✕</Text>
+                <Text style={styles.removeText}>{'\u2715'}</Text>
               </Pressable>
             </View>
           ))}
         </View>
       )}
 
-      <View className="flex-row items-center px-4 py-3 gap-2">
+      <View style={[styles.inputContainer, isFocused && styles.inputContainerFocused]}>
         <Pressable
           onPress={handlePickImage}
           disabled={connectionState !== 'connected'}
-          className="p-2"
-          style={{ opacity: connectionState !== 'connected' ? 0.4 : 1 }}
+          style={{ padding: 8, opacity: connectionState !== 'connected' ? 0.4 : 1 }}
         >
-          <AttachIcon size={22} color={colors.mutedForeground} />
+          <Paperclip size={20} color={colors.mutedForeground} />
         </Pressable>
 
         <Input
@@ -87,9 +86,12 @@ export default function ChatInput() {
           placeholderTextColor={colors.mutedForeground}
           multiline
           maxLength={4000}
-          className={`flex-1 h-auto min-h-12 max-h-40 py-3 px-4 ${
+          className={`flex-1 h-auto min-h-12 max-h-40 py-3 px-4 bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-transparent ${
             isMultiline ? 'rounded-2xl' : 'rounded-full'
           }`}
+          style={{ color: colors.foreground }}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           editable={connectionState === 'connected'}
           onSubmitEditing={canSend ? sendMessage : undefined}
           onContentSizeChange={(e: any) => {
@@ -104,16 +106,81 @@ export default function ChatInput() {
           }}
         />
 
-        <Button
-          size="icon"
-          variant={canSend ? 'default' : 'secondary'}
+        <Pressable style={{ padding: 8 }}>
+          <Mic size={20} color={colors.mutedForeground} />
+        </Pressable>
+
+        <Pressable
           onPress={canSend ? sendMessage : undefined}
           disabled={!canSend}
-          className="rounded-full"
+          style={[
+            styles.sendButton,
+            { opacity: canSend ? 1 : 0.4 },
+          ]}
         >
-          <Text className="text-lg">↑</Text>
-        </Button>
+          <Send size={18} color="#FFFFFF" />
+        </Pressable>
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  outerContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingBottom: 12,
+  },
+  attachmentsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+  },
+  attachmentThumb: {
+    position: 'relative',
+  },
+  removeAttachment: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+    gap: 2,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  inputContainerFocused: {
+    borderColor: '#F5A623',
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5A623',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 2,
+  },
+});

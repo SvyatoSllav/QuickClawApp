@@ -10,12 +10,12 @@ interface UsageProgressBarProps {
 export default function UsageProgressBar({ used, limit }: UsageProgressBarProps) {
   const percent = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
 
-  let barColor: string = colors.cobalt;
-  if (percent > 90) barColor = colors.error;
+  let barColor: string = colors.primary;
+  if (percent > 90) barColor = colors.destructive;
   else if (percent > 70) barColor = colors.warning;
 
   return (
-    <View className="h-1 bg-divider w-full overflow-hidden">
+    <View className="h-1 bg-muted w-full overflow-hidden">
       <View
         style={{
           width: `${percent}%`,

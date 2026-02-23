@@ -7,9 +7,22 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Text } from '@/components/ui/text';
-import { User, Users, Lightbulb, Plug, ShoppingBag, FileText, X } from 'lucide-react-native';
+import {
+  MessageSquare,
+  Users,
+  Sparkles,
+  FolderOpen,
+  Link,
+  BarChart3,
+  Server,
+  BookOpen,
+  HelpCircle,
+  Settings,
+  X,
+} from 'lucide-react-native';
 import { useNavigationStore, AppScreen } from '../../stores/navigationStore';
-import { useAgentStore } from '../../stores/agentStore';
+import { useSessionStore } from '../../stores/sessionStore';
+import { colors } from '../../config/colors';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.82;
@@ -18,24 +31,17 @@ const EASING = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 interface MenuItem {
   label: string;
-  icon: typeof User;
-  screen: AppScreen;
+  icon: typeof MessageSquare;
+  screen?: AppScreen;
+  badge?: number;
 }
-
-const MENU_ITEMS: MenuItem[] = [
-  { label: 'Agents', icon: Users, screen: 'agents' },
-  { label: 'Profile', icon: User, screen: 'profile' },
-  { label: 'Use Cases', icon: Lightbulb, screen: 'useCases' },
-  { label: 'Integrations', icon: Plug, screen: 'profile' },
-  { label: 'Marketplace', icon: ShoppingBag, screen: 'marketplace' },
-  { label: 'System Prompts', icon: FileText, screen: 'systemPrompts' },
-];
 
 export default function Sidebar() {
   const isSidebarOpen = useNavigationStore((s) => s.isSidebarOpen);
   const closeSidebar = useNavigationStore((s) => s.closeSidebar);
   const setScreen = useNavigationStore((s) => s.setScreen);
-  const activeAgent = useAgentStore((s) => s.getActiveAgent());
+  const currentScreen = useNavigationStore((s) => s.screen);
+  const sessions = useSessionStore((s) => s.sessions);
 
   const translateX = useSharedValue(-SIDEBAR_WIDTH);
   const backdropOpacity = useSharedValue(0);
@@ -59,20 +65,64 @@ export default function Sidebar() {
     opacity: backdropOpacity.value,
   }));
 
+  const mainItems: MenuItem[] = [
+    { label: 'Sessions', icon: MessageSquare, screen: 'chat', badge: sessions.length > 0 ? sessions.length : undefined },
+    { label: 'Agents', icon: Users, screen: 'agents' },
+    { label: 'Skills', icon: Sparkles, screen: 'skills' },
+    { label: 'Files', icon: FolderOpen, screen: 'files' },
+  ];
+
+  const managementItems: MenuItem[] = [
+    { label: 'Integrations', icon: Link, screen: 'profile' },
+    { label: 'Analytics', icon: BarChart3 },
+    { label: 'Server', icon: Server },
+    { label: 'Training', icon: BookOpen },
+    { label: 'Support', icon: HelpCircle },
+  ];
+
+  const renderItem = (item: MenuItem, isActive: boolean) => {
+    const Icon = item.icon;
+    return (
+      <Pressable
+        key={item.label}
+        onPress={() => {
+          if (item.screen) setScreen(item.screen);
+        }}
+        style={[
+          styles.menuItem,
+          isActive && styles.menuItemActive,
+        ]}
+      >
+        <Icon size={20} color={isActive ? colors.primary : '#6B7280'} />
+        <Text
+          style={[
+            styles.menuLabel,
+            isActive && styles.menuLabelActive,
+          ]}
+        >
+          {item.label}
+        </Text>
+        {item.badge && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{item.badge}</Text>
+          </View>
+        )}
+      </Pressable>
+    );
+  };
+
   return (
     <View
       style={StyleSheet.absoluteFill}
       pointerEvents={isSidebarOpen ? 'auto' : 'none'}
     >
-      {/* Backdrop */}
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <Pressable
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.3)' }]}
           onPress={closeSidebar}
         />
       </Animated.View>
 
-      {/* Sidebar panel */}
       <Animated.View
         style={[
           {
@@ -81,47 +131,158 @@ export default function Sidebar() {
             bottom: 0,
             left: 0,
             width: SIDEBAR_WIDTH,
-            backgroundColor: '#0a0b0d',
+            backgroundColor: colors.background,
             borderRightWidth: 1,
-            borderRightColor: '#1e1e22',
+            borderRightColor: colors.border,
           },
           sidebarStyle,
         ]}
       >
-        {/* Header with close button */}
-        <View className="flex-row items-center justify-between px-5 pt-4 pb-3">
-          <View className="flex-row items-center gap-2">
-            {activeAgent?.identity?.emoji ? (
-              <Text className="text-lg">{activeAgent.identity.emoji}</Text>
-            ) : null}
-            <Text className="text-lg font-bold text-foreground">
-              {activeAgent?.identity?.name ?? activeAgent?.name ?? 'Menu'}
-            </Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={{ fontSize: 22 }}>{'\uD83E\uDD80'}</Text>
+            <Text style={styles.headerTitle}>EasyClaw</Text>
           </View>
           <Pressable onPress={closeSidebar} hitSlop={12}>
-            <X size={22} color="#a1a1aa" />
+            <X size={22} color="#6B7280" />
           </Pressable>
         </View>
 
-        {/* Menu items */}
-        <View className="px-3 pt-2">
-          {MENU_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Pressable
-                key={item.label}
-                onPress={() => setScreen(item.screen)}
-                className="flex-row items-center gap-4 px-3 py-3.5 rounded-lg active:bg-accent"
-              >
-                <Icon size={20} color="#a1a1aa" />
-                <Text className="text-base font-medium text-foreground">
-                  {item.label}
-                </Text>
-              </Pressable>
-            );
+        {/* Main menu */}
+        <View style={styles.menuSection}>
+          {mainItems.map((item) => {
+            const isActive = item.screen === currentScreen;
+            return renderItem(item, isActive);
           })}
+        </View>
+
+        {/* Separator + Management */}
+        <View style={styles.separator} />
+        <Text style={styles.sectionHeader}>MANAGEMENT</Text>
+        <View style={styles.menuSection}>
+          {managementItems.map((item) => renderItem(item, false))}
+        </View>
+
+        {/* Bottom */}
+        <View style={styles.bottomSection}>
+          <Pressable
+            onPress={() => setScreen('profile')}
+            style={styles.settingsButton}
+          >
+            <Settings size={20} color="#6B7280" />
+          </Pressable>
+
+          <View style={styles.planCard}>
+            <Text style={styles.planLabel}>
+              Plan: <Text style={styles.planBold}>Free</Text>
+            </Text>
+            <Text style={styles.planTokens}>12,400 tokens remaining</Text>
+          </View>
         </View>
       </Animated.View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  menuSection: {
+    paddingHorizontal: 12,
+    gap: 2,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  menuItemActive: {
+    backgroundColor: '#FEF3C7',
+  },
+  menuLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#374151',
+    flex: 1,
+  },
+  menuLabelActive: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  badge: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    minWidth: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: 20,
+    marginVertical: 8,
+  },
+  sectionHeader: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    letterSpacing: 1.5,
+    paddingHorizontal: 26,
+    paddingVertical: 8,
+  },
+  bottomSection: {
+    marginTop: 'auto',
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  settingsButton: {
+    alignSelf: 'flex-end',
+    padding: 8,
+    marginBottom: 8,
+  },
+  planCard: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  planLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  planBold: {
+    fontWeight: '700',
+  },
+  planTokens: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+});

@@ -1,27 +1,50 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
 import { AppConfig } from '../config/appConfig';
+import apiClient from '../api/client';
+
+// Lazy-load RevenueCat only on native (crashes Metro on web)
+function getPurchases() {
+  return require('react-native-purchases').default;
+}
+function getLOG_LEVEL() {
+  return require('react-native-purchases').LOG_LEVEL;
+}
+
+type PurchasesPackage = any;
 
 interface SubscriptionState {
   isSubscribed: boolean;
   loading: boolean;
   error: string | null;
+  packages: PurchasesPackage[];
+  selectedPackage: PurchasesPackage | null;
   initRevenueCat: (userId: string) => Promise<void>;
   loadOfferings: () => Promise<void>;
-  purchasePackage: () => Promise<boolean>;
+  selectPackage: (pkg: PurchasesPackage) => void;
+  purchaseSelected: () => Promise<boolean>;
+  presentPaywall: () => Promise<boolean>;
+  presentCustomerCenter: () => Promise<void>;
   restorePurchases: () => Promise<boolean>;
   checkEntitlement: () => Promise<boolean>;
+  webPurchase: () => Promise<boolean>;
   logoutRevenueCat: () => Promise<void>;
 }
 
-export const useSubscriptionStore = create<SubscriptionState>((set) => ({
+export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   isSubscribed: false,
   loading: false,
   error: null,
+  packages: [],
+  selectedPackage: null,
 
   initRevenueCat: async (userId) => {
+    if (Platform.OS === 'web') {
+      console.log('[subscription] initRevenueCat skipped (web)');
+      return;
+    }
+    console.log('[subscription] initRevenueCat for user:', userId);
     try {
-      const Purchases = await import('react-native-purchases');
       const apiKey =
         Platform.OS === 'ios'
           ? AppConfig.revenueCatApiKeyIos
@@ -29,35 +52,54 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
 
       if (!apiKey) return;
 
-      Purchases.default.configure({ apiKey, appUserID: userId });
+      const Purchases = getPurchases();
+      if (__DEV__) {
+        Purchases.setLogLevel(getLOG_LEVEL().VERBOSE);
+      }
+
+      Purchases.configure({ apiKey, appUserID: userId });
     } catch (e) {
       console.warn('RevenueCat init failed:', e);
     }
   },
 
   loadOfferings: async () => {
+    if (Platform.OS === 'web') {
+      console.log('[subscription] loadOfferings skipped (web)');
+      set({ loading: false, packages: [], selectedPackage: null });
+      return;
+    }
+    console.log('[subscription] loadOfferings starting...');
     set({ loading: true, error: null });
     try {
-      const Purchases = await import('react-native-purchases');
-      await Purchases.default.getOfferings();
-      set({ loading: false });
+      const offerings = await getPurchases().getOfferings();
+      const packages = offerings.current?.availablePackages ?? [];
+      console.log('[subscription] loadOfferings: found', packages.length, 'packages');
+      set({
+        packages,
+        selectedPackage: packages[0] ?? null,
+        loading: false,
+      });
     } catch (e) {
+      console.error('[subscription] loadOfferings error:', e);
       set({ loading: false, error: String(e) });
     }
   },
 
-  purchasePackage: async () => {
+  selectPackage: (pkg) => {
+    set({ selectedPackage: pkg });
+  },
+
+  purchaseSelected: async () => {
+    const pkg = get().selectedPackage;
+    if (!pkg) {
+      set({ error: 'No package selected' });
+      return false;
+    }
+
     set({ loading: true, error: null });
     try {
-      const Purchases = await import('react-native-purchases');
-      const offerings = await Purchases.default.getOfferings();
-      const pkg = offerings.current?.availablePackages[0];
-      if (!pkg) {
-        set({ loading: false, error: 'No packages available' });
-        return false;
-      }
-
-      const { customerInfo } = await Purchases.default.purchasePackage(pkg);
+      const { customerInfo } = await getPurchases().purchasePackage(pkg);
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -74,11 +116,45 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
     }
   },
 
-  restorePurchases: async () => {
+  presentPaywall: async () => {
     set({ loading: true, error: null });
     try {
-      const Purchases = await import('react-native-purchases');
-      const customerInfo = await Purchases.default.restorePurchases();
+      const RevenueCatUI = (await import('react-native-purchases-ui')).default;
+      await RevenueCatUI.presentPaywallIfNeeded({
+        requiredEntitlementIdentifier: AppConfig.revenueCatEntitlementId,
+      });
+
+      const customerInfo = await getPurchases().getCustomerInfo();
+      const isActive =
+        customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
+        undefined;
+
+      set({ isSubscribed: isActive, loading: false });
+      return isActive;
+    } catch (e: any) {
+      if (e.userCancelled) {
+        set({ loading: false });
+        return false;
+      }
+      set({ loading: false, error: String(e) });
+      return false;
+    }
+  },
+
+  presentCustomerCenter: async () => {
+    try {
+      const RevenueCatUI = (await import('react-native-purchases-ui')).default;
+      await RevenueCatUI.presentCustomerCenter();
+    } catch (e) {
+      console.warn('Customer Center failed:', e);
+    }
+  },
+
+  restorePurchases: async () => {
+    if (Platform.OS === 'web') return false;
+    set({ loading: true, error: null });
+    try {
+      const customerInfo = await getPurchases().restorePurchases();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -92,27 +168,70 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
   },
 
   checkEntitlement: async () => {
+    if (Platform.OS === 'web') {
+      console.log('[subscription] checkEntitlement skipped (web)');
+      return false;
+    }
     try {
-      const Purchases = await import('react-native-purchases');
-      const customerInfo = await Purchases.default.getCustomerInfo();
+      const customerInfo = await getPurchases().getCustomerInfo();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
-
+      console.log('[subscription] checkEntitlement:', isActive, 'entitlementId:', AppConfig.revenueCatEntitlementId);
       set({ isSubscribed: isActive });
       return isActive;
-    } catch {
+    } catch (e) {
+      console.error('[subscription] checkEntitlement error:', e);
+      return false;
+    }
+  },
+
+  webPurchase: async () => {
+    console.log('[subscription] webPurchase starting...');
+    set({ loading: true, error: null });
+    try {
+      const { useAuthStore } = require('./authStore');
+      const authState = useAuthStore.getState();
+      const userId = authState.user?.id;
+      const token = authState.authToken;
+      console.log('[subscription] webPurchase userId:', userId, 'hasToken:', !!token);
+      if (!userId) throw new Error('Not authenticated');
+
+      const payload = {
+        event: {
+          type: 'INITIAL_PURCHASE',
+          app_user_id: String(userId),
+          expiration_at_ms: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        },
+      };
+      const url = '/payments/webhook/revenuecat/';
+      console.log('[subscription] webPurchase POST', url, JSON.stringify(payload));
+
+      const response = await apiClient.post(url, payload);
+      console.log('[subscription] webPurchase response status:', response.status, 'data:', JSON.stringify(response.data));
+
+      console.log('[subscription] webPurchase reloading profile...');
+      await useAuthStore.getState().loadProfile();
+      console.log('[subscription] webPurchase profile reloaded. subscriptionStatus:', useAuthStore.getState().profile?.subscriptionStatus);
+      console.log('[subscription] webPurchase SUCCESS');
+      set({ isSubscribed: true, loading: false });
+      return true;
+    } catch (e: any) {
+      console.error('[subscription] webPurchase ERROR:', e);
+      console.error('[subscription] webPurchase ERROR details — message:', e?.message, 'response.status:', e?.response?.status, 'response.data:', JSON.stringify(e?.response?.data));
+      set({ loading: false, error: String(e) });
       return false;
     }
   },
 
   logoutRevenueCat: async () => {
-    try {
-      const Purchases = await import('react-native-purchases');
-      await Purchases.default.logOut();
-    } catch {
-      // ignore
+    if (Platform.OS !== 'web') {
+      try {
+        await getPurchases().logOut();
+      } catch {
+        // ignore
+      }
     }
-    set({ isSubscribed: false });
+    set({ isSubscribed: false, packages: [], selectedPackage: null });
   },
 }));

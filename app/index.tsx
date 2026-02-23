@@ -11,12 +11,13 @@ import AuthScreen from '../src/screens/AuthScreen';
 import PlanScreen from '../src/screens/PlanScreen';
 import ChatScreen from '../src/screens/ChatScreen';
 import ProfileScreen from '../src/screens/ProfileScreen';
-import UseCasesScreen from '../src/screens/UseCasesScreen';
-import MarketplaceScreen from '../src/screens/MarketplaceScreen';
-import SystemPromptsScreen from '../src/screens/SystemPromptsScreen';
 import AgentsScreen from '../src/screens/AgentsScreen';
+import SkillsScreen from '../src/screens/SkillsScreen';
+import FilesScreen from '../src/screens/FilesScreen';
 import Sidebar from '../src/components/sidebar/Sidebar';
 import SessionDrawer from '../src/components/chat/SessionDrawer';
+import SpinnerIcon from '../src/components/ui/SpinnerIcon';
+import { Text } from '../src/components/ui/text';
 import { colors } from '../src/config/colors';
 
 export default function MainScreen() {
@@ -27,12 +28,13 @@ export default function MainScreen() {
   const isSessionDrawerOpen = useNavigationStore((s) => s.isSessionDrawerOpen);
   const closeSessionDrawer = useNavigationStore((s) => s.closeSessionDrawer);
   const initComplete = useAuthStore((s) => s.initComplete);
+  const authLoading = useAuthStore((s) => s.loading);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const hasOnboarded = useOnboardingStore((s) => s.hasCompletedOnboarding);
   const isSubscribed = useSubscriptionStore((s) => s.isSubscribed);
 
   useEffect(() => {
-    if (!initComplete) return;
+    if (!initComplete || authLoading) return;
 
     if (!hasOnboarded && !isAuthenticated) {
       setScreen('onboarding');
@@ -43,12 +45,15 @@ export default function MainScreen() {
     } else {
       setScreen('chat');
     }
-  }, [initComplete, hasOnboarded, isAuthenticated, isSubscribed, setScreen]);
+  }, [initComplete, authLoading, hasOnboarded, isAuthenticated, isSubscribed, setScreen]);
 
-  if (!initComplete) {
+  if (!initComplete || (authLoading && isAuthenticated)) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator color={colors.primary} size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <SpinnerIcon size={40} />
+        <Text style={{ fontSize: 15, color: '#8B8B8B', fontWeight: '500' }}>
+          {isAuthenticated ? 'Setting up your workspace...' : 'Loading...'}
+        </Text>
       </View>
     );
   }
@@ -65,14 +70,12 @@ export default function MainScreen() {
         return <ChatScreen />;
       case 'profile':
         return <ProfileScreen />;
-      case 'useCases':
-        return <UseCasesScreen />;
-      case 'marketplace':
-        return <MarketplaceScreen />;
-      case 'systemPrompts':
-        return <SystemPromptsScreen />;
       case 'agents':
         return <AgentsScreen />;
+      case 'skills':
+        return <SkillsScreen />;
+      case 'files':
+        return <FilesScreen />;
     }
   };
 

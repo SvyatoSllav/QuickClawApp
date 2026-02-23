@@ -1,26 +1,41 @@
 import React from 'react';
-import { View, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, ScrollView, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { Text } from '@/components/ui/text';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Check } from 'lucide-react-native';
+import { Menu, ChevronRight } from 'lucide-react-native';
 import { useNavigationStore } from '../stores/navigationStore';
 import { useAgentStore } from '../stores/agentStore';
 import { colors } from '../config/colors';
 
+const AGENT_EMOJIS: Record<string, string> = {
+  coder: '\uD83D\uDCBB',
+  researcher: '\uD83D\uDD0D',
+  writer: '\u270D\uFE0F',
+  analyst: '\uD83D\uDCCA',
+  assistant: '\uD83E\uDD16',
+};
+
+const EMOJI_BG_COLORS: Record<string, string> = {
+  coder: '#DBEAFE',
+  researcher: '#FEF3C7',
+  writer: '#FCE7F3',
+  analyst: '#D1FAE5',
+  assistant: '#F3E8FF',
+};
+
+const POPULAR_AGENTS = new Set(['coder', 'analyst', 'researcher']);
+
 const FALLBACK_DESCRIPTIONS: Record<string, string> = {
-  researcher: 'Web research, news monitoring, competitive intelligence, and multi-source information synthesis.',
-  writer: 'Articles, social media, email campaigns, video scripts, and image generation for visual content.',
-  coder: 'Code generation, debugging, architecture design, Git workflows, and background coding agents.',
-  analyst: 'Data exploration, statistical analysis, report generation, dashboards, and Google Sheets integration.',
-  assistant: 'Task management, calendar, email, reminders, and workflow automation across Trello, Notion, and Google.',
+  researcher: 'Web research, news monitoring, competitive intelligence.',
+  writer: 'Creates engaging marketing copy, landing pages, and product descriptions.',
+  coder: 'Full-stack dev helper. Writes, reviews, and debugs code across languages.',
+  analyst: 'Analyzes data, builds queries, and creates insightful reports.',
+  assistant: 'Task management, calendar, email, reminders, and workflow automation.',
 };
 
 export default function AgentsScreen() {
-  const goBack = useNavigationStore((s) => s.goBack);
+  const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
   const setScreen = useNavigationStore((s) => s.setScreen);
   const agents = useAgentStore((s) => s.agents);
-  const activeAgentId = useAgentStore((s) => s.activeAgentId);
   const switchAgent = useAgentStore((s) => s.switchAgent);
   const isLoading = useAgentStore((s) => s.isLoading);
 
@@ -30,67 +45,140 @@ export default function AgentsScreen() {
   };
 
   return (
-    <View className="flex-1 bg-background">
-      <View className="flex-row items-center px-4 py-3 border-b border-border">
-        <Button variant="ghost" size="sm" onPress={goBack}>
-          <Text className="text-sm font-medium">Back</Text>
-        </Button>
-        <Text className="font-bold text-lg ml-2">Agents</Text>
+    <View style={localStyles.container}>
+      {/* Header */}
+      <View style={localStyles.header}>
+        <Pressable onPress={toggleSidebar} hitSlop={8} style={{ padding: 4 }}>
+          <Menu size={22} color={colors.foreground} />
+        </Pressable>
+        <Text style={localStyles.headerTitle}>Agents</Text>
       </View>
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center">
+        <View style={localStyles.loadingContainer}>
           <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : (
-        <ScrollView contentContainerClassName="px-4 pt-4 pb-12 gap-3">
-          <Text variant="muted" className="text-xs mb-1 px-1">
-            Switch between specialized agents. Each agent has its own persona, tools, and session history.
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 }}>
+          <Text style={localStyles.pageTitle}>Choose an agent</Text>
+          <Text style={localStyles.pageSubtitle}>
+            Pre-configured agents for specific tasks
           </Text>
 
-          {agents.map((agent) => {
-            const isActive = activeAgentId === agent.id;
-            const emoji = agent.identity?.emoji ?? '';
-            const name = agent.identity?.name ?? agent.name ?? agent.id;
-            const description = agent.description || FALLBACK_DESCRIPTIONS[agent.id] || '';
-            const skills = agent.skills ?? [];
+          {/* Agent cards */}
+          <View style={{ gap: 10, marginTop: 16 }}>
+            {agents.map((agent) => {
+              const emoji = agent.identity?.emoji ?? AGENT_EMOJIS[agent.id] ?? '\uD83E\uDD16';
+              const name = agent.identity?.name ?? agent.name ?? agent.id;
+              const description = agent.description || FALLBACK_DESCRIPTIONS[agent.id] || '';
+              const bgColor = EMOJI_BG_COLORS[agent.id] ?? '#F3F4F6';
+              const isPopular = POPULAR_AGENTS.has(agent.id);
 
-            return (
-              <Pressable key={agent.id} onPress={() => handleSelect(agent.id)}>
-                <Card className={`py-0 ${isActive ? 'border-primary' : ''}`}>
-                  <CardContent className="py-4">
-                    <View className="flex-row items-center justify-between mb-1">
-                      <View className="flex-row items-center gap-2">
-                        <Text className="text-lg">{emoji}</Text>
-                        <Text className="font-semibold text-sm">{name}</Text>
-                      </View>
-                      {isActive && (
-                        <View className="w-5 h-5 rounded-full bg-primary items-center justify-center">
-                          <Check size={12} color="#fff" strokeWidth={3} />
+              return (
+                <Pressable
+                  key={agent.id}
+                  onPress={() => handleSelect(agent.id)}
+                  style={localStyles.agentCard}
+                >
+                  <View style={[localStyles.emojiCircle, { backgroundColor: bgColor }]}>
+                    <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <Text style={localStyles.agentName}>{name}</Text>
+                      {isPopular && (
+                        <View style={localStyles.popularBadge}>
+                          <Text style={localStyles.popularBadgeText}>Popular</Text>
                         </View>
                       )}
                     </View>
                     {description ? (
-                      <Text variant="muted" className="text-xs leading-5 ml-8" numberOfLines={2}>
-                        {description}
-                      </Text>
+                      <Text style={localStyles.agentDesc} numberOfLines={2}>{description}</Text>
                     ) : null}
-                    {skills.length > 0 && (
-                      <View className="flex-row flex-wrap gap-1.5 ml-8 mt-2">
-                        {skills.map((skill) => (
-                          <View key={skill} className="bg-muted rounded-full px-2.5 py-0.5">
-                            <Text className="text-[10px] text-muted-foreground">{skill}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </CardContent>
-                </Card>
-              </Pressable>
-            );
-          })}
+                  </View>
+                  <ChevronRight size={18} color="#D1D5DB" />
+                </Pressable>
+              );
+            })}
+          </View>
         </ScrollView>
       )}
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 6,
+  },
+  pageSubtitle: {
+    fontSize: 14,
+    color: '#8B8B8B',
+  },
+  agentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emojiCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  agentName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  agentDesc: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  popularBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  popularBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#F5A623',
+  },
+});

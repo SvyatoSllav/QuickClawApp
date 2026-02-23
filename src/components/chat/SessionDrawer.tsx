@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, FlatList, Pressable, Dimensions, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, FlatList, Pressable, Dimensions, StyleSheet, TextInput } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,8 +7,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Text } from '@/components/ui/text';
-import { Button } from '@/components/ui/button';
-import { Plus, Trash2, X } from 'lucide-react-native';
+import { Plus, Trash2, X, Pencil } from 'lucide-react-native';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Session } from '../../types/session';
@@ -44,7 +43,12 @@ export default function SessionDrawer({ visible, onClose }: Props) {
   const switchSession = useSessionStore((s) => s.switchSession);
   const createSession = useSessionStore((s) => s.createSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
+  const renameSession = useSessionStore((s) => s.renameSession);
   const activeSessionKey = useChatStore((s) => s.activeSessionKey);
+
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const editInputRef = useRef<TextInput>(null);
 
   const translateY = useSharedValue(MAX_DRAWER_HEIGHT);
   const backdropOpacity = useSharedValue(0);
@@ -84,36 +88,84 @@ export default function SessionDrawer({ visible, onClose }: Props) {
     deleteSession(key);
   };
 
+  const handleLongPress = (item: Session) => {
+    setEditingKey(item.key);
+    setEditText(getSessionTitle(item));
+    setTimeout(() => editInputRef.current?.focus(), 100);
+  };
+
+  const handleRenameSubmit = () => {
+    if (editingKey && editText.trim()) {
+      renameSession(editingKey, editText.trim());
+    }
+    setEditingKey(null);
+    setEditText('');
+  };
+
   const renderItem = ({ item }: { item: Session }) => {
     const isActive = item.key === activeSessionKey;
+    const isEditing = editingKey === item.key;
     return (
       <Pressable
-        onPress={() => handleSelect(item.key)}
-        className={`flex-row items-center px-4 py-3 border-b border-border ${
-          isActive ? 'bg-accent' : ''
-        }`}
+        onPress={() => isEditing ? undefined : handleSelect(item.key)}
+        onLongPress={() => handleLongPress(item)}
+        delayLongPress={400}
+        style={[
+          localStyles.sessionItem,
+          isActive && localStyles.sessionItemActive,
+        ]}
       >
-        <View className="flex-1 mr-3">
-          <Text
-            className={`text-sm ${isActive ? 'font-bold text-foreground' : 'font-medium text-foreground'}`}
-            numberOfLines={1}
-          >
-            {getSessionTitle(item)}
-          </Text>
-          {item.updatedAt && (
-            <Text className="text-xs text-muted-foreground mt-0.5">
+        <View style={{ flex: 1, marginRight: 12 }}>
+          {isEditing ? (
+            <TextInput
+              ref={editInputRef}
+              value={editText}
+              onChangeText={setEditText}
+              onSubmitEditing={handleRenameSubmit}
+              onBlur={handleRenameSubmit}
+              style={[
+                localStyles.sessionTitle,
+                isActive && localStyles.sessionTitleActive,
+                localStyles.sessionEditInput,
+              ]}
+              autoFocus
+              selectTextOnFocus
+              returnKeyType="done"
+            />
+          ) : (
+            <Text
+              style={[
+                localStyles.sessionTitle,
+                isActive && localStyles.sessionTitleActive,
+              ]}
+              numberOfLines={1}
+            >
+              {getSessionTitle(item)}
+            </Text>
+          )}
+          {item.updatedAt && !isEditing && (
+            <Text style={localStyles.sessionTime}>
               {formatTime(item.updatedAt)}
             </Text>
           )}
         </View>
-        {item.key !== 'main' && (
-          <Pressable
-            onPress={() => handleDelete(item.key)}
-            hitSlop={8}
-            className="p-1"
-          >
-            <Trash2 size={16} color={colors.mutedForeground} />
-          </Pressable>
+        {item.key !== 'main' && !isEditing && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Pressable
+              onPress={() => handleLongPress(item)}
+              hitSlop={8}
+              style={{ padding: 4 }}
+            >
+              <Pencil size={14} color={colors.mutedForeground} />
+            </Pressable>
+            <Pressable
+              onPress={() => handleDelete(item.key)}
+              hitSlop={8}
+              style={{ padding: 4 }}
+            >
+              <Trash2 size={16} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
         )}
       </Pressable>
     );
@@ -124,51 +176,38 @@ export default function SessionDrawer({ visible, onClose }: Props) {
       style={StyleSheet.absoluteFill}
       pointerEvents={visible ? 'auto' : 'none'}
     >
-      {/* Backdrop — fades independently */}
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <Pressable
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.3)' }]}
           onPress={onClose}
         />
       </Animated.View>
 
-      {/* Drawer panel — slides up from bottom */}
       <Animated.View
         style={[
-          {
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            maxHeight: MAX_DRAWER_HEIGHT,
-            backgroundColor: '#0a0b0d',
-            borderTopLeftRadius: 16,
-            borderTopRightRadius: 16,
-            borderTopWidth: 1,
-            borderTopColor: '#1e1e22',
-          },
+          localStyles.drawer,
           drawerStyle,
         ]}
       >
-        <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-          <Text className="text-base font-semibold text-foreground">Sessions</Text>
-          <View className="flex-row items-center gap-2">
-            <Button variant="outline" size="icon" onPress={handleCreate}>
-              <Plus size={18} color={colors.foreground} />
-            </Button>
-            <Pressable onPress={onClose} hitSlop={8} className="p-1">
+        <View style={localStyles.drawerHeader}>
+          <Text style={localStyles.drawerTitle}>Sessions</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Pressable onPress={handleCreate} style={localStyles.addButton}>
+              <Plus size={18} color={colors.primary} />
+            </Pressable>
+            <Pressable onPress={onClose} hitSlop={8} style={{ padding: 4 }}>
               <X size={20} color={colors.mutedForeground} />
             </Pressable>
           </View>
         </View>
 
         {isLoading ? (
-          <View className="py-8 items-center">
-            <Text className="text-sm text-muted-foreground">Loading...</Text>
+          <View style={localStyles.emptyState}>
+            <Text style={localStyles.emptyText}>Loading...</Text>
           </View>
         ) : sorted.length === 0 ? (
-          <View className="py-8 items-center">
-            <Text className="text-sm text-muted-foreground">No sessions yet</Text>
+          <View style={localStyles.emptyState}>
+            <Text style={localStyles.emptyText}>No sessions</Text>
           </View>
         ) : (
           <FlatList
@@ -181,3 +220,85 @@ export default function SessionDrawer({ visible, onClose }: Props) {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  drawer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: MAX_DRAWER_HEIGHT,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E0D4',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E0D4',
+  },
+  drawerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sessionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0E8DC',
+  },
+  sessionItemActive: {
+    backgroundColor: '#FEF3C7',
+  },
+  sessionTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1A1A1A',
+  },
+  sessionTitleActive: {
+    fontWeight: '700',
+    color: '#F5A623',
+  },
+  sessionEditInput: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primary,
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+    margin: 0,
+  },
+  sessionTime: {
+    fontSize: 12,
+    color: '#8B8B8B',
+    marginTop: 2,
+  },
+  emptyState: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#8B8B8B',
+  },
+});

@@ -32,7 +32,6 @@ interface AuthState {
   signInApple: () => Promise<void>;
   signInGoogle: () => Promise<void>;
   afterAuthFlow: () => Promise<void>;
-  skipAuth: () => Promise<void>;
   loadProfile: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -49,53 +48,51 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initComplete: false,
 
   init: async () => {
+    console.log('[auth] init() starting');
     const token = await getAuthToken();
     if (!token) {
+      console.log('[auth] No saved token, skipping init');
       set({ initComplete: true });
       return;
     }
 
-    // Restore test session in dev mode
-    if (__DEV__ && token === 'test-token') {
-      // Set all external stores BEFORE initComplete to avoid race conditions
-      // (initComplete triggers re-render; all state must be ready by then)
-      await useOnboardingStore.getState().completeOnboarding();
-      useSubscriptionStore.setState({ isSubscribed: true });
-      useDeployStore.setState({
-        assigned: true,
-        openclawRunning: true,
-        isReady: true,
-        ipAddress: '194.87.226.98',
-        gatewayToken: 'mBDiG-b2PczPIWCywnEp8L0IJ7q-zcPHsBAoAiZq3i0',
-      });
-      set({
-        authToken: token,
-        isAuthenticated: true,
-        user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
-        loading: false,
-        initComplete: true,
-      });
-      useNavigationStore.getState().setScreen('chat');
-      return;
-    }
-
+    console.log('[auth] Token found, loading profile...');
     set({ authToken: token, isAuthenticated: true, loading: true });
 
     try {
       await get().loadProfile();
+      console.log('[auth] Profile loaded. subscriptionStatus:', get().profile?.subscriptionStatus, 'model:', get().profile?.selectedModel);
 
-      // Initialize RevenueCat if we have a user
       const user = get().user;
       if (user) {
         const subStore = useSubscriptionStore.getState();
         await subStore.initRevenueCat(String(user.id));
         await subStore.checkEntitlement();
+        console.log('[auth] RevenueCat check done. isSubscribed:', subStore.isSubscribed);
       }
-    } catch {
+
+      const backendStatus = get().profile?.subscriptionStatus;
+      if (!useSubscriptionStore.getState().isSubscribed &&
+          (backendStatus === 'active' || backendStatus === 'cancelling')) {
+        console.log('[auth] Backend subscription fallback: marking subscribed (status:', backendStatus, ')');
+        useSubscriptionStore.setState({ isSubscribed: true });
+      }
+
+      if (useSubscriptionStore.getState().isSubscribed) {
+        console.log('[auth] User subscribed, checking deploy status...');
+        await useDeployStore.getState().checkStatus();
+        const ds = useDeployStore.getState();
+        console.log('[auth] Deploy status: isReady:', ds.isReady, 'ip:', ds.ipAddress, 'token:', ds.gatewayToken ? ds.gatewayToken.substring(0, 8) + '...' : 'null');
+      } else {
+        console.log('[auth] User NOT subscribed, skipping deploy check');
+      }
+    } catch (e) {
+      console.error('[auth] init() error, logging out:', e);
       await get().logout();
     }
 
     set({ loading: false, initComplete: true });
+    console.log('[auth] init() complete');
   },
 
   signInApple: async () => {
@@ -123,18 +120,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signInGoogle: async () => {
     set({ loading: true, error: null });
 
-    // Dev mock — auto-auth with test account
-    if (__DEV__) {
-      await setAuthToken('test-token');
-      set({
-        authToken: 'test-token',
-        user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
-        isAuthenticated: true,
-      });
-      await get().afterAuthFlow();
-      return;
-    }
-
     try {
       const result = await googleSignIn();
       const authResponse =
@@ -155,51 +140,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  skipAuth: async () => {
-    set({ loading: true, error: null });
-    await setAuthToken('test-token');
-    set({
-      authToken: 'test-token',
-      user: { id: 1, email: 'tarasov.slavas2002@gmail.com', firstName: 'Slava', lastName: 'Tarasov', profile: null },
-      isAuthenticated: true,
-    });
-    await get().afterAuthFlow();
-  },
-
   afterAuthFlow: async () => {
-    // Dev mock — connect to real OpenClaw server for testing
-    if (__DEV__) {
-      await useOnboardingStore.getState().completeOnboarding();
-      useSubscriptionStore.setState({ isSubscribed: true });
-      useDeployStore.setState({
-        assigned: true,
-        openclawRunning: true,
-        isReady: true,
-        ipAddress: '194.87.226.98',
-        gatewayToken: 'mBDiG-b2PczPIWCywnEp8L0IJ7q-zcPHsBAoAiZq3i0',
-      });
-      set({ loading: false });
-      useNavigationStore.getState().setScreen('chat');
-      return;
-    }
-
+    console.log('[auth] afterAuthFlow() starting');
     await get().loadProfile();
+    console.log('[auth] Profile loaded. subscriptionStatus:', get().profile?.subscriptionStatus);
 
-    // Mark onboarding complete
     await useOnboardingStore.getState().completeOnboarding();
 
-    // Init RevenueCat
     const user = get().user;
     if (user) {
       const subStore = useSubscriptionStore.getState();
       await subStore.initRevenueCat(String(user.id));
       await subStore.checkEntitlement();
+      console.log('[auth] RevenueCat check done. isSubscribed:', subStore.isSubscribed);
     }
 
-    const isSubscribed = useSubscriptionStore.getState().isSubscribed;
+    const rcSubscribed = useSubscriptionStore.getState().isSubscribed;
+    const backendStatus = get().profile?.subscriptionStatus;
+    const isSubscribed = rcSubscribed || backendStatus === 'active' || backendStatus === 'cancelling';
+    console.log('[auth] Subscription check: rc:', rcSubscribed, 'backend:', backendStatus, 'final:', isSubscribed);
 
+    if (isSubscribed) {
+      useSubscriptionStore.setState({ isSubscribed: true });
+      console.log('[auth] Fetching deploy status...');
+      await useDeployStore.getState().checkStatus();
+      const ds = useDeployStore.getState();
+      console.log('[auth] Deploy status: isReady:', ds.isReady, 'ip:', ds.ipAddress, 'token:', ds.gatewayToken ? ds.gatewayToken.substring(0, 8) + '...' : 'null');
+    }
+
+    const targetScreen = isSubscribed ? 'chat' : 'plan';
+    console.log('[auth] afterAuthFlow() done. Platform:', Platform.OS, 'Navigating to:', targetScreen, '(rcSubscribed:', rcSubscribed, 'backendStatus:', backendStatus, ')');
     set({ loading: false });
-    useNavigationStore.getState().setScreen(isSubscribed ? 'chat' : 'plan');
+    useNavigationStore.getState().setScreen(targetScreen);
   },
 
   loadProfile: async () => {
@@ -229,6 +201,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       profile,
       subscription,
     });
+
+    // Sync model from profile so ChatHeader shows correct model immediately
+    if (profile?.selectedModel) {
+      useChatStore.getState().syncModelFromServer(profile.selectedModel);
+    }
   },
 
   logout: async () => {
