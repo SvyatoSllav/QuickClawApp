@@ -3,12 +3,14 @@ import { Platform } from 'react-native';
 import { AppConfig } from '../config/appConfig';
 import apiClient from '../api/client';
 
-// Lazy-load RevenueCat only on native (crashes Metro on web)
-function getPurchases() {
-  return require('react-native-purchases').default;
+// TODO: RevenueCat temporarily disabled — native binary is stale and crashes
+// with "Purchases-TrackedEvent is not a supported event type". Re-enable after
+// rebuilding native app with: npx expo prebuild --clean && npx expo run:ios
+function getPurchases(): any {
+  return null;
 }
-function getLOG_LEVEL() {
-  return require('react-native-purchases').LOG_LEVEL;
+function getLOG_LEVEL(): any {
+  return null;
 }
 
 type PurchasesPackage = any;
@@ -53,8 +55,9 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       if (!apiKey) return;
 
       const Purchases = getPurchases();
+      if (!Purchases) return; // RevenueCat disabled
       if (__DEV__) {
-        Purchases.setLogLevel(getLOG_LEVEL().VERBOSE);
+        Purchases.setLogLevel(getLOG_LEVEL()?.VERBOSE);
       }
 
       Purchases.configure({ apiKey, appUserID: userId });
@@ -69,10 +72,12 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       set({ loading: false, packages: [], selectedPackage: null });
       return;
     }
+    const Purchases = getPurchases();
+    if (!Purchases) { set({ loading: false }); return; }
     console.log('[subscription] loadOfferings starting...');
     set({ loading: true, error: null });
     try {
-      const offerings = await getPurchases().getOfferings();
+      const offerings = await Purchases.getOfferings();
       const packages = offerings.current?.availablePackages ?? [];
       console.log('[subscription] loadOfferings: found', packages.length, 'packages');
       set({
@@ -99,7 +104,9 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     set({ loading: true, error: null });
     try {
-      const { customerInfo } = await getPurchases().purchasePackage(pkg);
+      const Purchases = getPurchases();
+      if (!Purchases) { set({ loading: false }); return false; }
+      const { customerInfo } = await Purchases.purchasePackage(pkg);
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -117,6 +124,8 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   presentPaywall: async () => {
+    const Purchases = getPurchases();
+    if (!Purchases) { return false; }
     set({ loading: true, error: null });
     try {
       const RevenueCatUI = (await import('react-native-purchases-ui')).default;
@@ -124,7 +133,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
         requiredEntitlementIdentifier: AppConfig.revenueCatEntitlementId,
       });
 
-      const customerInfo = await getPurchases().getCustomerInfo();
+      const customerInfo = await Purchases.getCustomerInfo();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -152,9 +161,11 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   restorePurchases: async () => {
     if (Platform.OS === 'web') return false;
+    const Purchases = getPurchases();
+    if (!Purchases) return false;
     set({ loading: true, error: null });
     try {
-      const customerInfo = await getPurchases().restorePurchases();
+      const customerInfo = await Purchases.restorePurchases();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -172,8 +183,10 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       console.log('[subscription] checkEntitlement skipped (web)');
       return false;
     }
+    const Purchases = getPurchases();
+    if (!Purchases) return false;
     try {
-      const customerInfo = await getPurchases().getCustomerInfo();
+      const customerInfo = await Purchases.getCustomerInfo();
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
@@ -225,9 +238,10 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   logoutRevenueCat: async () => {
-    if (Platform.OS !== 'web') {
+    const Purchases = getPurchases();
+    if (Purchases && Platform.OS !== 'web') {
       try {
-        await getPurchases().logOut();
+        await Purchases.logOut();
       } catch {
         // ignore
       }
