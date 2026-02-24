@@ -76,7 +76,7 @@ export default function ChatScreen() {
     if (needsSnapToBottom.current && visibleMessages.length > 0 && !isInitialLoading) {
       needsSnapToBottom.current = false;
       setIsAtBottom(true);
-      flatListRef.current?.scrollToEnd({ animated: false });
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
     } else if (isAtBottom) {
       flatListRef.current?.scrollToEnd({ animated: false });
     }

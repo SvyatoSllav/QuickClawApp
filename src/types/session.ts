@@ -5,5 +5,6 @@ export interface Session {
   updatedAt: number | null;
   kind: 'direct' | 'group' | 'global' | 'unknown';
   totalTokens?: number;
+  model?: string;
 }
 

@@ -510,18 +510,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }),
 
   syncModelFromServer: (serverModel) => {
-    // Only sync from server if no locally saved model
-    getItem(SELECTED_MODEL_KEY).then((saved) => {
-      if (saved) {
-        const savedModel = AVAILABLE_MODELS.find((m) => m.id === saved);
-        if (savedModel) {
-          set({ selectedModel: savedModel.id });
-          return;
-        }
-      }
-      const resolved = resolveServerModel(serverModel);
-      if (resolved) set({ selectedModel: resolved });
-    });
+    const resolved = resolveServerModel(serverModel);
+    if (resolved) {
+      set({ selectedModel: resolved });
+      setItem(SELECTED_MODEL_KEY, resolved);
+    }
   },
 
   clearMessages: () => set({ messages: [] }),

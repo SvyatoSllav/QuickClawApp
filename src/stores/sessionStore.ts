@@ -41,13 +41,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
             updatedAt: s.updatedAt ?? null,
             kind: s.kind ?? 'direct',
             totalTokens: s.totalTokens,
+            model: s.model ?? undefined,
           }));
         if (__DEV__) console.log('[sessions] Filtered sessions:', sessions.length, 'for prefix:', prefix);
         set({ sessions, isLoading: false });
 
-        const serverModel = data.result?.defaults?.model;
+        // Sync model from the ACTIVE SESSION (not just server defaults)
+        const { activeSessionKey } = useChatStore.getState();
+        const activeSession = data.result.sessions.find(
+          (s: any) => s.key === activeSessionKey,
+        );
+        const serverModel = activeSession?.model || data.result?.defaults?.model;
         if (serverModel) {
-          if (__DEV__) console.log('[sessions] Server model:', serverModel);
+          if (__DEV__) console.log('[sessions] Server model:', serverModel, '(from', activeSession?.model ? 'session' : 'defaults', ')');
           useChatStore.getState().syncModelFromServer(serverModel);
         }
       } else {
@@ -60,6 +66,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   switchSession: (key) => {
     const chat = useChatStore.getState();
     if (chat.activeSessionKey === key) return;
+
+    const session = get().sessions.find(s => s.key === key);
+    if (session?.model) {
+      chat.syncModelFromServer(session.model);
+    }
 
     chat.setActiveSessionKey(key);
     chat.clearMessages();

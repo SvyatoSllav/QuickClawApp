@@ -16,7 +16,6 @@ import { getAuthToken, setAuthToken, clearAuthToken } from '../services/secureSt
 import { useOnboardingStore } from './onboardingStore';
 import { useSubscriptionStore } from './subscriptionStore';
 import { useNavigationStore } from './navigationStore';
-import { useChatStore } from './chatStore';
 import { useDeployStore } from './deployStore';
 
 interface AuthState {
@@ -202,10 +201,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       subscription,
     });
 
-    // Sync model from profile so ChatHeader shows correct model immediately
-    if (profile?.selectedModel) {
-      useChatStore.getState().syncModelFromServer(profile.selectedModel);
-    }
   },
 
   logout: async () => {
