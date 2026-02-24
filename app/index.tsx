@@ -18,6 +18,7 @@ import AgentsScreen from '../src/screens/AgentsScreen';
 import SkillsScreen from '../src/screens/SkillsScreen';
 import FilesScreen from '../src/screens/FilesScreen';
 import SupportScreen from '../src/screens/SupportScreen';
+import KnowledgeBaseScreen from '../src/screens/KnowledgeBaseScreen';
 import Sidebar from '../src/components/sidebar/Sidebar';
 import SessionDrawer from '../src/components/chat/SessionDrawer';
 import SpinnerIcon from '../src/components/ui/SpinnerIcon';
@@ -124,6 +125,8 @@ export default function MainScreen() {
         return <FilesScreen />;
       case 'support':
         return <SupportScreen />;
+      case 'knowledgebase':
+        return <KnowledgeBaseScreen />;
     }
   };
 

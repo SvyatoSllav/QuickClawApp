@@ -77,9 +77,9 @@ export default function Sidebar() {
 
   const managementItems: MenuItem[] = [
     { label: 'Integrations', icon: Link, screen: 'profile' },
+    { label: 'Knowledge Base', icon: BookOpen, screen: 'knowledgebase' },
     { label: 'Analytics', icon: BarChart3, disabled: true },
     { label: 'Server', icon: Server, disabled: true },
-    { label: 'Training', icon: BookOpen, disabled: true },
     { label: 'Support', icon: HelpCircle, screen: 'support' },
   ];
 
