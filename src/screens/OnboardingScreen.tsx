@@ -1,0 +1,78 @@
+import React, { useRef, useState, useCallback } from 'react';
+import { View, FlatList, Dimensions, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Text } from '@/components/ui/text';
+import { Button } from '@/components/ui/button';
+import OnboardingPage from '../components/onboarding/OnboardingPage';
+import PageIndicator from '../components/onboarding/PageIndicator';
+import { useOnboardingStore } from '../stores/onboardingStore';
+import { useNavigationStore } from '../stores/navigationStore';
+import { colors } from '../config/colors';
+
+const { width } = Dimensions.get('window');
+
+const PAGES = [
+  { index: '01', titleKey: 'onboardingTitle1', descKey: 'onboardingDesc1' },
+  { index: '02', titleKey: 'onboardingTitle2', descKey: 'onboardingDesc2' },
+  { index: '03', titleKey: 'onboardingTitle3', descKey: 'onboardingDesc3' },
+] as const;
+
+export default function OnboardingScreen() {
+  const { t } = useTranslation();
+  const flatListRef = useRef<FlatList>(null);
+  const currentPage = useOnboardingStore((s) => s.currentPage);
+  const setScreen = useNavigationStore((s) => s.setScreen);
+  const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding);
+
+  const [listHeight, setListHeight] = useState(0);
+
+  const handleGetStarted = useCallback(async () => {
+    await completeOnboarding();
+    setScreen('auth');
+  }, [completeOnboarding, setScreen]);
+
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const page = Math.round(e.nativeEvent.contentOffset.x / width);
+      useOnboardingStore.getState().setCurrentPage(page);
+    },
+    [],
+  );
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <FlatList
+        ref={flatListRef}
+        data={PAGES}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        style={{ flex: 1 }}
+        onLayout={(e: LayoutChangeEvent) => setListHeight(e.nativeEvent.layout.height)}
+        keyExtractor={(_, i) => String(i)}
+        renderItem={({ item }) => (
+          <OnboardingPage
+            index={item.index}
+            title={t(item.titleKey)}
+            description={t(item.descKey)}
+            height={listHeight}
+          />
+        )}
+      />
+
+      <View className="px-6 pb-8 gap-4">
+        <PageIndicator total={PAGES.length} current={currentPage} />
+
+        <Button
+          onPress={handleGetStarted}
+          className="w-full"
+          style={{ backgroundColor: colors.primary }}
+        >
+          <Text style={{ fontWeight: '600', color: '#FFFFFF' }}>{t('getStarted', 'Get Started')}</Text>
+        </Button>
+      </View>
+    </View>
+  );
+}

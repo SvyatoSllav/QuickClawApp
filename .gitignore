@@ -4,10 +4,34 @@ __pycache__/
 *.pyo
 venv/
 .env
+.env.*
+!.env.example
 
 # Node
 node_modules/
 dist/
+
+# Expo
+.expo/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
 # IDE
 .idea/
@@ -16,6 +40,7 @@ dist/
 
 # OS
 .DS_Store
+*.pem
 
 # Django
 staticfiles/
@@ -30,3 +55,10 @@ target/
 
 # OpenClaw source (cloned for reference)
 openclaw-source/
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
