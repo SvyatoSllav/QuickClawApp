@@ -873,6 +873,8 @@ model: openrouter/anthropic/claude-sonnet-4
 gateway:
   mode: local
   bind: lan
+  controlUi:
+    dangerouslyDisableDeviceAuth: true
   auth:
     type: token
     token: {gateway_token}
@@ -987,6 +989,8 @@ api_key: {openrouter_key}
 gateway:
   mode: local
   bind: lan
+  controlUi:
+    dangerouslyDisableDeviceAuth: true
   auth:
     type: token
     token: {gateway_token}
@@ -1283,6 +1287,8 @@ api_key: {openrouter_key}
 gateway:
   mode: local
   bind: lan
+  controlUi:
+    dangerouslyDisableDeviceAuth: true
   auth:
     type: token
     token: {gateway_token}
