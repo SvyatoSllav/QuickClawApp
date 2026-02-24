@@ -5,10 +5,6 @@ export interface Session {
   updatedAt: number | null;
   kind: 'direct' | 'group' | 'global' | 'unknown';
   totalTokens?: number;
+  model?: string;
 }
 
-export interface SessionsListResult {
-  ts: number;
-  count: number;
-  sessions: Session[];
-}

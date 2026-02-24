@@ -4,25 +4,22 @@ import { Text } from '@/components/ui/text';
 import Markdown from 'react-native-markdown-display';
 import { ChatMessage } from '../../types/chat';
 import PulseDot from '../ui/PulseDot';
+import { colors } from '../../config/colors';
+import { formatTime } from '../../utils/formatters';
 
 interface MessageBubbleProps {
   message: ChatMessage;
 }
 
-function formatTime(ts: number) {
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
 const mdStyles = StyleSheet.create({
-  body: { color: '#1A1A1A', fontSize: 15, lineHeight: 22, userSelect: 'text' } as any,
+  body: { color: colors.foreground, fontSize: 15, lineHeight: 22, userSelect: 'text' } as any,
   paragraph: { marginTop: 0, marginBottom: 6 },
-  strong: { color: '#1A1A1A', fontWeight: '700' },
+  strong: { color: colors.foreground, fontWeight: '700' },
   em: { color: '#374151', fontStyle: 'italic' },
   link: { color: '#2563EB' },
   blockquote: {
     borderLeftWidth: 3,
-    borderLeftColor: '#E8E0D4',
+    borderLeftColor: colors.border,
     paddingLeft: 10,
     marginLeft: 0,
     marginVertical: 6,
@@ -38,7 +35,7 @@ const mdStyles = StyleSheet.create({
   },
   code_block: {
     backgroundColor: '#F9FAFB',
-    color: '#1A1A1A',
+    color: colors.foreground,
     padding: 10,
     borderRadius: 8,
     fontSize: 13,
@@ -49,7 +46,7 @@ const mdStyles = StyleSheet.create({
   },
   fence: {
     backgroundColor: '#F9FAFB',
-    color: '#1A1A1A',
+    color: colors.foreground,
     padding: 10,
     borderRadius: 8,
     fontSize: 13,
@@ -61,13 +58,13 @@ const mdStyles = StyleSheet.create({
   bullet_list: { marginVertical: 4 },
   ordered_list: { marginVertical: 4 },
   list_item: { marginVertical: 2 },
-  heading1: { color: '#1A1A1A', fontSize: 20, fontWeight: '700', marginVertical: 6 },
-  heading2: { color: '#1A1A1A', fontSize: 18, fontWeight: '700', marginVertical: 5 },
-  heading3: { color: '#1A1A1A', fontSize: 16, fontWeight: '600', marginVertical: 4 },
-  hr: { backgroundColor: '#E8E0D4', height: 1, marginVertical: 8 },
-  table: { borderColor: '#E8E0D4' },
-  tr: { borderBottomColor: '#E8E0D4' },
-  th: { color: '#1A1A1A', fontWeight: '600', padding: 6 },
+  heading1: { color: colors.foreground, fontSize: 20, fontWeight: '700', marginVertical: 6 },
+  heading2: { color: colors.foreground, fontSize: 18, fontWeight: '700', marginVertical: 5 },
+  heading3: { color: colors.foreground, fontSize: 16, fontWeight: '600', marginVertical: 4 },
+  hr: { backgroundColor: colors.border, height: 1, marginVertical: 8 },
+  table: { borderColor: colors.border },
+  tr: { borderBottomColor: colors.border },
+  th: { color: colors.foreground, fontWeight: '600', padding: 6 },
   td: { color: '#374151', padding: 6 },
 });
 
@@ -116,7 +113,7 @@ const localStyles = StyleSheet.create({
     paddingVertical: 12,
   },
   userBubble: {
-    backgroundColor: '#F5A623',
+    backgroundColor: colors.primary,
     borderRadius: 18,
     borderBottomRightRadius: 4,
   },
@@ -125,7 +122,7 @@ const localStyles = StyleSheet.create({
     borderRadius: 18,
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: '#E8E0D4',
+    borderColor: colors.border,
   },
   userText: {
     fontSize: 15,

@@ -33,6 +33,10 @@ class UserProfile(models.Model):
     # Apple OAuth
     apple_id = models.CharField(max_length=255, blank=True, db_index=True)
 
+    # OAuth provider tracking
+    auth_provider = models.CharField(max_length=10, blank=True, choices=[('google', 'Google'), ('apple', 'Apple')])
+    last_oauth_verified_at = models.DateTimeField(null=True, blank=True)
+
     # Telegram
     telegram_bot_token = models.CharField(max_length=255, blank=True)
     telegram_bot_username = models.CharField(max_length=255, blank=True)

@@ -80,7 +80,7 @@ export default function SupportScreen() {
 const localStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF8F0',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -88,29 +88,29 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D4',
+    borderBottomColor: colors.border,
   },
   headerTitle: {
     fontWeight: '700',
     fontSize: 18,
     marginLeft: 8,
-    color: '#1A1A1A',
+    color: colors.foreground,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   textArea: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E8E0D4',
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 14,
     fontSize: 15,
-    color: '#1A1A1A',
+    color: colors.foreground,
     minHeight: 140,
   },
 });

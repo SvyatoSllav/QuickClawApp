@@ -20,13 +20,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   isLoading: false,
 
   fetchSessions: () => {
-    console.log('[sessions] fetchSessions starting...');
+    if (__DEV__) console.log('[sessions] fetchSessions starting...');
     set({ isLoading: true });
     const { sendRequest } = useChatStore.getState();
     const activeAgentId = useAgentStore.getState().activeAgentId;
     remoteLog('info', 'sessions', 'fetchSessions', { agentId: activeAgentId });
     sendRequest('sessions.list', activeAgentId ? { agentId: activeAgentId } : {}, (data) => {
-      console.log('[sessions] sessions.list response:', data.ok ? (data.result?.sessions?.length + ' sessions') : 'FAILED', data.error || '');
+      if (__DEV__) console.log('[sessions] sessions.list response:', data.ok ? (data.result?.sessions?.length + ' sessions') : 'FAILED', data.error || '');
       remoteLog('info', 'sessions', 'sessions.list result', { ok: data.ok, count: data.result?.sessions?.length ?? 0, error: data.error ? JSON.stringify(data.error).substring(0, 200) : undefined });
       if (data.ok && data.result?.sessions) {
         const activeAgentId = useAgentStore.getState().activeAgentId;
@@ -41,17 +41,23 @@ export const useSessionStore = create<SessionState>((set, get) => ({
             updatedAt: s.updatedAt ?? null,
             kind: s.kind ?? 'direct',
             totalTokens: s.totalTokens,
+            model: s.model ?? undefined,
           }));
-        console.log('[sessions] Filtered sessions:', sessions.length, 'for prefix:', prefix);
+        if (__DEV__) console.log('[sessions] Filtered sessions:', sessions.length, 'for prefix:', prefix);
         set({ sessions, isLoading: false });
 
-        const serverModel = data.result?.defaults?.model;
+        // Sync model from the ACTIVE SESSION (not just server defaults)
+        const { activeSessionKey } = useChatStore.getState();
+        const activeSession = data.result.sessions.find(
+          (s: any) => s.key === activeSessionKey,
+        );
+        const serverModel = activeSession?.model || data.result?.defaults?.model;
         if (serverModel) {
-          console.log('[sessions] Server model:', serverModel);
+          if (__DEV__) console.log('[sessions] Server model:', serverModel, '(from', activeSession?.model ? 'session' : 'defaults', ')');
           useChatStore.getState().syncModelFromServer(serverModel);
         }
       } else {
-        console.warn('[sessions] fetchSessions unavailable (scope):', data.error?.message || data.error);
+        if (__DEV__) console.warn('[sessions] fetchSessions unavailable (scope):', data.error?.message || data.error);
         set({ isLoading: false });
       }
     });
@@ -60,6 +66,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   switchSession: (key) => {
     const chat = useChatStore.getState();
     if (chat.activeSessionKey === key) return;
+
+    const session = get().sessions.find(s => s.key === key);
+    if (session?.model) {
+      chat.syncModelFromServer(session.model);
+    }
 
     chat.setActiveSessionKey(key);
     chat.clearMessages();

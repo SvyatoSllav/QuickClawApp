@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   appleButtonText: {
-    color: '#1A1A1A',
+    color: colors.foreground,
     fontWeight: '600',
   },
   googleButton: {

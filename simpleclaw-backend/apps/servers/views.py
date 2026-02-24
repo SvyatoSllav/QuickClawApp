@@ -6,6 +6,7 @@ import logging
 import requests as http_requests
 from django.conf import settings
 from django.core.cache import cache
+from django.http import HttpResponse
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -177,6 +178,35 @@ class SkillDetailView(APIView):
         return metadata, body.strip()
 
 
+class InternalWsAuthView(APIView):
+    """Internal nginx auth_request endpoint for WS proxy.
+    Resolves gateway token → upstream server IP.
+    Called only by nginx (internal location), no user auth required.
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from .models import Server
+
+        token = request.META.get('HTTP_X_GATEWAY_TOKEN', '')
+        if not token:
+            return HttpResponse(status=403)
+
+        try:
+            server = Server.objects.get(
+                gateway_token=token,
+                status='active',
+                openclaw_running=True,
+            )
+        except Server.DoesNotExist:
+            return HttpResponse(status=403)
+
+        resp = HttpResponse(status=200)
+        resp['X-Ws-Upstream'] = f'{server.ip_address}:18789'
+        return resp
+
+
 class ServerStatusView(APIView):
     def get(self, request):
         """Статус сервера пользователя"""
@@ -186,6 +216,10 @@ class ServerStatusView(APIView):
         if not server:
             return Response({'assigned': False})
 
+        ws_url = None
+        if server.gateway_token and server.openclaw_running:
+            ws_url = f'wss://install-openclow.ru/ws-proxy/?token={server.gateway_token}'
+
         return Response({
             'assigned': True,
             'ip_address': server.ip_address,
@@ -194,6 +228,7 @@ class ServerStatusView(APIView):
             'gateway_token': server.gateway_token,
             'deployment_stage': server.deployment_stage,
             'last_health_check': server.last_health_check,
+            'ws_url': ws_url,
         })
 
 

@@ -6,6 +6,4 @@ export const AppConfig = {
   revenueCatApiKeyAndroid: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY || 'test_dGKQHBuaWgCtJpofsRAXQcnPiPR',
   revenueCatEntitlementId: 'EasyClaw Pro',
   deployPollIntervalMs: 5000,
-  supportEmail: 'tarasov.slavas2@gmail.com',
-  frontendUrl: 'https://install-openclow.ru',
 } as const;

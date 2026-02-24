@@ -1,19 +1,13 @@
 import apiClient from './client';
 import { AuthResponse, authResponseFromJson } from '../types/auth';
-import type { GoogleUserInfo } from '../services/googleAuth';
 
 export async function signInWithGoogle(idToken: string): Promise<AuthResponse> {
   const response = await apiClient.post('/auth/google/', { token: idToken });
   return authResponseFromJson(response.data);
 }
 
-export async function signInWithGoogleUserInfo(userInfo: GoogleUserInfo): Promise<AuthResponse> {
-  const response = await apiClient.post('/auth/google/', {
-    email: userInfo.email,
-    name: userInfo.name,
-    google_id: userInfo.google_id,
-    avatar_url: userInfo.avatar_url,
-  });
+export async function signInWithGoogleAccessToken(accessToken: string): Promise<AuthResponse> {
+  const response = await apiClient.post('/auth/google/', { access_token: accessToken });
   return authResponseFromJson(response.data);
 }
 

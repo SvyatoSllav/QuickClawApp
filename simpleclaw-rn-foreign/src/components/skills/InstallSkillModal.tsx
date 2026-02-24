@@ -64,18 +64,18 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
   // Fetch detail and initialize toggles when skill changes
   useEffect(() => {
     if (visible && skill) {
-      console.log('[skills] Modal opened for skill:', skill.name, 'slug:', skill.slug, 'id:', skill.id);
-      console.log('[skills] WS connectionState:', connectionState);
+      if (__DEV__) console.log('[skills] Modal opened for skill:', skill.name, 'slug:', skill.slug, 'id:', skill.id);
+      if (__DEV__) console.log('[skills] WS connectionState:', connectionState);
 
       const slug = skill.slug || skill.id || skill.name;
       setDetailLoading(true);
       setDetail(null);
       getSkillDetail(slug)
         .then((d) => {
-          console.log('[skills] Detail fetched OK for', slug, 'keys:', d ? Object.keys(d) : 'null');
+          if (__DEV__) console.log('[skills] Detail fetched OK for', slug, 'keys:', d ? Object.keys(d) : 'null');
           setDetail(d);
         })
-        .catch((e) => console.log('[skills] detail fetch error:', e))
+        .catch((e) => { if (__DEV__) console.log('[skills] detail fetch error:', e); })
         .finally(() => setDetailLoading(false));
 
       // Initialize toggles from current agent install state
@@ -83,9 +83,9 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
       for (const agent of agents) {
         const installed = agent.skills?.includes(skill.name) ?? false;
         initial[agent.id] = installed;
-        console.log('[skills] Agent', agent.id, 'skills:', JSON.stringify(agent.skills), '→ includes', skill.name, '=', installed);
+        if (__DEV__) console.log('[skills] Agent', agent.id, 'skills:', JSON.stringify(agent.skills), '→ includes', skill.name, '=', installed);
       }
-      console.log('[skills] Initial toggles:', JSON.stringify(initial));
+      if (__DEV__) console.log('[skills] Initial toggles:', JSON.stringify(initial));
       setToggles(initial);
     }
     if (visible) {
@@ -116,7 +116,7 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
   const toggleAgent = (agentId: string) => {
     setToggles((prev) => {
       const next = { ...prev, [agentId]: !prev[agentId] };
-      console.log('[skills] Toggle agent', agentId, ':', prev[agentId], '→', next[agentId]);
+      if (__DEV__) console.log('[skills] Toggle agent', agentId, ':', prev[agentId], '→', next[agentId]);
       return next;
     });
   };
@@ -127,7 +127,7 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
   });
 
   const handleSubmit = async () => {
-    console.log('[skills] handleSubmit called — skill:', skill?.name, 'hasChanges:', hasChanges, 'connectionState:', connectionState);
+    if (__DEV__) console.log('[skills] handleSubmit called — skill:', skill?.name, 'hasChanges:', hasChanges, 'connectionState:', connectionState);
     if (!skill || !hasChanges) return;
 
     if (connectionState !== 'connected') {
@@ -145,7 +145,7 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
     });
 
     if (!configResult.ok) {
-      console.log('[skills] config.get failed:', configResult.error);
+      if (__DEV__) console.log('[skills] config.get failed:', configResult.error);
       setSubmitting(false);
       Alert.alert('Error', 'Failed to read config. Try again.');
       return;
@@ -156,7 +156,7 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
 
     // Safety: refuse to patch if server returned no agents (would wipe config)
     if (serverAgents.length === 0) {
-      console.log('[skills] config.get returned 0 agents — aborting to prevent data loss');
+      if (__DEV__) console.log('[skills] config.get returned 0 agents — aborting to prevent data loss');
       setSubmitting(false);
       Alert.alert('Error', 'Server returned empty agent list. Try again.');
       return;
@@ -180,7 +180,7 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
     });
 
     const patch = { agents: { list: updatedList } };
-    console.log('[skills] Sending config.patch baseHash:', baseHash, 'agents:', JSON.stringify(updatedList));
+    if (__DEV__) console.log('[skills] Sending config.patch baseHash:', baseHash, 'agents:', JSON.stringify(updatedList));
 
     const patchResult: any = await new Promise((resolve) => {
       const reqId = sendRequest('config.patch', { baseHash, raw: JSON.stringify(patch) }, resolve);
@@ -188,15 +188,15 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
       else setTimeout(() => resolve({ ok: false, error: 'timeout' }), 15000);
     });
 
-    console.log('[skills] config.patch response:', JSON.stringify(patchResult).substring(0, 500));
+    if (__DEV__) console.log('[skills] config.patch response:', JSON.stringify(patchResult).substring(0, 500));
     await fetchAgents();
     setSubmitting(false);
 
     if (!patchResult.ok) {
-      console.log('[skills] config.patch FAILED:', patchResult.error);
+      if (__DEV__) console.log('[skills] config.patch FAILED:', patchResult.error);
       Alert.alert('Error', 'Failed to update skills. Try again.');
     } else {
-      console.log('[skills] Submit success, closing modal');
+      if (__DEV__) console.log('[skills] Submit success, closing modal');
       onClose();
     }
   };
@@ -382,10 +382,10 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
 const mdStyles = StyleSheet.create({
   body: { color: '#374151', fontSize: 14, lineHeight: 22 } as any,
   paragraph: { marginTop: 0, marginBottom: 8 },
-  strong: { color: '#1A1A1A', fontWeight: '700' },
-  heading1: { color: '#1A1A1A', fontSize: 18, fontWeight: '700', marginVertical: 8 },
-  heading2: { color: '#1A1A1A', fontSize: 16, fontWeight: '700', marginVertical: 6 },
-  heading3: { color: '#1A1A1A', fontSize: 15, fontWeight: '600', marginVertical: 4 },
+  strong: { color: colors.foreground, fontWeight: '700' },
+  heading1: { color: colors.foreground, fontSize: 18, fontWeight: '700', marginVertical: 8 },
+  heading2: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginVertical: 6 },
+  heading3: { color: colors.foreground, fontSize: 15, fontWeight: '600', marginVertical: 4 },
   code_inline: {
     backgroundColor: '#F3F4F6',
     color: '#DC2626',
@@ -531,7 +531,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -551,7 +551,7 @@ const s = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 12,

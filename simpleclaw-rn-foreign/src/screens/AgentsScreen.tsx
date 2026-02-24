@@ -46,7 +46,7 @@ export default function AgentsScreen() {
   // Fetch agents if store is empty but WS is connected
   useEffect(() => {
     if (agents.length === 0 && !isLoading && connectionState === 'connected') {
-      console.log('[agents-screen] Agents empty, fetching...');
+      if (__DEV__) console.log('[agents-screen] Agents empty, fetching...');
       fetchAgents();
     }
   }, [agents.length, isLoading, connectionState]);
@@ -142,12 +142,12 @@ const localStyles = StyleSheet.create({
   pageTitle: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.foreground,
     marginBottom: 6,
   },
   pageSubtitle: {
     fontSize: 14,
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
   },
   agentCard: {
     flexDirection: 'row',
@@ -158,7 +158,7 @@ const localStyles = StyleSheet.create({
     paddingVertical: 16,
     gap: 14,
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderColor: 'transparent' as const,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -179,7 +179,7 @@ const localStyles = StyleSheet.create({
   agentName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: colors.foreground,
   },
   agentDesc: {
     fontSize: 13,
@@ -187,7 +187,7 @@ const localStyles = StyleSheet.create({
     lineHeight: 18,
   },
   popularBadge: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
@@ -195,6 +195,6 @@ const localStyles = StyleSheet.create({
   popularBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#F5A623',
+    color: colors.primary,
   },
 });

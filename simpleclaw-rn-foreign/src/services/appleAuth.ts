@@ -40,8 +40,3 @@ export async function appleSignIn(): Promise<AppleAuthResult> {
   };
 }
 
-export async function isAppleSignInAvailable(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return false;
-  const AppleAuthentication = await import('expo-apple-authentication');
-  return AppleAuthentication.isAvailableAsync();
-}

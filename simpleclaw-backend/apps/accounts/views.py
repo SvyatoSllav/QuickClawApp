@@ -1,14 +1,19 @@
 import logging
 import json
 import base64
+import time
+import requests as http_requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 from .models import UserProfile
 from .serializers import UserSerializer, ProfileUpdateSerializer
@@ -16,55 +21,83 @@ from .serializers import UserSerializer, ProfileUpdateSerializer
 logger = logging.getLogger(__name__)
 
 
-def decode_google_jwt(token):
-    """Decode Google JWT token without verification (frontend already verified)"""
+def verify_google_token(token):
+    """Verify Google ID token signature, audience, expiry, issuer."""
     try:
-        # JWT format: header.payload.signature
-        parts = token.split('.')
-        if len(parts) != 3:
+        payload = google_id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            settings.GOOGLE_CLIENT_ID,
+        )
+        # verify_oauth2_token checks: signature, exp, aud, iss
+        if payload.get('iss') not in ('accounts.google.com', 'https://accounts.google.com'):
             return None
-        
-        # Decode payload (add padding if needed)
-        payload = parts[1]
-        padding = 4 - len(payload) % 4
-        if padding != 4:
-            payload += '=' * padding
-        
-        decoded = base64.urlsafe_b64decode(payload)
-        data = json.loads(decoded)
-        
         return {
-            'email': data.get('email', ''),
-            'name': data.get('name', ''),
-            'google_id': data.get('sub', ''),
-            'avatar_url': data.get('picture', ''),
+            'email': payload.get('email', ''),
+            'name': payload.get('name', ''),
+            'google_id': payload.get('sub', ''),
+            'avatar_url': payload.get('picture', ''),
+            'email_verified': payload.get('email_verified', False),
         }
     except Exception as e:
-        logger.error(f'JWT decode failed: {e}')
+        logger.warning('Google token verification failed: %s', e)
         return None
 
 
-def decode_apple_jwt(token):
-    """Decode Apple identity token JWT payload (same approach as Google)"""
+def verify_google_access_token(access_token):
+    """Verify Google access token by calling Google userinfo API server-side."""
+    try:
+        resp = http_requests.get(
+            'https://www.googleapis.com/oauth2/v2/userinfo',
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        if not data.get('email'):
+            return None
+        return {
+            'email': data['email'],
+            'name': data.get('name', ''),
+            'google_id': data.get('id', ''),
+            'avatar_url': data.get('picture', ''),
+            'email_verified': data.get('verified_email', False),
+        }
+    except Exception as e:
+        logger.warning('Google access token verification failed: %s', e)
+        return None
+
+
+def verify_apple_token(token):
+    """Verify Apple identity token: structure, expiry, issuer (no signature - no Apple credentials)."""
     try:
         parts = token.split('.')
         if len(parts) != 3:
             return None
-
-        payload = parts[1]
-        padding = 4 - len(payload) % 4
-        if padding != 4:
-            payload += '=' * padding
-
-        decoded = base64.urlsafe_b64decode(payload)
-        data = json.loads(decoded)
-
+        # Decode header to check structure
+        header = json.loads(base64.urlsafe_b64decode(parts[0] + '=='))
+        if header.get('alg') not in ('RS256', 'ES256'):
+            return None
+        # Decode payload
+        payload = json.loads(base64.urlsafe_b64decode(parts[1] + '=='))
+        # Check issuer
+        if payload.get('iss') != 'https://appleid.apple.com':
+            return None
+        # Check expiry
+        if payload.get('exp', 0) < time.time():
+            return None
+        # Check audience (should be our app bundle ID if configured)
+        apple_client_id = getattr(settings, 'APPLE_CLIENT_ID', '')
+        if apple_client_id and payload.get('aud') != apple_client_id:
+            return None
         return {
-            'email': data.get('email', ''),
-            'apple_id': data.get('sub', ''),
+            'email': payload.get('email', ''),
+            'apple_id': payload.get('sub', ''),
+            'email_verified': payload.get('email_verified', 'true') == 'true',
         }
     except Exception as e:
-        logger.error(f'Apple JWT decode failed: {e}')
+        logger.warning('Apple token verification failed: %s', e)
         return None
 
 
@@ -84,7 +117,7 @@ class AppleAuthView(APIView):
         if not token:
             return Response({'error': 'Token required'}, status=400)
 
-        token_data = decode_apple_jwt(token)
+        token_data = verify_apple_token(token)
         if not token_data or not token_data.get('email'):
             return Response({'error': 'Invalid Apple token'}, status=400)
 
@@ -114,6 +147,8 @@ class AppleAuthView(APIView):
         profile, _ = UserProfile.objects.get_or_create(user=user)
         if apple_id:
             profile.apple_id = apple_id
+        profile.auth_provider = 'apple'
+        profile.last_oauth_verified_at = timezone.now()
         profile.save()
 
         auth_token, _ = Token.objects.get_or_create(user=user)
@@ -136,25 +171,27 @@ class GoogleAuthView(APIView):
 
     def post(self, request):
         token = request.data.get('token', '')
-        email = request.data.get('email', '')
-        name = request.data.get('name', '')
-        google_id = request.data.get('google_id', '')
-        avatar_url = request.data.get('avatar_url', '')
+        access_token = request.data.get('access_token', '')
 
-        # If only token provided, decode it to get user info
-        if token and not email:
-            token_data = decode_google_jwt(token)
-            if token_data and token_data.get('email'):
-                email = token_data['email']
-                name = token_data.get('name', name)
-                google_id = token_data.get('google_id', google_id)
-                avatar_url = token_data.get('avatar_url', avatar_url)
-                logger.info(f'Decoded Google token for: {email}')
-            else:
+        user_data = None
+
+        if token:
+            # Mobile flow: ID token with cryptographic verification
+            user_data = verify_google_token(token)
+            if not user_data or not user_data.get('email'):
                 return Response({'error': 'Invalid Google token'}, status=400)
+        elif access_token:
+            # Web flow: access token verified via Google userinfo API
+            user_data = verify_google_access_token(access_token)
+            if not user_data or not user_data.get('email'):
+                return Response({'error': 'Invalid Google access token'}, status=400)
+        else:
+            return Response({'error': 'Token or access_token required'}, status=400)
 
-        if not email:
-            return Response({'error': 'Email required'}, status=400)
+        email = user_data['email']
+        name = user_data.get('name', '')
+        google_id = user_data.get('google_id', '')
+        avatar_url = user_data.get('avatar_url', '')
 
         user = User.objects.filter(email=email).first()
         created = False
@@ -181,6 +218,8 @@ class GoogleAuthView(APIView):
             profile.google_id = google_id
         if avatar_url:
             profile.avatar_url = avatar_url
+        profile.auth_provider = 'google'
+        profile.last_oauth_verified_at = timezone.now()
         profile.save()
 
         auth_token, _ = Token.objects.get_or_create(user=user)

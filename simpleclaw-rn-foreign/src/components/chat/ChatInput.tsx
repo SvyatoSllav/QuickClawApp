@@ -6,7 +6,8 @@ import { Text } from '@/components/ui/text';
 import { Input } from '@/components/ui/input';
 import { useChatStore } from '../../stores/chatStore';
 import { colors } from '../../config/colors';
-import { Paperclip, Mic, Send } from 'lucide-react-native';
+import { CHAT_INPUT } from '../../config/constants';
+import { Paperclip, Send } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ChatInput() {
@@ -19,9 +20,9 @@ export default function ChatInput() {
   const attachments = useChatStore((s) => s.attachments);
   const addAttachment = useChatStore((s) => s.addAttachment);
   const removeAttachment = useChatStore((s) => s.removeAttachment);
-  const [inputHeight, setInputHeight] = useState(48);
+  const [inputHeight, setInputHeight] = useState<number>(CHAT_INPUT.MIN_HEIGHT);
   const [isFocused, setIsFocused] = useState(false);
-  const lastHeight = useRef(48);
+  const lastHeight = useRef<number>(CHAT_INPUT.MIN_HEIGHT);
 
   const canSend =
     (inputText.trim().length > 0 || attachments.length > 0) &&
@@ -87,7 +88,7 @@ export default function ChatInput() {
           placeholder={t('typeMessage')}
           placeholderTextColor={colors.mutedForeground}
           multiline
-          maxLength={4000}
+          maxLength={CHAT_INPUT.MAX_LENGTH}
           className={`flex-1 h-auto min-h-12 max-h-40 py-3 px-4 bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-transparent ${
             isMultiline ? 'rounded-2xl' : 'rounded-full'
           }`}
@@ -99,7 +100,7 @@ export default function ChatInput() {
           onContentSizeChange={(e: any) => {
             const h = e?.nativeEvent?.contentSize?.height;
             if (h) {
-              const clamped = Math.min(160, Math.max(48, h));
+              const clamped = Math.min(CHAT_INPUT.MAX_HEIGHT, Math.max(CHAT_INPUT.MIN_HEIGHT, h));
               if (Math.abs(clamped - lastHeight.current) > 2) {
                 lastHeight.current = clamped;
                 setInputHeight(clamped);
@@ -107,10 +108,6 @@ export default function ChatInput() {
             }
           }}
         />
-
-        <Pressable style={{ padding: 8 }}>
-          <Mic size={20} color={colors.mutedForeground} />
-        </Pressable>
 
         <Pressable
           onPress={canSend ? sendMessage : undefined}
@@ -148,7 +145,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.destructive,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -173,13 +170,13 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputContainerFocused: {
-    borderColor: '#F5A623',
+    borderColor: colors.primary,
   },
   sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F5A623',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 2,

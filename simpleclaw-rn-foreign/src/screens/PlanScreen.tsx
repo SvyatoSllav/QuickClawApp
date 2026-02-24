@@ -68,7 +68,7 @@ function PackageCard({
             <Text className="text-4xl font-black" style={{ letterSpacing: -1.5, color: colors.foreground }}>
               {product.priceString}
             </Text>
-            <Text style={{ fontSize: 16, marginLeft: 4, color: '#8B8B8B' }}>
+            <Text style={{ fontSize: 16, marginLeft: 4, color: colors.mutedForeground }}>
               {period}
             </Text>
           </View>
@@ -101,25 +101,25 @@ export default function PlanScreen() {
   //   loadOfferings();
   // }, []);
 
-  console.log('[PlanScreen] render — packages:', packages.length, 'selectedPackage:', selectedPackage?.identifier ?? 'null', 'loading:', loading, 'error:', error, 'buttonDisabled:', loading || (!selectedPackage && packages.length > 0));
+  if (__DEV__) console.log('[PlanScreen] render — packages:', packages.length, 'selectedPackage:', selectedPackage?.identifier ?? 'null', 'loading:', loading, 'error:', error, 'buttonDisabled:', loading || (!selectedPackage && packages.length > 0));
 
   const handleSubscribe = async () => {
     const isWeb = Platform.OS === 'web';
     const noPackages = packages.length === 0;
     // Use webPurchase (fake webhook) when on web or when no RC packages available (dev/skip)
     const useSkip = isWeb || noPackages;
-    console.log('[PlanScreen] handleSubscribe called — platform:', Platform.OS, 'skip:', useSkip);
+    if (__DEV__) console.log('[PlanScreen] handleSubscribe called — platform:', Platform.OS, 'skip:', useSkip);
     const success = useSkip
       ? await webPurchase()
       : await purchaseSelected();
-    console.log('[PlanScreen] handleSubscribe result:', success);
+    if (__DEV__) console.log('[PlanScreen] handleSubscribe result:', success);
     if (success) {
-      console.log('[PlanScreen] Purchase succeeded, checking deploy status...');
+      if (__DEV__) console.log('[PlanScreen] Purchase succeeded, checking deploy status...');
       await useDeployStore.getState().checkStatus();
-      console.log('[PlanScreen] Navigating to chat');
+      if (__DEV__) console.log('[PlanScreen] Navigating to chat');
       setScreen('chat');
     } else {
-      console.log('[PlanScreen] Purchase failed or cancelled');
+      if (__DEV__) console.log('[PlanScreen] Purchase failed or cancelled');
     }
   };
 
@@ -175,7 +175,7 @@ export default function PlanScreen() {
                 <Text className="text-4xl font-black" style={{ letterSpacing: -1.5, color: colors.foreground }}>
                   {t('planPrice')}
                 </Text>
-                <Text style={{ fontSize: 16, marginLeft: 4, color: '#8B8B8B' }}>{t('planPeriod')}</Text>
+                <Text style={{ fontSize: 16, marginLeft: 4, color: colors.mutedForeground }}>{t('planPeriod')}</Text>
               </View>
               <Separator />
               {FEATURES.map((key, i) => (
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 24,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   packageType: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },

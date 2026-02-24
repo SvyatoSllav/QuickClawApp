@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { View, FlatList, Pressable, Dimensions, StyleSheet, TextInput } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -12,10 +12,11 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Session } from '../../types/session';
 import { colors } from '../../config/colors';
+import { TIMING } from '../../config/constants';
+import { formatSessionTime } from '../../utils/formatters';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const MAX_DRAWER_HEIGHT = SCREEN_HEIGHT * 0.7;
-const ANIM_DURATION = 280;
 const EASING = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 interface Props {
@@ -25,16 +26,6 @@ interface Props {
 
 function getSessionTitle(session: Session): string {
   return session.displayName || session.derivedTitle || session.key;
-}
-
-function formatTime(ts: number | null): string {
-  if (!ts) return '';
-  const d = new Date(ts);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 export default function SessionDrawer({ visible, onClose }: Props) {
@@ -55,11 +46,11 @@ export default function SessionDrawer({ visible, onClose }: Props) {
 
   useEffect(() => {
     translateY.value = withTiming(visible ? 0 : MAX_DRAWER_HEIGHT, {
-      duration: ANIM_DURATION,
+      duration: TIMING.ANIMATION_DURATION_MS,
       easing: EASING,
     });
     backdropOpacity.value = withTiming(visible ? 1 : 0, {
-      duration: ANIM_DURATION,
+      duration: TIMING.ANIMATION_DURATION_MS,
       easing: EASING,
     });
   }, [visible]);
@@ -72,7 +63,10 @@ export default function SessionDrawer({ visible, onClose }: Props) {
     opacity: backdropOpacity.value,
   }));
 
-  const sorted = [...sessions].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const sorted = useMemo(
+    () => [...sessions].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)),
+    [sessions],
+  );
 
   const handleSelect = (key: string) => {
     switchSession(key);
@@ -109,7 +103,7 @@ export default function SessionDrawer({ visible, onClose }: Props) {
       <Pressable
         onPress={() => isEditing ? undefined : handleSelect(item.key)}
         onLongPress={() => handleLongPress(item)}
-        delayLongPress={400}
+        delayLongPress={TIMING.LONGPRESS_DELAY_MS}
         style={[
           localStyles.sessionItem,
           isActive && localStyles.sessionItemActive,
@@ -145,7 +139,7 @@ export default function SessionDrawer({ visible, onClose }: Props) {
           )}
           {item.updatedAt && !isEditing && (
             <Text style={localStyles.sessionTime}>
-              {formatTime(item.updatedAt)}
+              {formatSessionTime(item.updatedAt)}
             </Text>
           )}
         </View>
@@ -232,7 +226,7 @@ const localStyles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderTopWidth: 1,
-    borderTopColor: '#E8E0D4',
+    borderTopColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -246,18 +240,18 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D4',
+    borderBottomColor: colors.border,
   },
   drawerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: colors.foreground,
   },
   addButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -270,16 +264,16 @@ const localStyles = StyleSheet.create({
     borderBottomColor: '#F0E8DC',
   },
   sessionItemActive: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
   },
   sessionTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1A1A1A',
+    color: colors.foreground,
   },
   sessionTitleActive: {
     fontWeight: '700',
-    color: '#F5A623',
+    color: colors.primary,
   },
   sessionEditInput: {
     borderBottomWidth: 1,
@@ -290,7 +284,7 @@ const localStyles = StyleSheet.create({
   },
   sessionTime: {
     fontSize: 12,
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     marginTop: 2,
   },
   emptyState: {
@@ -299,6 +293,6 @@ const localStyles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
   },
 });

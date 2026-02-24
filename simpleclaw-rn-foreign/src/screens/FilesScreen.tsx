@@ -60,7 +60,7 @@ export default function FilesScreen() {
           {files.map((file) => (
             <View key={file.name} style={localStyles.fileCard}>
               <View style={localStyles.fileIcon}>
-                <FileText size={22} color="#F5A623" />
+                <FileText size={22} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={localStyles.fileName}>{file.name}</Text>
@@ -90,7 +90,7 @@ const localStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
@@ -98,17 +98,17 @@ const localStyles = StyleSheet.create({
   modelPillText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: colors.foreground,
   },
   pageTitle: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.foreground,
     marginBottom: 4,
   },
   pageSubtitle: {
     fontSize: 14,
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
   },
   fileCard: {
     flexDirection: 'row',
@@ -128,19 +128,19 @@ const localStyles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fileName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.foreground,
     fontFamily: 'monospace',
   },
   fileMeta: {
     fontSize: 13,
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     marginTop: 2,
   },
 });
