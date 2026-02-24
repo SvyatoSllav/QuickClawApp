@@ -95,7 +95,7 @@ REST_FRAMEWORK = {
 
 # CORS
 CORS_ALLOWED_ORIGINS = [
-    'https://install-openclow.ru',
+    'https://claw-paw.com',
     'http://localhost:5173',
     'http://localhost:8090',
     'tauri://localhost',
@@ -104,7 +104,7 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://install-openclow.ru',
+    'https://claw-paw.com',
 ]
 
 # Redis cache (used for SkillsMP proxy etc.)
@@ -175,7 +175,7 @@ ADMIN_TELEGRAM_BOT_TOKEN = env('ADMIN_TELEGRAM_BOT_TOKEN', default='')
 ADMIN_TELEGRAM_CHAT_ID = env('ADMIN_TELEGRAM_CHAT_ID', default='')
 
 # Frontend
-FRONTEND_URL = env('FRONTEND_URL', default='https://install-openclow.ru')
+FRONTEND_URL = env('FRONTEND_URL', default='https://claw-paw.com')
 
 # Default model for new deployments
 DEFAULT_MODEL = 'claude-sonnet-4'

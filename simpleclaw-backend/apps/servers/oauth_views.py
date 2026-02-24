@@ -31,7 +31,7 @@ WELL_KNOWN_PROVIDERS = {
     },
 }
 
-REDIRECT_URI = 'https://install-openclow.ru/auth/callback'
+REDIRECT_URI = 'https://claw-paw.com/auth/callback'
 
 
 class OAuthStartView(APIView):

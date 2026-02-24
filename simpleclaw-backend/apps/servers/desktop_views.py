@@ -219,7 +219,7 @@ class DesktopCreatePaymentView(APIView):
                 },
                 'confirmation': {
                     'type': 'redirect',
-                    'return_url': 'https://install-openclow.ru/desktop-payment-success',
+                    'return_url': 'https://claw-paw.com/desktop-payment-success',
                 },
                 'capture': True,
                 'save_payment_method': True,

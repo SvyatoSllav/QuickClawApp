@@ -13,7 +13,7 @@ import pytest
 import requests
 import websockets
 
-API_BASE = "https://install-openclow.ru/api"
+API_BASE = "https://claw-paw.com/api"
 
 # Timeouts
 HTTP_TIMEOUT = 15

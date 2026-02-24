@@ -77,9 +77,9 @@ export default function Sidebar() {
 
   const managementItems: MenuItem[] = [
     { label: 'Integrations', icon: Link, screen: 'profile' },
+    { label: 'Knowledge Base', icon: BookOpen, screen: 'knowledgebase' },
     { label: 'Analytics', icon: BarChart3, disabled: true },
     { label: 'Server', icon: Server, disabled: true },
-    { label: 'Training', icon: BookOpen, disabled: true },
     { label: 'Support', icon: HelpCircle, screen: 'support' },
   ];
 
@@ -158,7 +158,7 @@ export default function Sidebar() {
         <View style={[localStyles.header, { paddingTop: insets.top + 12 }]}>
           <View style={localStyles.headerLeft}>
             <Text style={{ fontSize: 22 }}>{'\uD83E\uDD80'}</Text>
-            <Text style={localStyles.headerTitle}>EasyClaw</Text>
+            <Text style={localStyles.headerTitle}>ClawPaw</Text>
           </View>
           <Pressable onPress={closeSidebar} hitSlop={12}>
             <X size={22} color="#6B7280" />

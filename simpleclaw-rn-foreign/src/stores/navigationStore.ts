@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type AppScreen = 'onboarding' | 'auth' | 'plan' | 'chat' | 'profile' | 'agents' | 'skills' | 'files' | 'support';
+export type AppScreen = 'onboarding' | 'auth' | 'plan' | 'chat' | 'profile' | 'agents' | 'skills' | 'files' | 'support' | 'knowledgebase';
 
 interface NavigationState {
   screen: AppScreen;

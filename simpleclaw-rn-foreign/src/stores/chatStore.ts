@@ -327,7 +327,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 maxProtocol: 3,
                 client: {
                   id: 'openclaw-control-ui',
-                  displayName: 'EasyClaw',
+                  displayName: 'ClawPaw',
                   version: '1.0.0',
                   platform: 'mobile',
                   mode: 'ui',

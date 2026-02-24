@@ -1,6 +1,6 @@
 export const en = {
   // General
-  appName: 'EasyClaw',
+  appName: 'ClawPaw',
   support: 'Support',
   back: 'Back',
   continue: 'Continue',
@@ -21,12 +21,12 @@ export const en = {
   signInWithApple: 'Sign in with Apple',
   signInWithGoogle: 'Sign in with Google',
   signingIn: 'Signing in...',
-  signInTitle: 'Welcome to EasyClaw',
+  signInTitle: 'Welcome to ClawPaw',
   signInSubtitle: 'Your personal AI agent, always online.',
 
   // Plan
   planTitle: 'Choose your plan',
-  planSubtitle: 'Unlock full access to EasyClaw',
+  planSubtitle: 'Unlock full access to ClawPaw',
   planName: 'OpenClaw Pro',
   planPrice: '$49',
   planPeriod: '/month',

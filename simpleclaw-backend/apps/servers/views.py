@@ -279,7 +279,7 @@ class ServerStatusView(APIView):
 
         ws_url = None
         if server.gateway_token and server.openclaw_running:
-            ws_url = f'wss://install-openclow.ru/ws-proxy/?token={server.gateway_token}'
+            ws_url = f'wss://claw-paw.com/ws-proxy/?token={server.gateway_token}'
 
         return Response({
             'assigned': True,

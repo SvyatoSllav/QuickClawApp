@@ -34,7 +34,8 @@ interface SubscriptionState {
 }
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
-  isSubscribed: false,
+  // TODO: RevenueCat disabled — bypass subscription gate for testing
+  isSubscribed: true,
   loading: false,
   error: null,
   packages: [],

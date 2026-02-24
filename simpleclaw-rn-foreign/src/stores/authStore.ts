@@ -62,18 +62,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await get().loadProfile();
       if (__DEV__) console.log('[auth] Profile loaded. subscriptionStatus:', get().profile?.subscriptionStatus, 'model:', get().profile?.selectedModel);
 
-      const user = get().user;
-      if (user) {
-        const subStore = useSubscriptionStore.getState();
-        await subStore.initRevenueCat(String(user.id));
-        await subStore.checkEntitlement();
-        if (__DEV__) console.log('[auth] RevenueCat check done. isSubscribed:', subStore.isSubscribed);
-      }
+      // TODO: RevenueCat disabled — skip native SDK init to avoid crash
+      // const user = get().user;
+      // if (user) {
+      //   const subStore = useSubscriptionStore.getState();
+      //   await subStore.initRevenueCat(String(user.id));
+      //   await subStore.checkEntitlement();
+      //   if (__DEV__) console.log('[auth] RevenueCat check done. isSubscribed:', subStore.isSubscribed);
+      // }
 
       const backendStatus = get().profile?.subscriptionStatus;
-      if (!useSubscriptionStore.getState().isSubscribed &&
-          (backendStatus === 'active' || backendStatus === 'cancelling')) {
-        if (__DEV__) console.log('[auth] Backend subscription fallback: marking subscribed (status:', backendStatus, ')');
+      if (backendStatus === 'active' || backendStatus === 'cancelling') {
+        if (__DEV__) console.log('[auth] Backend subscription: marking subscribed (status:', backendStatus, ')');
         useSubscriptionStore.setState({ isSubscribed: true });
       }
 
@@ -146,17 +146,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     await useOnboardingStore.getState().completeOnboarding();
 
-    const user = get().user;
-    if (user) {
-      const subStore = useSubscriptionStore.getState();
-      await subStore.initRevenueCat(String(user.id));
-      await subStore.checkEntitlement();
-      if (__DEV__) console.log('[auth] RevenueCat check done. isSubscribed:', subStore.isSubscribed);
-    }
+    // TODO: RevenueCat disabled — skip native SDK init to avoid crash
+    // const user = get().user;
+    // if (user) {
+    //   const subStore = useSubscriptionStore.getState();
+    //   await subStore.initRevenueCat(String(user.id));
+    //   await subStore.checkEntitlement();
+    //   if (__DEV__) console.log('[auth] RevenueCat check done. isSubscribed:', subStore.isSubscribed);
+    // }
 
-    const rcSubscribed = useSubscriptionStore.getState().isSubscribed;
     const backendStatus = get().profile?.subscriptionStatus;
-    const isSubscribed = rcSubscribed || backendStatus === 'active' || backendStatus === 'cancelling';
+    const isSubscribed = backendStatus === 'active' || backendStatus === 'cancelling';
     if (__DEV__) console.log('[auth] Subscription check: rc:', rcSubscribed, 'backend:', backendStatus, 'final:', isSubscribed);
 
     if (isSubscribed) {

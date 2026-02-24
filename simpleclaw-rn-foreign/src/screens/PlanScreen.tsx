@@ -147,7 +147,7 @@ export default function PlanScreen() {
           {t('planTitle')}
         </Text>
         <Text variant="muted" className="mb-8">
-          {t('planSubtitle', 'Unlock full access to EasyClaw')}
+          {t('planSubtitle', 'Unlock full access to ClawPaw')}
         </Text>
 
         {loading && packages.length === 0 ? (
