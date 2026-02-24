@@ -174,7 +174,7 @@ const localStyles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -182,12 +182,12 @@ const localStyles = StyleSheet.create({
   emptyTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.foreground,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 15,
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     textAlign: 'center',
   },
   fab: {
@@ -196,7 +196,7 @@ const localStyles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E8E0D4',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

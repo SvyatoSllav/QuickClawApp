@@ -8,12 +8,6 @@ export interface ServerStatus {
   wsUrl: string | null;
 }
 
-export interface ServerPool {
-  available: number;
-  totalActive: number;
-  total: number;
-}
-
 export function serverStatusFromJson(json: Record<string, unknown>): ServerStatus {
   return {
     assigned: json['assigned'] as boolean,
@@ -26,10 +20,3 @@ export function serverStatusFromJson(json: Record<string, unknown>): ServerStatu
   };
 }
 
-export function serverPoolFromJson(json: Record<string, unknown>): ServerPool {
-  return {
-    available: json['available'] as number,
-    totalActive: json['total_active'] as number,
-    total: json['total'] as number,
-  };
-}

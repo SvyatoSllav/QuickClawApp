@@ -7,8 +7,3 @@ export interface Session {
   totalTokens?: number;
 }
 
-export interface SessionsListResult {
-  ts: number;
-  count: number;
-  sessions: Session[];
-}

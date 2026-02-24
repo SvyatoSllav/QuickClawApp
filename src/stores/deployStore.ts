@@ -28,7 +28,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
   _intervalId: null,
 
   startPolling: () => {
-    console.log('[deploy] startPolling()');
+    if (__DEV__) console.log('[deploy] startPolling()');
     get().stopPolling();
     get().checkStatus();
     const id = setInterval(() => {
@@ -40,18 +40,18 @@ export const useDeployStore = create<DeployState>((set, get) => ({
   stopPolling: () => {
     const id = get()._intervalId;
     if (id) {
-      console.log('[deploy] stopPolling()');
+      if (__DEV__) console.log('[deploy] stopPolling()');
       clearInterval(id);
       set({ _intervalId: null });
     }
   },
 
   checkStatus: async () => {
-    console.log('[deploy] checkStatus() calling /server/status/...');
+    if (__DEV__) console.log('[deploy] checkStatus() calling /server/status/...');
     try {
       const serverStatus = await getServerStatus();
       const isReady = serverStatus.assigned && serverStatus.openclawRunning;
-      console.log('[deploy] checkStatus() response:', JSON.stringify({
+      if (__DEV__) console.log('[deploy] checkStatus() response:', JSON.stringify({
         assigned: serverStatus.assigned,
         openclawRunning: serverStatus.openclawRunning,
         status: serverStatus.status,
@@ -77,7 +77,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         get().stopPolling();
       }
     } catch (e: any) {
-      console.error('[deploy] checkStatus() ERROR:', e);
+      if (__DEV__) console.error('[deploy] checkStatus() ERROR:', e);
       remoteLog('error', 'deploy', 'checkStatus error', { error: e?.message });
     }
   },

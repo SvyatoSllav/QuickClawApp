@@ -73,7 +73,7 @@ const localStyles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.foreground,
     marginTop: 24,
     marginBottom: 8,
     textTransform: 'uppercase',
@@ -81,7 +81,7 @@ const localStyles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 15,
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     textAlign: 'center',
     marginBottom: 32,
   },
@@ -97,14 +97,14 @@ const stepStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E8E0D4',
+    borderTopColor: colors.border,
     paddingTop: 12,
     flexWrap: 'nowrap',
   },
   index: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     minWidth: 24,
     letterSpacing: 2,
   },
@@ -117,7 +117,7 @@ const stepStyles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#E8E0D4',
+    backgroundColor: colors.border,
   },
   label: {
     fontSize: 15,
@@ -128,9 +128,9 @@ const stepStyles = StyleSheet.create({
     color: colors.primary,
   },
   labelActive: {
-    color: '#1A1A1A',
+    color: colors.foreground,
   },
   labelInactive: {
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
   },
 });

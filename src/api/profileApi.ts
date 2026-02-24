@@ -12,10 +12,6 @@ export async function getUsage(): Promise<UsageData> {
   return usageFromJson(response.data);
 }
 
-export async function updateSelectedModel(model: string): Promise<void> {
-  await apiClient.patch('/profile/', { selected_model: model });
-}
-
 export async function setServerModel(model: string): Promise<void> {
   await apiClient.post('/server/set-model/', { model });
 }

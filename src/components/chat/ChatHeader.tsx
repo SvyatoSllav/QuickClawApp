@@ -117,14 +117,14 @@ const styles = StyleSheet.create({
   sessionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: colors.foreground,
     flexShrink: 1,
   },
   modelButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E8E0D4',
+    borderColor: colors.border,
     paddingVertical: 0,
     width: 200,
     shadowColor: '#000',
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   dropdownItemActive: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
     borderRadius: 8,
   },
   dropdownLabel: {

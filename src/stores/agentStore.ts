@@ -25,7 +25,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   isLoading: false,
 
   fetchAgents: () => {
-    console.log('[agents] fetchAgents starting...');
+    if (__DEV__) console.log('[agents] fetchAgents starting...');
     set({ isLoading: true });
     const { sendRequest } = useChatStore.getState();
 
@@ -39,10 +39,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     const savedIdP = getItem(ACTIVE_AGENT_KEY);
 
     agentsP.then((data) => {
-      console.log('[agents] agents.list response:', data.ok ? (data.result?.agents?.length + ' agents, defaultId: ' + data.result?.defaultId) : 'FAILED', data.error || '');
+      if (__DEV__) console.log('[agents] agents.list response:', data.ok ? (data.result?.agents?.length + ' agents, defaultId: ' + data.result?.defaultId) : 'FAILED', data.error || '');
       remoteLog('info', 'agents', 'agents.list result', { ok: data.ok, count: data.result?.agents?.length ?? 0, defaultId: data.result?.defaultId });
       if (!data.ok || !data.result?.agents) {
-        console.error('[agents] fetchAgents failed:', data.error);
+        if (__DEV__) console.error('[agents] fetchAgents failed:', data.error);
         set({ isLoading: false });
         return;
       }
@@ -58,7 +58,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       savedIdP.then((savedId) => {
         const validSaved = savedId && agentsList.some((a) => a.id === savedId) ? savedId : null;
         const activeId = validSaved ?? serverDefaultId;
-        console.log('[agents] Active agent:', activeId, '(saved:', savedId, 'default:', serverDefaultId, ')');
+        if (__DEV__) console.log('[agents] Active agent:', activeId, '(saved:', savedId, 'default:', serverDefaultId, ')');
         remoteLog('info', 'agents', 'active agent set', { activeId, savedId, serverDefaultId });
 
         set({ agents: agentsList, defaultAgentId: serverDefaultId, activeAgentId: activeId, isLoading: false });
@@ -66,7 +66,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         if (activeId) {
           const chat = useChatStore.getState();
           const sessionKey = `agent:${activeId}:main`;
-          console.log('[agents] Setting session key:', sessionKey);
+          if (__DEV__) console.log('[agents] Setting session key:', sessionKey);
           chat.setActiveSessionKey(sessionKey);
           chat.loadHistory(sessionKey);
           useSessionStore.getState().fetchSessions();
@@ -75,22 +75,22 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
       // Enrich agents with skills/descriptions from config (non-blocking)
       configP.then((cfgData) => {
-        console.log('[agents] config.get response:', cfgData.ok ? 'ok' : 'FAILED', cfgData.error || '');
+        if (__DEV__) console.log('[agents] config.get response:', cfgData.ok ? 'ok' : 'FAILED', cfgData.error || '');
         if (cfgData.ok && cfgData.result?.config?.agents?.list) {
           const configAgents = cfgData.result.config.agents.list as any[];
-          console.log('[agents] config agents count:', configAgents.length);
+          if (__DEV__) console.log('[agents] config agents count:', configAgents.length);
           const enriched = agentsList.map((agent) => {
             const cfgAgent = configAgents.find((c: any) => c.id === agent.id);
             if (cfgAgent) {
-              console.log('[agents] Enriching agent', agent.id, '— skills:', JSON.stringify(cfgAgent.skills), 'description:', cfgAgent.description?.substring(0, 60));
+              if (__DEV__) console.log('[agents] Enriching agent', agent.id, '— skills:', JSON.stringify(cfgAgent.skills), 'description:', cfgAgent.description?.substring(0, 60));
               return { ...agent, skills: cfgAgent.skills, description: cfgAgent.description };
             }
-            console.log('[agents] No config entry for agent', agent.id);
+            if (__DEV__) console.log('[agents] No config entry for agent', agent.id);
             return agent;
           });
           set({ agents: enriched });
         } else {
-          console.log('[agents] config.get — no agents.list in result, raw keys:', cfgData.ok ? Object.keys(cfgData.result?.config || {}) : 'N/A');
+          if (__DEV__) console.log('[agents] config.get — no agents.list in result, raw keys:', cfgData.ok ? Object.keys(cfgData.result?.config || {}) : 'N/A');
         }
       });
     });

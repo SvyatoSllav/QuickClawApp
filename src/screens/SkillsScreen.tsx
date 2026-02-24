@@ -1,26 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, TextInput, ActivityIndicator, Image } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { Menu, Search, Grid3X3, Star, Download, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useNavigationStore } from '../stores/navigationStore';
 import { colors } from '../config/colors';
+import { PAGINATION } from '../config/constants';
+import { formatCount, formatCompactDate } from '../utils/formatters';
 import { searchSkills, SkillsmpSkill, SkillCategory } from '../api/skillsmpApi';
 import CategoriesDrawer from '../components/skills/CategoriesDrawer';
 import InstallSkillModal from '../components/skills/InstallSkillModal';
-
-const PAGE_SIZE = 5;
-
-function formatCount(n?: number): string {
-  if (n == null) return '0';
-  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
-  return String(n);
-}
-
-function formatDate(ts?: number): string {
-  if (!ts) return '';
-  const d = new Date(ts * 1000);
-  return d.toISOString().split('T')[0];
-}
 
 function getAuthorAvatar(author?: string): string | null {
   if (!author) return null;
@@ -43,12 +31,12 @@ export default function SkillsScreen() {
   const fetchPage = useCallback(async (searchQuery: string, pageNum: number) => {
     setIsLoading(true);
     try {
-      const result = await searchSkills(searchQuery, pageNum, PAGE_SIZE, 'stars');
+      const result = await searchSkills(searchQuery, pageNum, PAGINATION.SKILLS_PAGE_SIZE, 'stars');
       setSkills(result.skills ?? []);
       setTotal(result.total ?? 0);
       setPage(pageNum);
     } catch (e) {
-      console.log('[skills] search error:', e);
+      if (__DEV__) console.log('[skills] search error:', e);
       setSkills([]);
       setTotal(0);
     } finally {
@@ -80,7 +68,7 @@ export default function SkillsScreen() {
     fetchPage('', 1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / PAGINATION.SKILLS_PAGE_SIZE));
   const currentQuery = activeCategoryLabel || query;
 
   const goToPage = (p: number) => {
@@ -88,73 +76,75 @@ export default function SkillsScreen() {
     fetchPage(currentQuery, p);
   };
 
-  // Build page numbers to display (max 5 visible)
-  const getPageNumbers = (): number[] => {
-    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    if (page <= 3) return [1, 2, 3, 4, 5];
-    if (page >= totalPages - 2) return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-    return [page - 2, page - 1, page, page + 1, page + 2];
-  };
+  // Build page numbers to display
+  const pageNumbers = useMemo((): number[] => {
+    const max = PAGINATION.MAX_VISIBLE_PAGES;
+    if (totalPages <= max) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const half = Math.floor(max / 2);
+    if (page <= half + 1) return Array.from({ length: max }, (_, i) => i + 1);
+    if (page >= totalPages - half) return Array.from({ length: max }, (_, i) => totalPages - max + 1 + i);
+    return Array.from({ length: max }, (_, i) => page - half + i);
+  }, [totalPages, page]);
 
   return (
-    <View style={s.container}>
+    <View style={localStyles.container}>
       {/* Header */}
-      <View style={s.header}>
+      <View style={localStyles.header}>
         <Pressable onPress={toggleSidebar} hitSlop={8} style={{ padding: 4 }}>
           <Menu size={22} color={colors.foreground} />
         </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 }}>
-        <Text style={s.pageTitle}>Skills</Text>
-        <Text style={s.pageDescription}>
+        <Text style={localStyles.pageTitle}>Skills</Text>
+        <Text style={localStyles.pageDescription}>
           Ready-made setups that teach your assistant new tricks. Pick one — and it will guide you through everything.
         </Text>
 
         {/* Search bar */}
-        <View style={s.searchRow}>
-          <View style={s.searchContainer}>
-            <Search size={18} color="#8B8B8B" />
+        <View style={localStyles.searchRow}>
+          <View style={localStyles.searchContainer}>
+            <Search size={18} color={colors.mutedForeground} />
             <TextInput
               value={query}
               onChangeText={setQuery}
               onSubmitEditing={handleSearch}
               placeholder="Search skills..."
-              placeholderTextColor="#8B8B8B"
-              style={s.searchInput}
+              placeholderTextColor={colors.mutedForeground}
+              style={localStyles.searchInput}
               returnKeyType="search"
             />
           </View>
-          <Pressable onPress={() => setShowCategories(true)} style={s.categoriesButton}>
+          <Pressable onPress={() => setShowCategories(true)} style={localStyles.categoriesButton}>
             <Grid3X3 size={16} color={colors.primary} />
-            <Text style={s.categoriesText}>Categories</Text>
+            <Text style={localStyles.categoriesText}>Categories</Text>
           </Pressable>
         </View>
 
         {/* Active category chip */}
         {activeCategoryLabel && (
-          <View style={s.activeCategoryRow}>
-            <Pressable onPress={handleClearCategory} style={s.activeCategoryChip}>
-              <Text style={s.activeCategoryText}>{activeCategoryLabel} ×</Text>
+          <View style={localStyles.activeCategoryRow}>
+            <Pressable onPress={handleClearCategory} style={localStyles.activeCategoryChip}>
+              <Text style={localStyles.activeCategoryText}>{activeCategoryLabel} ×</Text>
             </Pressable>
           </View>
         )}
 
         {/* Results */}
         {isLoading ? (
-          <View style={s.loadingContainer}>
+          <View style={localStyles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : skills.length === 0 ? (
-          <View style={s.emptyContainer}>
-            <Text style={s.emptyText}>
+          <View style={localStyles.emptyContainer}>
+            <Text style={localStyles.emptyText}>
               {query ? 'No skills found' : 'Loading skills...'}
             </Text>
           </View>
         ) : (
           <View style={{ gap: 12, marginTop: 4 }}>
             {total > 0 && (
-              <Text style={s.resultsCount}>
+              <Text style={localStyles.resultsCount}>
                 {total} skills found
               </Text>
             )}
@@ -171,22 +161,22 @@ export default function SkillsScreen() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <View style={s.pagination}>
+              <View style={localStyles.pagination}>
                 <Pressable
                   onPress={() => goToPage(page - 1)}
                   disabled={page === 1}
-                  style={[s.pageArrow, page === 1 && s.pageArrowDisabled]}
+                  style={[localStyles.pageArrow, page === 1 && localStyles.pageArrowDisabled]}
                 >
                   <ChevronLeft size={18} color={page === 1 ? '#D1D5DB' : colors.foreground} />
                 </Pressable>
 
-                {getPageNumbers().map((p) => (
+                {pageNumbers.map((p) => (
                   <Pressable
                     key={p}
                     onPress={() => goToPage(p)}
-                    style={[s.pageNumber, p === page && s.pageNumberActive]}
+                    style={[localStyles.pageNumber, p === page && localStyles.pageNumberActive]}
                   >
-                    <Text style={[s.pageNumberText, p === page && s.pageNumberTextActive]}>
+                    <Text style={[localStyles.pageNumberText, p === page && localStyles.pageNumberTextActive]}>
                       {p}
                     </Text>
                   </Pressable>
@@ -195,7 +185,7 @@ export default function SkillsScreen() {
                 <Pressable
                   onPress={() => goToPage(page + 1)}
                   disabled={page === totalPages}
-                  style={[s.pageArrow, page === totalPages && s.pageArrowDisabled]}
+                  style={[localStyles.pageArrow, page === totalPages && localStyles.pageArrowDisabled]}
                 >
                   <ChevronRight size={18} color={page === totalPages ? '#D1D5DB' : colors.foreground} />
                 </Pressable>
@@ -225,51 +215,51 @@ function SkillCard({ skill, onPress }: { skill: SkillsmpSkill; onPress?: () => v
   const avatarUri = getAuthorAvatar(skill.author);
 
   return (
-    <Pressable style={s.card} onPress={onPress}>
+    <Pressable style={localStyles.card} onPress={onPress}>
       {/* Card header — skill name + stars */}
-      <View style={s.cardHeader}>
-        <Text style={s.cardHeaderName} numberOfLines={1}>
+      <View style={localStyles.cardHeader}>
+        <Text style={localStyles.cardHeaderName} numberOfLines={1}>
           {skill.name}
         </Text>
         {skill.stars != null && (
-          <View style={s.cardStatsInline}>
+          <View style={localStyles.cardStatsInline}>
             <Star size={12} color="#F59E0B" />
-            <Text style={s.cardStatText}>{formatCount(skill.stars)}</Text>
+            <Text style={localStyles.cardStatText}>{formatCount(skill.stars)}</Text>
           </View>
         )}
       </View>
 
       {/* Card body */}
-      <View style={s.cardBody}>
+      <View style={localStyles.cardBody}>
         {/* Skill name — large */}
-        <Text style={s.cardSkillName} numberOfLines={1}>
+        <Text style={localStyles.cardSkillName} numberOfLines={1}>
           {skill.name}
         </Text>
 
         {/* Author */}
         {skill.author && (
-          <View style={s.authorRow}>
+          <View style={localStyles.authorRow}>
             {avatarUri && (
-              <Image source={{ uri: avatarUri }} style={s.authorAvatar} />
+              <Image source={{ uri: avatarUri }} style={localStyles.authorAvatar} />
             )}
-            <Text style={s.authorName}>{skill.author}</Text>
+            <Text style={localStyles.authorName}>{skill.author}</Text>
           </View>
         )}
 
         {/* Description */}
-        <Text style={s.cardDesc} numberOfLines={2}>
+        <Text style={localStyles.cardDesc} numberOfLines={2}>
           {skill.description}
         </Text>
 
         {/* Bottom row: date + installs */}
-        <View style={s.cardMeta}>
+        <View style={localStyles.cardMeta}>
           {skill.updatedAt ? (
-            <Text style={s.cardMetaText}>{formatDate(skill.updatedAt)}</Text>
+            <Text style={localStyles.cardMetaText}>{formatCompactDate(skill.updatedAt)}</Text>
           ) : null}
           {skill.installs != null && (
-            <View style={s.cardMetaItem}>
+            <View style={localStyles.cardMetaItem}>
               <Download size={12} color="#9CA3AF" />
-              <Text style={s.cardMetaText}>{formatCount(skill.installs)}</Text>
+              <Text style={localStyles.cardMetaText}>{formatCount(skill.installs)}</Text>
             </View>
           )}
         </View>
@@ -278,7 +268,7 @@ function SkillCard({ skill, onPress }: { skill: SkillsmpSkill; onPress?: () => v
   );
 }
 
-const s = StyleSheet.create({
+const localStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -293,7 +283,7 @@ const s = StyleSheet.create({
   pageTitle: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.foreground,
     marginBottom: 8,
   },
   pageDescription: {
@@ -315,7 +305,7 @@ const s = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E8E0D4',
+    borderColor: colors.border,
     paddingHorizontal: 12,
     gap: 8,
     height: 44,
@@ -323,7 +313,7 @@ const s = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: '#1A1A1A',
+    color: colors.foreground,
     paddingVertical: 0,
   },
   categoriesButton: {
@@ -368,11 +358,11 @@ const s = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
   },
   resultsCount: {
     fontSize: 13,
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     fontWeight: '500',
   },
 
@@ -468,7 +458,7 @@ const s = StyleSheet.create({
   cardSkillName: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.foreground,
     marginBottom: 6,
   },
   authorRow: {

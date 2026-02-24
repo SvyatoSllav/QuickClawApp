@@ -19,16 +19,9 @@ async function ensureConfigured() {
   configured = true;
 }
 
-export interface GoogleUserInfo {
-  email: string;
-  name: string;
-  google_id: string;
-  avatar_url: string;
-}
-
 export type GoogleSignInResult =
   | { type: 'token'; idToken: string }
-  | { type: 'userInfo'; userInfo: GoogleUserInfo };
+  | { type: 'access_token'; accessToken: string };
 
 // --- Web: Google Identity Services ---
 
@@ -68,24 +61,10 @@ function googleSignInWeb(): Promise<GoogleSignInResult> {
             return;
           }
           if (tokenResponse.access_token) {
-            try {
-              const resp = await fetch(
-                'https://www.googleapis.com/oauth2/v2/userinfo',
-                { headers: { Authorization: 'Bearer ' + tokenResponse.access_token } },
-              );
-              const userInfo = await resp.json();
-              resolve({
-                type: 'userInfo',
-                userInfo: {
-                  email: userInfo.email,
-                  name: userInfo.name || '',
-                  google_id: userInfo.id || '',
-                  avatar_url: userInfo.picture || '',
-                },
-              });
-            } catch {
-              reject(new Error('Failed to fetch Google user info'));
-            }
+            resolve({
+              type: 'access_token',
+              accessToken: tokenResponse.access_token,
+            });
           } else {
             reject(new Error('Google OAuth failed'));
           }

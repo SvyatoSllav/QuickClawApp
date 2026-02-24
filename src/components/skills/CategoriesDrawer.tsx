@@ -166,7 +166,7 @@ const localStyles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.foreground,
   },
   categoryItem: {
     flexDirection: 'row',
@@ -183,7 +183,7 @@ const localStyles = StyleSheet.create({
     gap: 12,
   },
   categoryItemActive: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
   },
   categoryLabel: {
     fontSize: 15,

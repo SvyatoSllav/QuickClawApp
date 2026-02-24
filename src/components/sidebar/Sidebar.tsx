@@ -24,10 +24,10 @@ import {
 import { useNavigationStore, AppScreen } from '../../stores/navigationStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { colors } from '../../config/colors';
+import { TIMING } from '../../config/constants';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.82;
-const ANIM_DURATION = 280;
 const EASING = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 interface MenuItem {
@@ -51,11 +51,11 @@ export default function Sidebar() {
 
   useEffect(() => {
     translateX.value = withTiming(isSidebarOpen ? 0 : -SIDEBAR_WIDTH, {
-      duration: ANIM_DURATION,
+      duration: TIMING.ANIMATION_DURATION_MS,
       easing: EASING,
     });
     backdropOpacity.value = withTiming(isSidebarOpen ? 1 : 0, {
-      duration: ANIM_DURATION,
+      duration: TIMING.ANIMATION_DURATION_MS,
       easing: EASING,
     });
   }, [isSidebarOpen]);
@@ -88,11 +88,11 @@ export default function Sidebar() {
 
     if (item.disabled) {
       return (
-        <View key={item.label} style={[styles.menuItem, { opacity: 0.4 }]}>
+        <View key={item.label} style={[localStyles.menuItem, { opacity: 0.4 }]}>
           <Icon size={20} color="#6B7280" />
-          <Text style={styles.menuLabel}>{item.label}</Text>
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>Soon</Text>
+          <Text style={localStyles.menuLabel}>{item.label}</Text>
+          <View style={localStyles.comingSoonBadge}>
+            <Text style={localStyles.comingSoonText}>Soon</Text>
           </View>
         </View>
       );
@@ -105,22 +105,22 @@ export default function Sidebar() {
           if (item.screen) setScreen(item.screen);
         }}
         style={[
-          styles.menuItem,
-          isActive && styles.menuItemActive,
+          localStyles.menuItem,
+          isActive && localStyles.menuItemActive,
         ]}
       >
         <Icon size={20} color={isActive ? colors.primary : '#6B7280'} />
         <Text
           style={[
-            styles.menuLabel,
-            isActive && styles.menuLabelActive,
+            localStyles.menuLabel,
+            isActive && localStyles.menuLabelActive,
           ]}
         >
           {item.label}
         </Text>
         {item.badge && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{item.badge}</Text>
+          <View style={localStyles.badge}>
+            <Text style={localStyles.badgeText}>{item.badge}</Text>
           </View>
         )}
       </Pressable>
@@ -155,10 +155,10 @@ export default function Sidebar() {
         ]}
       >
         {/* Header */}
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <View style={styles.headerLeft}>
+        <View style={[localStyles.header, { paddingTop: insets.top + 12 }]}>
+          <View style={localStyles.headerLeft}>
             <Text style={{ fontSize: 22 }}>{'\uD83E\uDD80'}</Text>
-            <Text style={styles.headerTitle}>EasyClaw</Text>
+            <Text style={localStyles.headerTitle}>EasyClaw</Text>
           </View>
           <Pressable onPress={closeSidebar} hitSlop={12}>
             <X size={22} color="#6B7280" />
@@ -166,7 +166,7 @@ export default function Sidebar() {
         </View>
 
         {/* Main menu */}
-        <View style={styles.menuSection}>
+        <View style={localStyles.menuSection}>
           {mainItems.map((item) => {
             const isActive = item.screen === currentScreen;
             return renderItem(item, isActive);
@@ -174,26 +174,26 @@ export default function Sidebar() {
         </View>
 
         {/* Separator + Management */}
-        <View style={styles.separator} />
-        <Text style={styles.sectionHeader}>MANAGEMENT</Text>
-        <View style={styles.menuSection}>
+        <View style={localStyles.separator} />
+        <Text style={localStyles.sectionHeader}>MANAGEMENT</Text>
+        <View style={localStyles.menuSection}>
           {managementItems.map((item) => renderItem(item, false))}
         </View>
 
         {/* Bottom */}
-        <View style={styles.bottomSection}>
+        <View style={localStyles.bottomSection}>
           <Pressable
             onPress={() => setScreen('profile')}
-            style={styles.settingsButton}
+            style={localStyles.settingsButton}
           >
             <Settings size={20} color="#6B7280" />
           </Pressable>
 
-          <View style={styles.planCard}>
-            <Text style={styles.planLabel}>
-              Plan: <Text style={styles.planBold}>Free</Text>
+          <View style={localStyles.planCard}>
+            <Text style={localStyles.planLabel}>
+              Plan: <Text style={localStyles.planBold}>Free</Text>
             </Text>
-            <Text style={styles.planTokens}>12,400 tokens remaining</Text>
+            <Text style={localStyles.planTokens}>12,400 tokens remaining</Text>
           </View>
         </View>
       </Animated.View>
@@ -201,7 +201,7 @@ export default function Sidebar() {
   );
 }
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.foreground,
   },
   menuSection: {
     paddingHorizontal: 12,
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   menuItemActive: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
   },
   menuLabel: {
     fontSize: 15,
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   planCard: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.accent,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,

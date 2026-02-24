@@ -42,10 +42,10 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   initRevenueCat: async (userId) => {
     if (Platform.OS === 'web') {
-      console.log('[subscription] initRevenueCat skipped (web)');
+      if (__DEV__) console.log('[subscription] initRevenueCat skipped (web)');
       return;
     }
-    console.log('[subscription] initRevenueCat for user:', userId);
+    if (__DEV__) console.log('[subscription] initRevenueCat for user:', userId);
     try {
       const apiKey =
         Platform.OS === 'ios'
@@ -62,31 +62,31 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
       Purchases.configure({ apiKey, appUserID: userId });
     } catch (e) {
-      console.warn('RevenueCat init failed:', e);
+      if (__DEV__) console.warn('RevenueCat init failed:', e);
     }
   },
 
   loadOfferings: async () => {
     if (Platform.OS === 'web') {
-      console.log('[subscription] loadOfferings skipped (web)');
+      if (__DEV__) console.log('[subscription] loadOfferings skipped (web)');
       set({ loading: false, packages: [], selectedPackage: null });
       return;
     }
     const Purchases = getPurchases();
     if (!Purchases) { set({ loading: false }); return; }
-    console.log('[subscription] loadOfferings starting...');
+    if (__DEV__) console.log('[subscription] loadOfferings starting...');
     set({ loading: true, error: null });
     try {
       const offerings = await Purchases.getOfferings();
       const packages = offerings.current?.availablePackages ?? [];
-      console.log('[subscription] loadOfferings: found', packages.length, 'packages');
+      if (__DEV__) console.log('[subscription] loadOfferings: found', packages.length, 'packages');
       set({
         packages,
         selectedPackage: packages[0] ?? null,
         loading: false,
       });
     } catch (e) {
-      console.error('[subscription] loadOfferings error:', e);
+      if (__DEV__) console.error('[subscription] loadOfferings error:', e);
       set({ loading: false, error: String(e) });
     }
   },
@@ -155,7 +155,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       const RevenueCatUI = (await import('react-native-purchases-ui')).default;
       await RevenueCatUI.presentCustomerCenter();
     } catch (e) {
-      console.warn('Customer Center failed:', e);
+      if (__DEV__) console.warn('Customer Center failed:', e);
     }
   },
 
@@ -180,7 +180,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   checkEntitlement: async () => {
     if (Platform.OS === 'web') {
-      console.log('[subscription] checkEntitlement skipped (web)');
+      if (__DEV__) console.log('[subscription] checkEntitlement skipped (web)');
       return false;
     }
     const Purchases = getPurchases();
@@ -190,24 +190,24 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       const isActive =
         customerInfo.entitlements.active[AppConfig.revenueCatEntitlementId] !==
         undefined;
-      console.log('[subscription] checkEntitlement:', isActive, 'entitlementId:', AppConfig.revenueCatEntitlementId);
+      if (__DEV__) console.log('[subscription] checkEntitlement:', isActive, 'entitlementId:', AppConfig.revenueCatEntitlementId);
       set({ isSubscribed: isActive });
       return isActive;
     } catch (e) {
-      console.error('[subscription] checkEntitlement error:', e);
+      if (__DEV__) console.error('[subscription] checkEntitlement error:', e);
       return false;
     }
   },
 
   webPurchase: async () => {
-    console.log('[subscription] webPurchase starting...');
+    if (__DEV__) console.log('[subscription] webPurchase starting...');
     set({ loading: true, error: null });
     try {
       const { useAuthStore } = require('./authStore');
       const authState = useAuthStore.getState();
       const userId = authState.user?.id;
       const token = authState.authToken;
-      console.log('[subscription] webPurchase userId:', userId, 'hasToken:', !!token);
+      if (__DEV__) console.log('[subscription] webPurchase userId:', userId, 'hasToken:', !!token);
       if (!userId) throw new Error('Not authenticated');
 
       const payload = {
@@ -218,20 +218,20 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
         },
       };
       const url = '/payments/webhook/revenuecat/';
-      console.log('[subscription] webPurchase POST', url, JSON.stringify(payload));
+      if (__DEV__) console.log('[subscription] webPurchase POST', url, JSON.stringify(payload));
 
       const response = await apiClient.post(url, payload);
-      console.log('[subscription] webPurchase response status:', response.status, 'data:', JSON.stringify(response.data));
+      if (__DEV__) console.log('[subscription] webPurchase response status:', response.status, 'data:', JSON.stringify(response.data));
 
-      console.log('[subscription] webPurchase reloading profile...');
+      if (__DEV__) console.log('[subscription] webPurchase reloading profile...');
       await useAuthStore.getState().loadProfile();
-      console.log('[subscription] webPurchase profile reloaded. subscriptionStatus:', useAuthStore.getState().profile?.subscriptionStatus);
-      console.log('[subscription] webPurchase SUCCESS');
+      if (__DEV__) console.log('[subscription] webPurchase profile reloaded. subscriptionStatus:', useAuthStore.getState().profile?.subscriptionStatus);
+      if (__DEV__) console.log('[subscription] webPurchase SUCCESS');
       set({ isSubscribed: true, loading: false });
       return true;
     } catch (e: any) {
-      console.error('[subscription] webPurchase ERROR:', e);
-      console.error('[subscription] webPurchase ERROR details — message:', e?.message, 'response.status:', e?.response?.status, 'response.data:', JSON.stringify(e?.response?.data));
+      if (__DEV__) console.error('[subscription] webPurchase ERROR:', e);
+      if (__DEV__) console.error('[subscription] webPurchase ERROR details — message:', e?.message, 'response.status:', e?.response?.status, 'response.data:', JSON.stringify(e?.response?.data));
       set({ loading: false, error: String(e) });
       return false;
     }

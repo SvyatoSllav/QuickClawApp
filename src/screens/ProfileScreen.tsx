@@ -10,7 +10,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { useUsageStore } from '../stores/usageStore';
 import { cancelSubscription } from '../api/subscriptionApi';
-import { formatDate } from '../utils/formatDate';
+import { formatDate } from '../utils/formatters';
 import IntegrationsCard from '../components/integrations/IntegrationsCard';
 import TelegramSetupSheet from '../components/integrations/TelegramSetupSheet';
 import { colors } from '../config/colors';
@@ -151,7 +151,7 @@ export default function ProfileScreen() {
 const localStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF8F0',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -159,18 +159,18 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D4',
+    borderBottomColor: colors.border,
   },
   headerTitle: {
     fontWeight: '700',
     fontSize: 18,
     marginLeft: 8,
-    color: '#1A1A1A',
+    color: colors.foreground,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#8B8B8B',
+    color: colors.mutedForeground,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },

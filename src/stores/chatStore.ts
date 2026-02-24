@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { ModelId, ChatMessage, ChatAttachment, AVAILABLE_MODELS, MODEL_TO_OPENROUTER } from '../types/chat';
 import apiClient from '../api/client';
-import { setServerModel } from '../api/profileApi';
 import { getItem, setItem } from '../services/secureStorage';
 import { remoteLog } from '../services/remoteLog';
+import { TIMING, WS_MESSAGE_TYPES } from '../config/constants';
 
 const SELECTED_MODEL_KEY = 'selected_model';
 
@@ -89,11 +89,11 @@ function resetHealthWatchdog(get: () => ChatState) {
   healthWatchdog = setTimeout(() => {
     const { connectionState, ws } = get();
     if (connectionState === 'connected' && ws) {
-      console.log('[ws] Health watchdog: no events for 60s, forcing reconnect');
+      if (__DEV__) console.log('[ws] Health watchdog: no events for 60s, forcing reconnect');
       remoteLog('warn', 'ws', 'health watchdog timeout, forcing reconnect');
       ws.close();
     }
-  }, 60000);
+  }, TIMING.HEALTH_WATCHDOG_MS);
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -109,7 +109,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   _connGeneration: 0,
 
   setModel: async (model) => {
-    console.log('[chat] setModel called:', model);
+    if (__DEV__) console.log('[chat] setModel called:', model);
     set({ selectedModel: model });
     setItem(SELECTED_MODEL_KEY, model);
 
@@ -118,7 +118,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Per-session override via WebSocket (immediate, no restart)
     sendRequest('sessions.patch', { key: activeSessionKey, model: openrouterModel }, (data) => {
-      console.log('[chat] sessions.patch model response:', data.ok ? 'ok' : 'FAILED', JSON.stringify(data.error || ''));
+      if (__DEV__) console.log('[chat] sessions.patch model response:', data.ok ? 'ok' : 'FAILED', JSON.stringify(data.error || ''));
     });
 
     // Persist to backend profile (for next login). Skip setServerModel — it SSHes
@@ -126,7 +126,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       await apiClient.patch('/profile/', { selected_model: model });
     } catch (e: any) {
-      console.error('[chat] setModel profile save ERROR:', e?.response?.status, e?.message);
+      if (__DEV__) console.error('[chat] setModel profile save ERROR:', e?.response?.status, e?.message);
     }
   },
 
@@ -145,7 +145,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendRequest: (method, params, onResponse) => {
     const { ws, connectionState } = get();
     if (!ws || connectionState !== 'connected') {
-      console.log('[ws] sendRequest SKIPPED (not connected):', method, 'state:', connectionState, 'ws:', !!ws);
+      if (__DEV__) console.log('[ws] sendRequest SKIPPED (not connected):', method, 'state:', connectionState, 'ws:', !!ws);
       remoteLog('warn', 'ws', 'sendRequest skipped', { method, state: connectionState, hasWs: !!ws });
       return null;
     }
@@ -155,11 +155,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       get()._responseHandlers.set(id, onResponse);
     }
 
-    console.log('[ws] sendRequest:', method, 'id:', id, 'params:', JSON.stringify(params).substring(0, 200));
+    if (__DEV__) console.log('[ws] sendRequest:', method, 'id:', id, 'params:', JSON.stringify(params).substring(0, 200));
     try {
-      ws.send(JSON.stringify({ type: 'req', id, method, params }));
+      ws.send(JSON.stringify({ type: WS_MESSAGE_TYPES.REQUEST, id, method, params }));
     } catch (e) {
-      console.error('[ws] sendRequest send failed:', e);
+      if (__DEV__) console.error('[ws] sendRequest send failed:', e);
       get()._responseHandlers.delete(id);
       return null;
     }
@@ -167,11 +167,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadHistory: (sessionKey) => {
-    console.log('[ws] loadHistory:', sessionKey);
+    if (__DEV__) console.log('[ws] loadHistory:', sessionKey);
     remoteLog('info', 'ws', 'loadHistory', { sessionKey });
     set({ isLoadingHistory: true });
     const reqId = get().sendRequest('chat.history', { sessionKey }, (data) => {
-      console.log('[ws] loadHistory response:', data.ok ? `${data.result?.messages?.length ?? 0} messages` : 'FAILED', data.error || '');
+      if (__DEV__) console.log('[ws] loadHistory response:', data.ok ? `${data.result?.messages?.length ?? 0} messages` : 'FAILED', data.error || '');
       remoteLog('info', 'ws', 'loadHistory result', { ok: data.ok, count: data.result?.messages?.length ?? 0, session: sessionKey });
       if (data.ok && data.result?.messages) {
         const messages: ChatMessage[] = data.result.messages
@@ -188,7 +188,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     });
     if (reqId === null) {
-      console.log('[ws] loadHistory: sendRequest returned null, clearing loading state');
+      if (__DEV__) console.log('[ws] loadHistory: sendRequest returned null, clearing loading state');
       set({ isLoadingHistory: false });
     }
   },
@@ -196,18 +196,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: () => {
     const { inputText, ws, connectionState, activeSessionKey, attachments } = get();
     const text = inputText.trim();
-    console.log('[ws] sendMessage called: text="' + text.substring(0, 50) + '" state=' + connectionState + ' session=' + activeSessionKey + ' attachments=' + attachments.length);
+    if (__DEV__) console.log('[ws] sendMessage called: text="' + text.substring(0, 50) + '" state=' + connectionState + ' session=' + activeSessionKey + ' attachments=' + attachments.length);
 
     // Self-healing: if state says connected but ws is gone, fix it
     if (connectionState === 'connected' && !ws) {
-      console.warn('[ws] State corrupted: connected but no ws — resetting to disconnected');
+      if (__DEV__) console.warn('[ws] State corrupted: connected but no ws — resetting to disconnected');
       remoteLog('error', 'ws', 'state corrupted: connected but no ws');
       set({ connectionState: 'disconnected', ws: null });
       return;
     }
 
     if ((!text && attachments.length === 0) || connectionState !== 'connected' || !ws) {
-      console.log('[ws] sendMessage SKIPPED: noText=' + (!text && attachments.length === 0) + ' notConnected=' + (connectionState !== 'connected') + ' noWs=' + !ws);
+      if (__DEV__) console.log('[ws] sendMessage SKIPPED: noText=' + (!text && attachments.length === 0) + ' notConnected=' + (connectionState !== 'connected') + ' noWs=' + !ws);
       return;
     }
 
@@ -240,19 +240,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     }
 
-    console.log('[ws] sendMessage → chat.send id=' + requestId + ' session=' + activeSessionKey);
+    if (__DEV__) console.log('[ws] sendMessage → chat.send id=' + requestId + ' session=' + activeSessionKey);
     remoteLog('info', 'ws', 'chat.send', { session: activeSessionKey, textLen: text.length, attachments: attachments.length });
     try {
       ws.send(
         JSON.stringify({
-          type: 'req',
+          type: WS_MESSAGE_TYPES.REQUEST,
           id: requestId,
           method: 'chat.send',
           params,
         }),
       );
     } catch (e: any) {
-      console.error('[ws] sendMessage send failed:', e);
+      if (__DEV__) console.error('[ws] sendMessage send failed:', e);
       remoteLog('error', 'ws', 'chat.send exception', { error: e?.message });
     }
   },
@@ -262,7 +262,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Duplicate connection guard
     if ((curState === 'connecting' || curState === 'connected') && existingWs) {
-      console.log('[ws] Already', curState, '— skipping duplicate connect to', serverIp);
+      if (__DEV__) console.log('[ws] Already', curState, '— skipping duplicate connect to', serverIp);
       return;
     }
 
@@ -274,11 +274,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     lastConnectParams = { serverIp, gatewayToken, wsUrl };
 
     const wsEndpoint = wsUrl || `ws://${serverIp}:18789`;
-    console.log('[ws] Connecting to ' + wsEndpoint + ' gen=' + gen);
+    if (__DEV__) console.log('[ws] Connecting to ' + wsEndpoint + ' gen=' + gen);
     remoteLog('info', 'ws', 'connecting', { endpoint: wsEndpoint, gen });
 
     if (existingWs) {
-      console.log('[ws] Closing existing WebSocket before reconnect');
+      if (__DEV__) console.log('[ws] Closing existing WebSocket before reconnect');
       existingWs.close();
     }
 
@@ -292,7 +292,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     ws.onopen = () => {
       // Stale check
       if (get()._connGeneration !== gen) { ws.close(); return; }
-      console.log('[ws] WebSocket opened, waiting for challenge...');
+      if (__DEV__) console.log('[ws] WebSocket opened, waiting for challenge...');
       remoteLog('info', 'ws', 'onopen', { gen });
     };
 
@@ -306,7 +306,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       try {
         const data = JSON.parse(event.data);
         const msgSummary = data.type + ' ' + (data.event || data.id || data.method || '') + (data.ok !== undefined ? ' ok=' + data.ok : '');
-        console.log('[ws] ← recv:', msgSummary);
+        if (__DEV__) console.log('[ws] ← recv:', msgSummary);
         remoteLog('info', 'ws.recv', msgSummary, {
           gen,
           ...(data.error ? { error: JSON.stringify(data.error).substring(0, 200) } : {}),
@@ -315,11 +315,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         });
 
         // Handle challenge — send connect request
-        if (data.type === 'event' && data.event === 'connect.challenge') {
-          console.log('[ws] Challenge received, sending auth as control-ui mode=ui');
+        if (data.type === WS_MESSAGE_TYPES.EVENT && data.event === 'connect.challenge') {
+          if (__DEV__) console.log('[ws] Challenge received, sending auth as control-ui mode=ui');
           ws.send(
             JSON.stringify({
-              type: 'req',
+              type: WS_MESSAGE_TYPES.REQUEST,
               id: 'connect-init',
               method: 'connect',
               params: {
@@ -342,10 +342,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         // Handle connect response
-        if (data.type === 'res' && data.id === 'connect-init') {
+        if (data.type === WS_MESSAGE_TYPES.RESPONSE && data.id === 'connect-init') {
           if (data.ok || data.payload) {
             const hadMessages = get().messages.length > 0;
-            console.log('[ws] Connect SUCCESS gen=' + gen + ' (reconnect:', hadMessages, ')');
+            if (__DEV__) console.log('[ws] Connect SUCCESS gen=' + gen + ' (reconnect:', hadMessages, ')');
             remoteLog('info', 'ws', 'connected', { gen, reconnect: hadMessages });
 
             if (hadMessages) {
@@ -364,22 +364,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
             keepaliveInterval = setInterval(() => {
               const { ws: curWs, connectionState: cs } = get();
               if (curWs && cs === 'connected') {
-                try { curWs.send(JSON.stringify({ type: 'ping' })); } catch {}
+                try { curWs.send(JSON.stringify({ type: WS_MESSAGE_TYPES.PING })); } catch {}
               }
-            }, 30000);
+            }, TIMING.KEEPALIVE_INTERVAL_MS);
           } else {
-            console.error('[ws] Connect FAILED:', JSON.stringify(data.error || data));
+            if (__DEV__) console.error('[ws] Connect FAILED:', JSON.stringify(data.error || data));
             remoteLog('error', 'ws', 'connect failed', { error: data.error || data });
           }
           return;
         }
 
         // Route RPC responses to registered handlers
-        if (data.type === 'res' && data.id) {
+        if (data.type === WS_MESSAGE_TYPES.RESPONSE && data.id) {
           const handler = get()._responseHandlers.get(data.id);
           if (handler) {
             get()._responseHandlers.delete(data.id);
-            console.log('[ws] RPC response for', data.id, 'ok:', !!data.ok, data.error ? 'error:' + JSON.stringify(data.error) : '');
+            if (__DEV__) console.log('[ws] RPC response for', data.id, 'ok:', !!data.ok, data.error ? 'error:' + JSON.stringify(data.error) : '');
             remoteLog('info', 'ws.rpc', data.id, { ok: !!data.ok, error: data.error ? JSON.stringify(data.error).substring(0, 300) : undefined });
             handler({ ok: !!data.ok, result: data.payload, error: data.error });
             return;
@@ -387,7 +387,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         // Handle chat streaming events — filter by active session
-        if (data.type === 'event' && data.event === 'chat') {
+        if (data.type === WS_MESSAGE_TYPES.EVENT && data.event === 'chat') {
           const payload = data.payload;
           const activeKey = get().activeSessionKey;
 
@@ -395,12 +395,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           if (payload.state === 'delta' && payload.message?.content) {
             const content = normalizeContent(payload.message.content);
-            console.log('[ws] chat delta len=' + content.length + ' preview="' + content.substring(0, 50) + '"');
+            if (__DEV__) console.log('[ws] chat delta len=' + content.length + ' preview="' + content.substring(0, 50) + '"');
             remoteLog('info', 'ws.chat', 'delta', { len: content.length, session: payload.sessionKey });
             get().updateLastAssistantMessage(content);
           } else if (payload.state === 'final') {
             const finalContent = payload.message?.content ? normalizeContent(payload.message.content) : null;
-            console.log('[ws] Chat message final for session:', payload.sessionKey, 'finalLen=' + (finalContent?.length ?? 'none'));
+            if (__DEV__) console.log('[ws] Chat message final for session:', payload.sessionKey, 'finalLen=' + (finalContent?.length ?? 'none'));
             remoteLog('info', 'ws.chat', 'final', { len: finalContent?.length ?? 0, session: payload.sessionKey });
             // If final has content and it's longer than what we have, use it
             if (finalContent && finalContent.length > 0) {
@@ -412,11 +412,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         // Handle chat.send response
-        if (data.type === 'res' && data.id?.startsWith('req-') && !data.ok) {
-          console.error('[ws] chat.send FAILED:', JSON.stringify(data.error || data));
+        if (data.type === WS_MESSAGE_TYPES.RESPONSE && data.id?.startsWith('req-') && !data.ok) {
+          if (__DEV__) console.error('[ws] chat.send FAILED:', JSON.stringify(data.error || data));
           remoteLog('error', 'ws', 'chat.send failed', { error: data.error || data });
         }
-        if (data.type === 'res' && data.ok && data.id?.startsWith('req-')) {
+        if (data.type === WS_MESSAGE_TYPES.RESPONSE && data.ok && data.id?.startsWith('req-')) {
           remoteLog('info', 'ws', 'chat.send OK, creating assistant placeholder', { reqId: data.id });
           const assistantMsg: ChatMessage = {
             id: `assistant-${Date.now()}`,
@@ -427,7 +427,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           set((s) => ({ messages: [...s.messages, assistantMsg] }));
         }
       } catch (e: any) {
-        console.error('[ws] Message parse error:', e, 'raw:', String(event.data).substring(0, 200));
+        if (__DEV__) console.error('[ws] Message parse error:', e, 'raw:', String(event.data).substring(0, 200));
         remoteLog('error', 'ws', 'parse error', { error: e?.message, raw: String(event.data).substring(0, 200) });
       }
     };
@@ -435,10 +435,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     ws.onclose = (event) => {
       // Stale check: only handle if this is still the active connection
       if (get()._connGeneration !== gen) {
-        console.log('[ws] Stale onclose (gen=' + gen + ' current=' + get()._connGeneration + '), ignoring');
+        if (__DEV__) console.log('[ws] Stale onclose (gen=' + gen + ' current=' + get()._connGeneration + '), ignoring');
         return;
       }
-      console.log('[ws] WebSocket CLOSED gen=' + gen + ' code=' + event.code + ' reason="' + (event.reason || '') + '"');
+      if (__DEV__) console.log('[ws] WebSocket CLOSED gen=' + gen + ' code=' + event.code + ' reason="' + (event.reason || '') + '"');
       remoteLog('warn', 'ws', 'closed', { gen, code: event.code, reason: event.reason || '' });
       set({ connectionState: 'disconnected', ws: null });
 
@@ -451,16 +451,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       reconnectTimeout = setTimeout(() => {
         const state = get();
         if (state.connectionState === 'disconnected') {
-          console.log('[ws] Auto-reconnecting...');
+          if (__DEV__) console.log('[ws] Auto-reconnecting...');
           remoteLog('info', 'ws', 'auto-reconnecting after close');
           state.connect(serverIp, gatewayToken, wsUrl);
         }
-      }, 2000);
+      }, TIMING.RECONNECT_DELAY_MS);
     };
 
     ws.onerror = (event) => {
       if (get()._connGeneration !== gen) return;
-      console.error('[ws] WebSocket ERROR gen=' + gen);
+      if (__DEV__) console.error('[ws] WebSocket ERROR gen=' + gen);
       remoteLog('error', 'ws', 'error', { gen });
       ws.close();
     };
@@ -470,7 +470,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   disconnect: () => {
-    console.log('[ws] disconnect() called');
+    if (__DEV__) console.log('[ws] disconnect() called');
     // Bump generation to invalidate all callbacks
     set((s) => ({ _connGeneration: s._connGeneration + 1 }));
     if (reconnectTimeout) {
@@ -487,7 +487,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     const ws = get().ws;
     if (ws) {
-      console.log('[ws] Closing WebSocket from disconnect()');
+      if (__DEV__) console.log('[ws] Closing WebSocket from disconnect()');
       ws.close();
     }
     set({ ws: null, connectionState: 'disconnected' });
