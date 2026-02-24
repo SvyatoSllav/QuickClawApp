@@ -7,7 +7,6 @@ Run with:
 import os
 import json
 import asyncio
-import hashlib
 from urllib.parse import urlparse, parse_qs
 
 import pytest
@@ -58,49 +57,71 @@ def wss_url(server_info):
 
 
 class OpenClawWsClient:
-    """Reusable async WebSocket client for OpenClaw protocol."""
+    """Async WebSocket client implementing the OpenClaw gateway protocol.
+
+    Protocol:
+      1. Server sends event: {"type":"event","event":"connect.challenge","payload":{"nonce":"..."}}
+      2. Client sends request: {"type":"req","id":"connect-init","method":"connect","params":{...,"auth":{"token":"..."}}}
+      3. Server responds: {"type":"res","id":"connect-init","ok":true,...}
+      4. RPC: {"type":"req","id":"<id>","method":"<method>","params":{...}}
+      5. Response: {"type":"res","id":"<id>","ok":true,"payload":{...}}
+    """
 
     def __init__(self):
         self.ws = None
-        self._msg_id = 0
+        self._msg_counter = 0
 
     async def connect(self, ws_uri: str, token: str):
         self.ws = await websockets.connect(ws_uri, open_timeout=WS_TIMEOUT)
-        # Handle challenge-response auth
+
+        # Wait for challenge
         raw = await asyncio.wait_for(self.ws.recv(), timeout=WS_TIMEOUT)
         msg = json.loads(raw)
-        if msg.get("type") == "challenge":
-            challenge = msg["challenge"]
-            response_hash = hashlib.sha256(
-                f"{challenge}:{token}".encode()
-            ).hexdigest()
+
+        if msg.get("type") == "event" and msg.get("event") == "connect.challenge":
+            # Send connect request with auth token
             await self.ws.send(json.dumps({
-                "type": "auth",
-                "token": token,
-                "response": response_hash,
+                "type": "req",
+                "id": "connect-init",
+                "method": "connect",
+                "params": {
+                    "minProtocol": 3,
+                    "maxProtocol": 3,
+                    "client": {
+                        "id": "test",
+                        "displayName": "IntegrationTest",
+                        "version": "1.0.0",
+                        "platform": "linux",
+                        "mode": "test",
+                    },
+                    "caps": [],
+                    "scopes": ["operator.read", "operator.write", "operator.admin"],
+                    "auth": {"token": token},
+                },
             }))
+
+            # Wait for connect response
             raw = await asyncio.wait_for(self.ws.recv(), timeout=WS_TIMEOUT)
-            auth_result = json.loads(raw)
-            if not auth_result.get("ok"):
-                raise ConnectionError(f"WS auth failed: {auth_result}")
-            return auth_result
-        elif msg.get("ok"):
-            return msg
+            resp = json.loads(raw)
+            if resp.get("type") == "res" and resp.get("id") == "connect-init":
+                if not resp.get("ok"):
+                    raise ConnectionError(f"Connect failed: {resp.get('error', resp)}")
+            return resp
         else:
-            raise ConnectionError(f"Unexpected WS message: {msg}")
+            raise ConnectionError(f"Expected connect.challenge, got: {msg}")
 
     async def send_request(self, method: str, params: dict | None = None) -> dict:
-        """Send a JSON-RPC-style request and wait for matching response."""
-        self._msg_id += 1
-        msg_id = self._msg_id
-        payload = {"id": msg_id, "method": method}
-        if params:
+        """Send an RPC request and wait for the matching response."""
+        self._msg_counter += 1
+        msg_id = f"test-{self._msg_counter}-{id(self)}"
+        payload = {"type": "req", "id": msg_id, "method": method}
+        if params is not None:
             payload["params"] = params
         await self.ws.send(json.dumps(payload))
-        return await self._wait_for_id(msg_id)
+        return await self._wait_for_response(msg_id)
 
-    async def _wait_for_id(self, msg_id: int) -> dict:
-        """Read messages until we find one with matching id."""
+    async def _wait_for_response(self, msg_id: str) -> dict:
+        """Read messages until we find a response with matching id."""
         deadline = asyncio.get_event_loop().time() + WS_TIMEOUT
         while True:
             remaining = deadline - asyncio.get_event_loop().time()
@@ -108,23 +129,11 @@ class OpenClawWsClient:
                 raise TimeoutError(f"No response for id={msg_id}")
             raw = await asyncio.wait_for(self.ws.recv(), timeout=remaining)
             msg = json.loads(raw)
-            if msg.get("id") == msg_id:
+            if msg.get("type") == "res" and msg.get("id") == msg_id:
                 return msg
 
-    async def wait_for_event(self, event_name: str, timeout: float = WS_TIMEOUT) -> dict:
-        """Read messages until we find an event with the given name."""
-        deadline = asyncio.get_event_loop().time() + timeout
-        while True:
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                raise TimeoutError(f"No event '{event_name}' received")
-            raw = await asyncio.wait_for(self.ws.recv(), timeout=remaining)
-            msg = json.loads(raw)
-            if msg.get("event") == event_name or msg.get("type") == event_name:
-                return msg
-
-    async def collect_until_done(self, timeout: float = 30) -> list[dict]:
-        """Collect all messages until a 'done' event or timeout."""
+    async def collect_events(self, timeout: float = 30) -> list[dict]:
+        """Collect all messages until timeout or connection close."""
         messages = []
         deadline = asyncio.get_event_loop().time() + timeout
         while True:
@@ -135,9 +144,13 @@ class OpenClawWsClient:
                 raw = await asyncio.wait_for(self.ws.recv(), timeout=remaining)
                 msg = json.loads(raw)
                 messages.append(msg)
-                if msg.get("type") == "done" or msg.get("event") == "done":
+                # Stop on chat final state
+                if (msg.get("type") == "event" and msg.get("event") == "chat"
+                        and msg.get("payload", {}).get("state") == "final"):
                     break
             except asyncio.TimeoutError:
+                break
+            except websockets.exceptions.ConnectionClosed:
                 break
         return messages
 
@@ -152,6 +165,7 @@ async def ws_client(wss_url, gateway_token):
 
     Port 18789 is only accessible from the server itself,
     so all external WS tests go through the nginx WSS proxy.
+    If OpenClaw is down, tests are skipped automatically.
     """
     if not wss_url:
         pytest.skip("No WSS URL available")
@@ -163,7 +177,7 @@ async def ws_client(wss_url, gateway_token):
     client = OpenClawWsClient()
     try:
         await client.connect(wss_url, token)
-    except (websockets.exceptions.InvalidStatus, OSError, ConnectionError) as e:
+    except (websockets.exceptions.InvalidStatus, OSError, ConnectionError, TimeoutError) as e:
         pytest.skip(f"OpenClaw WS not reachable (server may be down): {e}")
     yield client
     await client.close()

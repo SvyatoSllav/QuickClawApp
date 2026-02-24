@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, TextInput, ActivityIndicator, Image } from 'react-native';
 import { Text } from '@/components/ui/text';
-import { Menu, Search, Grid3X3, Star, Download, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Menu, Search, Grid3X3, Star, Download, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react-native';
 import { useNavigationStore } from '../stores/navigationStore';
+import { useAgentStore } from '../stores/agentStore';
 import { colors } from '../config/colors';
 import { PAGINATION } from '../config/constants';
 import { formatCount, formatCompactDate } from '../utils/formatters';
@@ -17,6 +18,19 @@ function getAuthorAvatar(author?: string): string | null {
 
 export default function SkillsScreen() {
   const toggleSidebar = useNavigationStore((s) => s.toggleSidebar);
+  const agents = useAgentStore((s) => s.agents);
+
+  // Set of skill names installed on at least one agent
+  const installedSkills = useMemo(() => {
+    const set = new Set<string>();
+    for (const agent of agents) {
+      for (const s of agent.skills ?? []) {
+        set.add(s);
+      }
+    }
+    return set;
+  }, [agents]);
+
   const [query, setQuery] = useState('');
   const [skills, setSkills] = useState<SkillsmpSkill[]>([]);
   const [total, setTotal] = useState(0);
@@ -152,6 +166,7 @@ export default function SkillsScreen() {
               <SkillCard
                 key={skill.id || index}
                 skill={skill}
+                isInstalled={installedSkills.has(skill.name)}
                 onPress={() => {
                   setSelectedSkill(skill);
                   setShowInstallModal(true);
@@ -211,7 +226,7 @@ export default function SkillsScreen() {
   );
 }
 
-function SkillCard({ skill, onPress }: { skill: SkillsmpSkill; onPress?: () => void }) {
+function SkillCard({ skill, isInstalled, onPress }: { skill: SkillsmpSkill; isInstalled?: boolean; onPress?: () => void }) {
   const avatarUri = getAuthorAvatar(skill.author);
 
   return (
@@ -221,12 +236,20 @@ function SkillCard({ skill, onPress }: { skill: SkillsmpSkill; onPress?: () => v
         <Text style={localStyles.cardHeaderName} numberOfLines={1}>
           {skill.name}
         </Text>
-        {skill.stars != null && (
-          <View style={localStyles.cardStatsInline}>
-            <Star size={12} color="#F59E0B" />
-            <Text style={localStyles.cardStatText}>{formatCount(skill.stars)}</Text>
-          </View>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {isInstalled && (
+            <View style={localStyles.installedBadge}>
+              <CheckCircle size={12} color="#16A34A" />
+              <Text style={localStyles.installedText}>Installed</Text>
+            </View>
+          )}
+          {skill.stars != null && (
+            <View style={localStyles.cardStatsInline}>
+              <Star size={12} color="#F59E0B" />
+              <Text style={localStyles.cardStatText}>{formatCount(skill.stars)}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Card body */}
@@ -439,6 +462,20 @@ const localStyles = StyleSheet.create({
     fontFamily: 'monospace',
     color: '#6B7280',
     marginRight: 8,
+  },
+  installedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  installedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#16A34A',
   },
   cardStatsInline: {
     flexDirection: 'row',

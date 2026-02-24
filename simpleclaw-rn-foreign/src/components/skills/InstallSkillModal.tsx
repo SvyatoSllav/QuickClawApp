@@ -24,6 +24,7 @@ import { colors } from '../../config/colors';
 import { useAgentStore } from '../../stores/agentStore';
 import { useChatStore } from '../../stores/chatStore';
 import { getSkillDetail, type SkillsmpSkill, type SkillDetail } from '../../api/skillsmpApi';
+import { installSkill, uninstallSkill } from '../../api/serverApi';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ANIM_DURATION = 280;
@@ -137,7 +138,37 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
 
     setSubmitting(true);
 
-    // First get config to obtain baseHash and current agent skills
+    // Determine if any agent is newly toggling ON or all are toggling OFF
+    const wasInstalledOnAny = agents.some((a) => a.skills?.includes(skill.name));
+    const willBeInstalledOnAny = agents.some((a) => toggles[a.id]);
+
+    // Step 1: Download skill files to server if being installed for the first time
+    if (willBeInstalledOnAny && !wasInstalledOnAny && skill.githubUrl) {
+      try {
+        if (__DEV__) console.log('[skills] Installing skill files on server:', skill.name);
+        await installSkill(skill.name, skill.githubUrl);
+        if (__DEV__) console.log('[skills] Skill files installed OK');
+      } catch (e: any) {
+        if (__DEV__) console.log('[skills] Skill file install failed:', e?.message || e);
+        setSubmitting(false);
+        Alert.alert('Install Error', 'Failed to download skill files to server. Try again.');
+        return;
+      }
+    }
+
+    // Step 2: Remove skill files if no agent uses it anymore
+    if (!willBeInstalledOnAny && wasInstalledOnAny) {
+      try {
+        if (__DEV__) console.log('[skills] Uninstalling skill files from server:', skill.name);
+        await uninstallSkill(skill.name);
+        if (__DEV__) console.log('[skills] Skill files uninstalled OK');
+      } catch (e: any) {
+        if (__DEV__) console.log('[skills] Skill file uninstall failed:', e?.message || e);
+        // Non-fatal: continue with config patch to remove from agent skills arrays
+      }
+    }
+
+    // Step 3: Get config to obtain baseHash and current agent skills
     const configResult: any = await new Promise((resolve) => {
       const reqId = sendRequest('config.get', {}, resolve);
       if (!reqId) resolve({ ok: false, error: 'WS disconnected' });
@@ -162,7 +193,7 @@ export default function InstallSkillModal({ visible, skill, onClose }: Props) {
       return;
     }
 
-    // Build updated agents.list preserving ALL fields, only changing skills
+    // Step 4: Build updated agents.list preserving ALL fields, only changing skills
     const updatedList = serverAgents.map((cfgAgent: any) => {
       const currentSkills: string[] = cfgAgent.skills ?? [];
       const wantInstalled = toggles[cfgAgent.id] ?? false;

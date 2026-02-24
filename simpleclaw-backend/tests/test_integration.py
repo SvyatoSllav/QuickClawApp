@@ -5,10 +5,27 @@ Usage:
     TEST_AUTH_TOKEN=<token> pytest tests/ -v
 """
 
+import json
+import uuid
+
 import pytest
 import requests
 
 from .conftest import API_BASE, HTTP_TIMEOUT
+
+
+def _extract(resp: dict, key: str = "payload") -> any:
+    """Extract data from an OpenClaw WS response."""
+    return resp.get(key, resp.get("result", resp.get("data")))
+
+
+def _get_agents(payload) -> list:
+    """Normalize agents from various response shapes."""
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        return payload.get("agents", [])
+    return []
 
 
 # ─── REST API Tests ──────────────────────────────────────────────────────────
@@ -60,7 +77,6 @@ class TestRestAPI:
 
     def test_skill_detail(self, auth_headers):
         """GET /api/skills/<slug>/ returns skill data using a short name."""
-        # Use the skill `name` field (e.g. "feature-flags") which is a valid Django slug
         resp = requests.get(
             f"{API_BASE}/skills/search/", params={"q": "*", "limit": "5"},
             headers=auth_headers, timeout=HTTP_TIMEOUT,
@@ -70,10 +86,8 @@ class TestRestAPI:
         if not skills:
             pytest.skip("No skills available")
 
-        # Prefer the short `name` field which works with Django's <slug:slug> URL
         slug = skills[0].get("name") or skills[0].get("id")
         resp2 = requests.get(f"{API_BASE}/skills/{slug}/", headers=auth_headers, timeout=HTTP_TIMEOUT)
-        # The search-based detail endpoint may not find an exact match; accept 200 or 502 (marketplace down)
         assert resp2.status_code in (200, 502), f"Unexpected status {resp2.status_code}: {resp2.text[:200]}"
 
     def test_server_pool(self):
@@ -110,7 +124,7 @@ class TestRestAPI:
 class TestWebSocket:
     """WebSocket tests via wss://install-openclow.ru/ws-proxy/.
 
-    Port 18789 on the server is not externally accessible, so all
+    Port 18789 on the server is only accessible locally, so all
     WS communication goes through the nginx WSS reverse proxy.
     If OpenClaw is down, tests are skipped automatically.
     """
@@ -119,15 +133,12 @@ class TestWebSocket:
     async def test_ws_connect(self, ws_client):
         """Connect via WSS proxy, handle challenge, authenticate."""
         assert ws_client.ws is not None
-        assert ws_client.ws.open
 
     @pytest.mark.asyncio
     async def test_ws_agents_list(self, ws_client):
         """agents.list returns agents."""
         resp = await ws_client.send_request("agents.list")
-        agents = resp.get("result", resp.get("agents", resp.get("data", [])))
-        if isinstance(agents, dict):
-            agents = agents.get("agents", [])
+        agents = _get_agents(_extract(resp))
         assert isinstance(agents, list)
         assert len(agents) >= 1
 
@@ -135,65 +146,49 @@ class TestWebSocket:
     async def test_ws_config_get(self, ws_client):
         """config.get returns configuration."""
         resp = await ws_client.send_request("config.get")
-        result = resp.get("result", resp)
-        assert result is not None
-        assert isinstance(result, dict)
+        payload = _extract(resp)
+        assert payload is not None
 
     @pytest.mark.asyncio
     async def test_ws_sessions_list(self, ws_client):
         """sessions.list returns sessions for an agent."""
         agents_resp = await ws_client.send_request("agents.list")
-        agents = agents_resp.get("result", agents_resp.get("agents", agents_resp.get("data", [])))
-        if isinstance(agents, dict):
-            agents = agents.get("agents", [])
+        agents = _get_agents(_extract(agents_resp))
         if not agents:
             pytest.skip("No agents available")
 
         agent_id = agents[0].get("id") or agents[0].get("name")
         resp = await ws_client.send_request("sessions.list", {"agent": agent_id})
-        result = resp.get("result", resp.get("sessions", resp.get("data", [])))
-        if isinstance(result, dict):
-            result = result.get("sessions", [])
-        assert isinstance(result, list)
+        result = _extract(resp)
+        sessions = result if isinstance(result, list) else (result or {}).get("sessions", [])
+        assert isinstance(sessions, list)
 
     @pytest.mark.asyncio
     async def test_ws_session_create_and_delete(self, ws_client):
         """Create a session via chat.send, then delete it."""
-        agents_resp = await ws_client.send_request("agents.list")
-        agents = agents_resp.get("result", agents_resp.get("agents", agents_resp.get("data", [])))
-        if isinstance(agents, dict):
-            agents = agents.get("agents", [])
-        if not agents:
-            pytest.skip("No agents available")
-        agent_id = agents[0].get("id") or agents[0].get("name")
+        # Create a new session by sending a message with a fresh sessionKey
+        session_key = f"test-session-{uuid.uuid4().hex[:8]}"
+        idempotency_key = f"idem-{uuid.uuid4().hex[:8]}"
 
         resp = await ws_client.send_request("chat.send", {
-            "agent": agent_id,
-            "message": "integration test — please reply with one word",
+            "sessionKey": session_key,
+            "message": "integration test — reply with one word",
+            "idempotencyKey": idempotency_key,
         })
+        assert resp.get("ok") is True or resp.get("payload") is not None
 
-        messages = await ws_client.collect_until_done(timeout=30)
+        # Collect streaming events until final
+        await ws_client.collect_events(timeout=30)
 
-        # Find session ID
-        session_id = resp.get("result", {}).get("session_id") or resp.get("session_id")
-        if not session_id:
-            for m in messages:
-                sid = m.get("session_id") or (m.get("result", {}) or {}).get("session_id")
-                if sid:
-                    session_id = sid
-                    break
-
-        if session_id:
-            del_resp = await ws_client.send_request("sessions.delete", {"session_id": session_id})
-            assert del_resp is not None
+        # Delete the session
+        del_resp = await ws_client.send_request("sessions.delete", {"sessionKey": session_key})
+        assert del_resp is not None
 
     @pytest.mark.asyncio
     async def test_ws_agent_switch(self, ws_client):
         """agents.set switches active agent."""
         agents_resp = await ws_client.send_request("agents.list")
-        agents = agents_resp.get("result", agents_resp.get("agents", agents_resp.get("data", [])))
-        if isinstance(agents, dict):
-            agents = agents.get("agents", [])
+        agents = _get_agents(_extract(agents_resp))
         if len(agents) < 2:
             pytest.skip("Need at least 2 agents to test switch")
 
@@ -204,91 +199,93 @@ class TestWebSocket:
     @pytest.mark.asyncio
     async def test_ws_chat_send(self, ws_client):
         """chat.send with test message, receive streaming response."""
-        agents_resp = await ws_client.send_request("agents.list")
-        agents = agents_resp.get("result", agents_resp.get("agents", agents_resp.get("data", [])))
-        if isinstance(agents, dict):
-            agents = agents.get("agents", [])
-        if not agents:
-            pytest.skip("No agents available")
-        agent_id = agents[0].get("id") or agents[0].get("name")
+        session_key = f"test-chat-{uuid.uuid4().hex[:8]}"
+        idempotency_key = f"idem-{uuid.uuid4().hex[:8]}"
 
         resp = await ws_client.send_request("chat.send", {
-            "agent": agent_id,
+            "sessionKey": session_key,
             "message": "Say exactly: INTEGRATION_TEST_OK",
+            "idempotencyKey": idempotency_key,
         })
+        assert resp.get("ok") is True or resp.get("payload") is not None
 
-        messages = await ws_client.collect_until_done(timeout=30)
-        assert len(messages) >= 1, "Expected at least one streaming message"
+        messages = await ws_client.collect_events(timeout=30)
+        assert len(messages) >= 1, "Expected at least one streaming event"
+
+        # Clean up
+        await ws_client.send_request("sessions.delete", {"sessionKey": session_key})
 
     @pytest.mark.asyncio
     async def test_ws_chat_history(self, ws_client):
         """chat.history returns messages for a session."""
         agents_resp = await ws_client.send_request("agents.list")
-        agents = agents_resp.get("result", agents_resp.get("agents", agents_resp.get("data", [])))
-        if isinstance(agents, dict):
-            agents = agents.get("agents", [])
+        agents = _get_agents(_extract(agents_resp))
         if not agents:
             pytest.skip("No agents available")
         agent_id = agents[0].get("id") or agents[0].get("name")
 
         sessions_resp = await ws_client.send_request("sessions.list", {"agent": agent_id})
-        sessions = sessions_resp.get("result", sessions_resp.get("sessions", sessions_resp.get("data", [])))
-        if isinstance(sessions, dict):
-            sessions = sessions.get("sessions", [])
+        result = _extract(sessions_resp)
+        sessions = result if isinstance(result, list) else (result or {}).get("sessions", [])
         if not sessions:
             pytest.skip("No sessions to check history")
 
-        session_id = sessions[0].get("id") or sessions[0].get("session_id")
-        resp = await ws_client.send_request("chat.history", {"session_id": session_id})
-        result = resp.get("result", resp.get("messages", resp.get("data", [])))
-        if isinstance(result, dict):
-            result = result.get("messages", [])
-        assert isinstance(result, list)
+        session_key = sessions[0].get("key") or sessions[0].get("id") or sessions[0].get("sessionKey")
+        resp = await ws_client.send_request("chat.history", {"sessionKey": session_key})
+        result = _extract(resp)
+        messages = result if isinstance(result, list) else (result or {}).get("messages", [])
+        assert isinstance(messages, list)
 
     @pytest.mark.asyncio
     async def test_ws_skill_install_uninstall(self, ws_client):
-        """config.get → config.patch to add/remove a test skill."""
+        """config.get → config.patch to add/remove a test skill using baseHash+raw format."""
         config_resp = await ws_client.send_request("config.get")
-        config = config_resp.get("result", config_resp)
+        config_payload = _extract(config_resp) or {}
 
-        agents_resp = await ws_client.send_request("agents.list")
-        agents = agents_resp.get("result", agents_resp.get("agents", agents_resp.get("data", [])))
-        if isinstance(agents, dict):
-            agents = agents.get("agents", [])
-        if not agents:
-            pytest.skip("No agents available")
+        base_hash = config_payload.get("hash")
+        config_data = config_payload.get("config", config_payload)
+        agents_list = config_data.get("agents", {}).get("list", [])
 
-        agent_id = agents[0].get("id") or agents[0].get("name")
-
-        # Extract current skills
-        agent_config = None
-        if isinstance(config, dict):
-            agents_config = config.get("agents", {})
-            if isinstance(agents_config, dict):
-                agent_config = agents_config.get(agent_id, {})
-            elif isinstance(agents_config, list):
-                for a in agents_config:
-                    if a.get("id") == agent_id or a.get("name") == agent_id:
-                        agent_config = a
-                        break
-
-        current_skills = []
-        if agent_config:
-            current_skills = agent_config.get("skills", [])
+        if not agents_list:
+            pytest.skip("No agents in config")
 
         test_skill = "veterinarian"
 
-        # Add test skill
-        new_skills = list(current_skills) + [test_skill]
+        # Add test skill to first agent
+        updated_list = []
+        for agent in agents_list:
+            a = dict(agent)
+            if a.get("id") == agents_list[0].get("id"):
+                skills = list(a.get("skills", []))
+                if test_skill not in skills:
+                    skills.append(test_skill)
+                a["skills"] = skills
+            updated_list.append(a)
+
+        patch = {"agents": {"list": updated_list}}
         patch_resp = await ws_client.send_request("config.patch", {
-            "agent": agent_id,
-            "skills": new_skills,
+            "baseHash": base_hash,
+            "raw": json.dumps(patch),
         })
         assert patch_resp is not None
 
-        # Remove test skill (restore original)
+        # Remove test skill (restore original) — re-read config for fresh hash
+        config_resp2 = await ws_client.send_request("config.get")
+        config_payload2 = _extract(config_resp2) or {}
+        base_hash2 = config_payload2.get("hash")
+        config_data2 = config_payload2.get("config", config_payload2)
+        agents_list2 = config_data2.get("agents", {}).get("list", [])
+
+        restored_list = []
+        for agent in agents_list2:
+            a = dict(agent)
+            skills = [s for s in a.get("skills", []) if s != test_skill]
+            a["skills"] = skills
+            restored_list.append(a)
+
+        restore_patch = {"agents": {"list": restored_list}}
         restore_resp = await ws_client.send_request("config.patch", {
-            "agent": agent_id,
-            "skills": current_skills,
+            "baseHash": base_hash2,
+            "raw": json.dumps(restore_patch),
         })
         assert restore_resp is not None

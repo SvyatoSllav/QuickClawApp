@@ -3,6 +3,7 @@ import json
 import logging
 import paramiko
 import io
+import requests as http_requests
 from django.conf import settings
 
 
@@ -997,7 +998,7 @@ channels:
     dmPolicy: open
     allowFrom: {allow_from}
     groupPolicy: allowlist
-    streamMode: off
+    streamMode: partial
 
 limits:
   max_tokens_per_message: 4096
@@ -1293,7 +1294,7 @@ channels:
     dmPolicy: open
     allowFrom: {allow_from}
     groupPolicy: allowlist
-    streamMode: off
+    streamMode: partial
 
 limits:
   max_tokens_per_message: 4096
@@ -1896,6 +1897,55 @@ message(action="send", to="<chat_id>", content="Описание", mediaUrl="/ab
         self.server.clawdmatrix_installed = True
         self.server.save(update_fields=['clawdmatrix_installed'])
         logger.info(f'ClawdMatrix on-demand skills installed on {self.server.ip_address}')
+
+    def install_marketplace_skill(self, skill_name: str, github_url: str):
+        """Download a skill from GitHub and install it into the OpenClaw container.
+
+        Fetches SKILL.md from the raw GitHub URL, creates the skill directory
+        inside the container, and writes the file via docker exec.
+        """
+        from .views import SkillDetailView
+
+        raw_url = SkillDetailView._github_to_raw_url(github_url)
+        if not raw_url:
+            raise ValueError(f'Cannot resolve GitHub URL: {github_url}')
+
+        resp = http_requests.get(raw_url, timeout=15)
+        if resp.status_code != 200:
+            raise ValueError(f'Failed to fetch SKILL.md from {raw_url}: HTTP {resp.status_code}')
+
+        skill_md_content = resp.text
+
+        # Create skill directory inside the container
+        self.exec_command(f'docker exec openclaw mkdir -p /app/skills/{skill_name}')
+
+        # Write SKILL.md via docker exec with heredoc
+        # Escape single quotes in content for shell safety
+        escaped = skill_md_content.replace("'", "'\\''")
+        self.exec_command(
+            f"docker exec openclaw sh -c 'cat > /app/skills/{skill_name}/SKILL.md << '\"'\"'SKILLEOF'\"'\"'\n{escaped}\nSKILLEOF\n'",
+            timeout=30,
+        )
+
+        # Verify the file was written
+        out, err, code = self.exec_command(
+            f'docker exec openclaw test -f /app/skills/{skill_name}/SKILL.md && echo OK'
+        )
+        if 'OK' not in out:
+            # Fallback: write via a temp file on the host and docker cp
+            import tempfile
+            tmp_path = f'/tmp/skill-{skill_name}-SKILL.md'
+            self.upload_file(skill_md_content, tmp_path)
+            self.exec_command(f'docker exec openclaw mkdir -p /app/skills/{skill_name}')
+            self.exec_command(f'docker cp {tmp_path} openclaw:/app/skills/{skill_name}/SKILL.md')
+            self.exec_command(f'rm -f {tmp_path}')
+
+        logger.info(f'Marketplace skill "{skill_name}" installed on {self.server.ip_address}')
+
+    def uninstall_marketplace_skill(self, skill_name: str):
+        """Remove a marketplace skill from the OpenClaw container."""
+        self.exec_command(f'docker exec openclaw rm -rf /app/skills/{skill_name}')
+        logger.info(f'Marketplace skill "{skill_name}" uninstalled from {self.server.ip_address}')
 
     def prune_builtin_skills(self):
         """Move non-essential built-in skills to /app/skills-disabled/.

@@ -178,6 +178,67 @@ class SkillDetailView(APIView):
         return metadata, body.strip()
 
 
+class SkillInstallView(APIView):
+    """POST /api/server/skills/install/ — download skill files to user's server."""
+    throttle_classes = [UserRateThrottle]
+
+    def post(self, request):
+        skill_name = (request.data.get('skill_name') or '').strip()
+        github_url = (request.data.get('github_url') or '').strip()
+
+        if not skill_name or not re.match(r'^[a-z0-9][a-z0-9-]*$', skill_name):
+            return Response({'error': 'Invalid skill name'}, status=400)
+        if not github_url or not github_url.startswith('https://github.com/'):
+            return Response({'error': 'Invalid GitHub URL'}, status=400)
+
+        profile = request.user.profile
+        server = getattr(profile, 'server', None)
+        if not server or not server.openclaw_running:
+            return Response({'error': 'Server not ready'}, status=404)
+
+        from .services import ServerManager
+        manager = ServerManager(server)
+        try:
+            manager.connect()
+            manager.install_marketplace_skill(skill_name, github_url)
+            return Response({'success': True})
+        except ValueError as e:
+            return Response({'error': str(e)}, status=400)
+        except Exception as e:
+            logger.exception('skill install error for user %s', request.user.id)
+            return Response({'error': 'Internal error'}, status=500)
+        finally:
+            manager.disconnect()
+
+
+class SkillUninstallView(APIView):
+    """POST /api/server/skills/uninstall/ — remove skill files from user's server."""
+    throttle_classes = [UserRateThrottle]
+
+    def post(self, request):
+        skill_name = (request.data.get('skill_name') or '').strip()
+
+        if not skill_name or not re.match(r'^[a-z0-9][a-z0-9-]*$', skill_name):
+            return Response({'error': 'Invalid skill name'}, status=400)
+
+        profile = request.user.profile
+        server = getattr(profile, 'server', None)
+        if not server or not server.openclaw_running:
+            return Response({'error': 'Server not ready'}, status=404)
+
+        from .services import ServerManager
+        manager = ServerManager(server)
+        try:
+            manager.connect()
+            manager.uninstall_marketplace_skill(skill_name)
+            return Response({'success': True})
+        except Exception as e:
+            logger.exception('skill uninstall error for user %s', request.user.id)
+            return Response({'error': 'Internal error'}, status=500)
+        finally:
+            manager.disconnect()
+
+
 class InternalWsAuthView(APIView):
     """Internal nginx auth_request endpoint for WS proxy.
     Resolves gateway token → upstream server IP.
